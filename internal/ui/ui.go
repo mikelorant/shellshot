@@ -13,14 +13,21 @@ type Terminaler interface {
 	Write(bs []byte) error
 }
 
+type Queuer interface {
+	Send(string)
+	Queue() chan string
+}
+
 type UI struct {
 	model Model
 }
 
 type Model struct {
-	term Terminaler
-	cols int
-	rows int
+	term  Terminaler
+	queue Queuer
+	cols  int
+	rows  int
+	msg   string
 }
 
 type (
@@ -73,26 +80,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
-		case "enter":
-			m.term.Write([]byte{13})
-		case "backspace":
-			m.term.Write([]byte{8})
 		}
 
-		m.term.Write([]byte(string(msg.Runes)))
+		switch len(msg.Runes) {
+		case 0:
+			m.term.Write([]byte(keys[msg.String()]))
+		default:
+			m.term.Write([]byte(string(msg.Runes)))
+		}
 	case exitMsg:
 		return m, tea.Quit
+	}
+
+	queue := m.queue.Queue()
+	if len(queue) != 0 {
+		m.msg = <-queue
 	}
 
 	return m, nil
 }
 
 func (m Model) View() string {
-	return lipgloss.NewStyle().
+	term := lipgloss.NewStyle().
 		Width(m.cols).
 		Height(m.rows).
 		BorderStyle(lipgloss.NormalBorder()).
 		Render(m.term.Render())
+
+	if m.queue == nil {
+		return term
+	}
+
+	status := lipgloss.NewStyle().
+		Width(m.cols).
+		Height(1).
+		BorderStyle(lipgloss.NormalBorder()).
+		MarginTop(1).
+		Render(m.msg)
+
+	return lipgloss.JoinVertical(lipgloss.Left, term, status)
 }
 
 func WithCols(cols int) func(*UI) {
@@ -104,6 +130,12 @@ func WithCols(cols int) func(*UI) {
 func WithRows(rows int) func(*UI) {
 	return func(u *UI) {
 		u.model.rows = rows
+	}
+}
+
+func WithQueue(queue Queuer) func(*UI) {
+	return func(u *UI) {
+		u.model.queue = queue
 	}
 }
 

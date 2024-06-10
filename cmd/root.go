@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mikelorant/shellshot/internal/message"
 	"github.com/mikelorant/shellshot/internal/shell"
 	"github.com/mikelorant/shellshot/internal/terminal"
 	"github.com/mikelorant/shellshot/internal/ui"
@@ -28,10 +29,16 @@ type UIer interface {
 	Start(ui.Terminaler, ...func(*ui.UI)) error
 }
 
+type Messager interface {
+	Send(string)
+	Queue() chan string
+}
+
 type App struct {
 	Shell    Sheller
 	Terminal Terminaler
 	UI       UIer
+	Msg      Messager
 }
 
 func NewRootCmd(a App) *cobra.Command {
@@ -69,6 +76,7 @@ func NewApp() App {
 		Shell:    shell.New(),
 		Terminal: terminal.New(),
 		UI:       ui.New(),
+		Msg:      message.New(),
 	}
 }
 
@@ -82,9 +90,12 @@ func (a *App) Start() error {
 	a.Terminal.Start(
 		terminal.WithPTMX(ptmx),
 		terminal.WithDebug(8080),
+		terminal.WithMessager(a.Msg),
 	)
 
-	a.UI.Start(a.Terminal)
+	a.UI.Start(a.Terminal,
+		ui.WithQueue(a.Msg),
+	)
 
 	return nil
 }

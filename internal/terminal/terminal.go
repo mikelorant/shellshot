@@ -15,6 +15,11 @@ type Terminal struct {
 	cols      int
 	rows      int
 	debugPort int
+	msg       Messager
+}
+
+type Messager interface {
+	Send(string)
 }
 
 const (
@@ -61,7 +66,7 @@ func (t *Terminal) Start(opts ...func(*Terminal)) {
 
 	if t.debugPort != 0 {
 		go func() {
-			debugServer(term, t.debugPort)
+			t.debugServer()
 		}()
 	}
 
@@ -112,13 +117,20 @@ func (t *Terminal) Write(bs []byte) error {
 // 	}()
 // }
 
-func debugServer(vt *midterm.Terminal, port int) {
+func (t *Terminal) debugServer() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", root(vt))
+	mux.HandleFunc("/", root(t.vt))
 
-	addr := fmt.Sprintf(":%v", port)
+	addr := fmt.Sprintf(":%v", t.debugPort)
 
+	t.msg.Send(fmt.Sprintf("Starting debug server on port: %v", t.debugPort))
 	http.ListenAndServe(addr, mux)
+}
+
+func (t *Terminal) send(str string) {
+	if t.msg != nil {
+		t.msg.Send(str)
+	}
 }
 
 func WithPTMX(ptmx *os.File) func(*Terminal) {
@@ -142,6 +154,12 @@ func WithCols(cols int) func(*Terminal) {
 func WithDebug(port int) func(*Terminal) {
 	return func(t *Terminal) {
 		t.debugPort = port
+	}
+}
+
+func WithMessager(msg Messager) func(*Terminal) {
+	return func(t *Terminal) {
+		t.msg = msg
 	}
 }
 
