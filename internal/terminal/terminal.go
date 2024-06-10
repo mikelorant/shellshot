@@ -1,12 +1,10 @@
 package terminal
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-
-	// "time"
 
 	"github.com/vito/midterm"
 )
@@ -40,14 +38,12 @@ func (t *Terminal) Start(opts ...func(*Terminal)) {
 		o(t)
 	}
 
-	t.vt = midterm.NewTerminal(t.rows, t.cols)
-	t.vt.Raw = defaultRaw
-	t.vt.CursorVisible = defaultCursorVisible
+	term := midterm.NewTerminal(t.rows, t.cols)
+	term.Raw = defaultRaw
+	term.CursorVisible = defaultCursorVisible
 
 	if t.ptmx != nil {
-		t.vt.ForwardResponses = t.ptmx
-
-		go io.Copy(t.ptmx, os.Stdin)
+		term.ForwardResponses = t.ptmx
 
 		go func() {
 			for {
@@ -58,16 +54,36 @@ func (t *Terminal) Start(opts ...func(*Terminal)) {
 					break
 				}
 
-				t.vt.Write(buf[:n])
+				term.Write(buf[:n])
 			}
 		}()
 	}
 
 	if t.debugPort != 0 {
 		go func() {
-			debugServer(t.vt, t.debugPort)
+			debugServer(term, t.debugPort)
 		}()
 	}
+
+	t.vt = term
+}
+
+func (t *Terminal) Render() string {
+	var buf bytes.Buffer
+
+	if err := t.vt.Render(&buf); err != nil {
+		return ""
+	}
+
+	return buf.String()
+}
+
+func (t *Terminal) Write(bs []byte) error {
+	if _, err := t.ptmx.Write(bs); err != nil {
+		return fmt.Errorf("unable to write to ptmx: %w", err)
+	}
+
+	return nil
 }
 
 // func (t *Terminal) Capture(ch chan bool) []string {

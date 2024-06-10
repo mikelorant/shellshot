@@ -3,10 +3,10 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/mikelorant/shellshot/internal/shell"
 	"github.com/mikelorant/shellshot/internal/terminal"
+	"github.com/mikelorant/shellshot/internal/ui"
 
 	cc "github.com/ivanpirog/coloredcobra"
 	"github.com/spf13/cobra"
@@ -20,11 +20,18 @@ type Sheller interface {
 
 type Terminaler interface {
 	Start(...func(*terminal.Terminal))
+	Render() string
+	Write(bs []byte) error
+}
+
+type UIer interface {
+	Start(ui.Terminaler, ...func(*ui.UI)) error
 }
 
 type App struct {
 	Shell    Sheller
 	Terminal Terminaler
+	UI       UIer
 }
 
 func NewRootCmd(a App) *cobra.Command {
@@ -61,6 +68,7 @@ func NewApp() App {
 	return App{
 		Shell:    shell.New(),
 		Terminal: terminal.New(),
+		UI:       ui.New(),
 	}
 }
 
@@ -76,11 +84,7 @@ func (a *App) Start() error {
 		terminal.WithDebug(8080),
 	)
 
-	if err := a.Shell.WriteString("nyancat\n"); err != nil {
-		return fmt.Errorf("unable to start nyancat: %w", err)
-	}
-
-	time.Sleep(1 * time.Minute)
+	a.UI.Start(a.Terminal)
 
 	return nil
 }
