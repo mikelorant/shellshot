@@ -29,9 +29,12 @@ func SaveAsSVG(fs []string, dir string) error {
 }
 
 func ToSVG(frame string) (*bytes.Buffer, error) {
-	var svg *bytes.Buffer
+	svg := new(bytes.Buffer)
 
-	if err := ansitosvg.Convert(strings.NewReader(frame), svg, ansitosvg.DefaultOptions); err != nil {
+	opts := ansitosvg.DefaultOptions
+	opts.FontName = "JetBrainsMono Nerd Font"
+
+	if err := ansitosvg.Convert(strings.NewReader(frame), svg, opts); err != nil {
 		return nil, fmt.Errorf("unable to convert frame: %w", err)
 	}
 

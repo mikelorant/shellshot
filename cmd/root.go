@@ -39,6 +39,15 @@ type App struct {
 	Terminal Terminaler
 	UI       UIer
 	Msg      Messager
+
+	options Options
+}
+
+type Options struct {
+	shell string
+	cols  int
+	rows  int
+	debug bool
 }
 
 func NewRootCmd(a App) *cobra.Command {
@@ -49,6 +58,18 @@ func NewRootCmd(a App) *cobra.Command {
 			return a.Start()
 		},
 	}
+
+	const (
+		defaultShell = "sh"
+		defaultCols  = 80
+		defaultRows  = 24
+		defaultDebug = false
+	)
+
+	cmd.Flags().StringVarP(&a.options.shell, "shell", "s", defaultShell, "Shell to use in terminal")
+	cmd.Flags().IntVarP(&a.options.cols, "columns", "c", defaultCols, "Terminal columns")
+	cmd.Flags().IntVarP(&a.options.rows, "rows", "r", defaultRows, "Terminal rows")
+	cmd.Flags().BoolVarP(&a.options.debug, "debug", "d", defaultDebug, "Enable debug server")
 
 	cc.Init(&cc.Config{
 		RootCmd:         cmd,
@@ -81,7 +102,11 @@ func NewApp() App {
 }
 
 func (a *App) Start() error {
-	ptmx, err := a.Shell.Start()
+	ptmx, err := a.Shell.Start(
+		shell.WithShell(a.options.shell),
+		shell.WithCols(a.options.cols),
+		shell.WithRows(a.options.rows),
+	)
 	if err != nil {
 		return fmt.Errorf("unable to start shell: %w", err)
 	}
@@ -91,10 +116,14 @@ func (a *App) Start() error {
 		terminal.WithPTMX(ptmx),
 		terminal.WithDebug(8080),
 		terminal.WithMessager(a.Msg),
+		terminal.WithCols(a.options.cols),
+		terminal.WithRows(a.options.rows),
 	)
 
 	a.UI.Start(a.Terminal,
 		ui.WithQueue(a.Msg),
+		ui.WithCols(a.options.cols),
+		ui.WithRows(a.options.rows),
 	)
 
 	return nil

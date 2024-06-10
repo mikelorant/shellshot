@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/mikelorant/shellshot/internal/frame"
+
 	"github.com/vito/midterm"
 )
 
@@ -120,6 +122,7 @@ func (t *Terminal) Write(bs []byte) error {
 func (t *Terminal) debugServer() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", root(t.vt))
+	mux.HandleFunc("/svg", svg(t.vt))
 
 	addr := fmt.Sprintf(":%v", t.debugPort)
 
@@ -167,8 +170,35 @@ func root(vt *midterm.Terminal) func(w http.ResponseWriter, _ *http.Request) {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		// w.Header().Set("Content-Type", "text/html")
 
+		fmt.Fprintf(w, `
+			<style>
+			    span {
+			        font-family: JetBrainsMono Nerd Font, sans-serif;
+			    }
+			</style>
+		`)
+
 		fmt.Fprint(w, "<body>")
 		fmt.Fprint(w, vt.HTML())
 		fmt.Fprint(w, "</body>")
+	}
+}
+
+func svg(vt *midterm.Terminal) func(w http.ResponseWriter, _ *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		var buf bytes.Buffer
+
+		if err := vt.Render(&buf); err != nil {
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/svg+xml")
+
+		svg, err := frame.ToSVG(buf.String())
+		if err != nil {
+			return
+		}
+
+		fmt.Fprint(w, svg.String())
 	}
 }
