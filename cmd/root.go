@@ -13,49 +13,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type Sheller interface {
-	Start(...func(*shell.Shell)) (*os.File, error)
-	Write([]byte) error
-	WriteString(string) error
-}
-
-type Terminaler interface {
-	Start(...func(*terminal.Terminal))
-	Render() string
-	Write(bs []byte) error
-}
-
-type UIer interface {
-	Start(ui.Terminaler, ...func(*ui.UI)) error
-}
-
-type Messager interface {
-	Send(string)
-	Queue() chan string
-}
-
-type App struct {
-	Shell    Sheller
-	Terminal Terminaler
-	UI       UIer
-	Msg      Messager
-
-	options Options
-}
-
 type Options struct {
-	shell string
-	cols  int
-	rows  int
-	debug bool
+	Shell   string
+	Winsize Winsize
+	Debug   bool
 }
 
-func NewRootCmd(a App) *cobra.Command {
+type Winsize struct {
+	Rows int
+	Cols int
+}
+
+func NewRootCmd(exec func(Options) error) *cobra.Command {
+	var opts Options
+
 	cmd := &cobra.Command{
 		Use:   "shellshot",
 		Short: "shellshot is a shell recorder",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return a.Start()
+			return exec(opts)
 		},
 	}
 
@@ -66,10 +42,10 @@ func NewRootCmd(a App) *cobra.Command {
 		defaultDebug = false
 	)
 
-	cmd.Flags().StringVarP(&a.options.shell, "shell", "s", defaultShell, "Shell to use in terminal")
-	cmd.Flags().IntVarP(&a.options.cols, "columns", "c", defaultCols, "Terminal columns")
-	cmd.Flags().IntVarP(&a.options.rows, "rows", "r", defaultRows, "Terminal rows")
-	cmd.Flags().BoolVarP(&a.options.debug, "debug", "d", defaultDebug, "Enable debug server")
+	cmd.Flags().StringVarP(&opts.Shell, "shell", "s", defaultShell, "Shell to use in terminal")
+	cmd.Flags().IntVarP(&opts.Winsize.Cols, "columns", "c", defaultCols, "Terminal columns")
+	cmd.Flags().IntVarP(&opts.Winsize.Rows, "rows", "r", defaultRows, "Terminal rows")
+	cmd.Flags().BoolVarP(&opts.Debug, "debug", "d", defaultDebug, "Enable debug server")
 
 	cc.Init(&cc.Config{
 		RootCmd:         cmd,
@@ -86,44 +62,38 @@ func NewRootCmd(a App) *cobra.Command {
 }
 
 func Execute() {
-	if err := NewRootCmd(NewApp()).Execute(); err != nil {
+	if err := NewRootCmd(start).Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func NewApp() App {
-	return App{
-		Shell:    shell.New(),
-		Terminal: terminal.New(),
-		UI:       ui.New(),
-		Msg:      message.New(),
-	}
-}
+func start(opts Options) error {
+	msg := message.New()
 
-func (a *App) Start() error {
-	ptmx, err := a.Shell.Start(
-		shell.WithShell(a.options.shell),
-		shell.WithCols(a.options.cols),
-		shell.WithRows(a.options.rows),
+	ptmx, err := shell.New().Start(
+		shell.WithShell(opts.Shell),
+		shell.WithCols(opts.Winsize.Cols),
+		shell.WithRows(opts.Winsize.Rows),
 	)
 	if err != nil {
 		return fmt.Errorf("unable to start shell: %w", err)
 	}
 	defer ptmx.Close()
 
-	a.Terminal.Start(
+	term := terminal.New()
+	term.Start(
 		terminal.WithPTMX(ptmx),
 		terminal.WithDebug(8080),
-		terminal.WithMessager(a.Msg),
-		terminal.WithCols(a.options.cols),
-		terminal.WithRows(a.options.rows),
+		terminal.WithMessager(msg),
+		terminal.WithCols(opts.Winsize.Cols),
+		terminal.WithRows(opts.Winsize.Rows),
 	)
 
-	a.UI.Start(a.Terminal,
-		ui.WithQueue(a.Msg),
-		ui.WithCols(a.options.cols),
-		ui.WithRows(a.options.rows),
+	ui.New().Start(term,
+		ui.WithQueue(msg),
+		ui.WithCols(opts.Winsize.Cols),
+		ui.WithRows(opts.Winsize.Rows),
 	)
 
 	return nil
