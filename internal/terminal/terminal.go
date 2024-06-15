@@ -1,204 +1,62 @@
 package terminal
 
 import (
-	"bytes"
-	"fmt"
-	"net/http"
-	"os"
-
-	"github.com/mikelorant/shellshot/internal/frame"
-
-	"github.com/vito/midterm"
+	"io"
 )
-
-type Terminal struct {
-	ptmx      *os.File
-	vt        *midterm.Terminal
-	cols      int
-	rows      int
-	debugPort int
-	msg       Messager
-}
 
 type Messager interface {
 	Send(string)
+	Queue() chan string
 }
 
-const (
-	defaultCols          = 80
-	defaultRows          = 24
-	defaultRaw           = true
-	defaultCursorVisible = true
-)
-
-func New() *Terminal {
-	term := &Terminal{
-		cols: defaultCols,
-		rows: defaultRows,
-	}
-
-	return term
+type Options struct {
+	Cmd      string
+	Cols     int
+	Rows     int
+	FPS      int
+	Input    io.Reader
+	Output   io.Writer
+	Messager Messager
 }
 
-func (t *Terminal) Start(opts ...func(*Terminal)) {
-	for _, o := range opts {
-		o(t)
-	}
-
-	term := midterm.NewTerminal(t.rows, t.cols)
-	term.Raw = defaultRaw
-	term.CursorVisible = defaultCursorVisible
-
-	if t.ptmx != nil {
-		term.ForwardResponses = t.ptmx
-
-		go func() {
-			for {
-				buf := make([]byte, 32*1024)
-
-				n, err := t.ptmx.Read(buf)
-				if err != nil {
-					break
-				}
-
-				term.Write(buf[:n])
-			}
-		}()
-	}
-
-	if t.debugPort != 0 {
-		go func() {
-			t.debugServer()
-		}()
-	}
-
-	t.vt = term
-}
-
-func (t *Terminal) Render() string {
-	var buf bytes.Buffer
-
-	if err := t.vt.Render(&buf); err != nil {
-		return ""
-	}
-
-	return buf.String()
-}
-
-func (t *Terminal) Write(bs []byte) error {
-	if _, err := t.ptmx.Write(bs); err != nil {
-		return fmt.Errorf("unable to write to ptmx: %w", err)
-	}
-
-	return nil
-}
-
-// func (t *Terminal) Capture(ch chan bool) []string {
-// 	done := make(chan bool, 1)
-// 	var frames []string
-//
-// 	go func() {
-// 		ticker := time.NewTicker(50 * time.Millisecond)
-//
-// 		for {
-// 			select {
-// 			case <-done:
-// 				return
-// 			case <-ticker.C:
-// 				l := buf.Len()
-// 				r := buf.Next(l)
-//
-// 				vt.Write(r)
-//
-// 				var frame bytes.Buffer
-// 				vt.Render(&frame)
-//
-// 				frames = append(frames, frame.String())
-// 			}
-// 		}
-// 	}()
-// }
-
-func (t *Terminal) debugServer() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", root(t.vt))
-	mux.HandleFunc("/svg", svg(t.vt))
-
-	addr := fmt.Sprintf(":%v", t.debugPort)
-
-	t.msg.Send(fmt.Sprintf("Starting debug server on port: %v", t.debugPort))
-	http.ListenAndServe(addr, mux)
-}
-
-func (t *Terminal) send(str string) {
-	if t.msg != nil {
-		t.msg.Send(str)
+func WithCommand(cmd string) func(*Options) {
+	return func(o *Options) {
+		o.Cmd = cmd
 	}
 }
 
-func WithPTMX(ptmx *os.File) func(*Terminal) {
-	return func(t *Terminal) {
-		t.ptmx = ptmx
+func WithCols(cols int) func(*Options) {
+	return func(o *Options) {
+		o.Cols = cols
 	}
 }
 
-func WithRows(rows int) func(*Terminal) {
-	return func(t *Terminal) {
-		t.rows = rows
+func WithRows(rows int) func(*Options) {
+	return func(o *Options) {
+		o.Rows = rows
 	}
 }
 
-func WithCols(cols int) func(*Terminal) {
-	return func(t *Terminal) {
-		t.cols = cols
+func WithInput(r io.Reader) func(*Options) {
+	return func(o *Options) {
+		o.Input = r
 	}
 }
 
-func WithDebug(port int) func(*Terminal) {
-	return func(t *Terminal) {
-		t.debugPort = port
+func WithOutput(w io.Writer) func(*Options) {
+	return func(o *Options) {
+		o.Output = w
 	}
 }
 
-func WithMessager(msg Messager) func(*Terminal) {
-	return func(t *Terminal) {
-		t.msg = msg
+func WithFPS(fps int) func(*Options) {
+	return func(o *Options) {
+		o.FPS = fps
 	}
 }
 
-func root(vt *midterm.Terminal) func(w http.ResponseWriter, _ *http.Request) {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		// w.Header().Set("Content-Type", "text/html")
-
-		fmt.Fprintf(w, `
-			<style>
-			    span {
-			        font-family: JetBrainsMono Nerd Font, sans-serif;
-			    }
-			</style>
-		`)
-
-		fmt.Fprint(w, "<body>")
-		fmt.Fprint(w, vt.HTML())
-		fmt.Fprint(w, "</body>")
-	}
-}
-
-func svg(vt *midterm.Terminal) func(w http.ResponseWriter, _ *http.Request) {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		var buf bytes.Buffer
-
-		if err := vt.Render(&buf); err != nil {
-			return
-		}
-
-		w.Header().Set("Content-Type", "image/svg+xml")
-
-		svg, err := frame.ToSVG(buf.String())
-		if err != nil {
-			return
-		}
-
-		fmt.Fprint(w, svg.String())
+func WithMessager(msger Messager) func(*Options) {
+	return func(o *Options) {
+		o.Messager = msger
 	}
 }

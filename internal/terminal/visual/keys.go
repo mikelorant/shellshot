@@ -1,4 +1,4 @@
-package ui
+package visual
 
 var keys = map[string]string{
 	"up":        "\x1b[A",

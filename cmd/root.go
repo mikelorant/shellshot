@@ -2,31 +2,30 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 
 	"github.com/mikelorant/shellshot/internal/message"
-	"github.com/mikelorant/shellshot/internal/shell"
+	"github.com/mikelorant/shellshot/internal/server"
 	"github.com/mikelorant/shellshot/internal/terminal"
-	"github.com/mikelorant/shellshot/internal/ui"
+	"github.com/mikelorant/shellshot/internal/terminal/emulator"
+	"github.com/mikelorant/shellshot/internal/terminal/pseudo"
+	"github.com/mikelorant/shellshot/internal/terminal/visual"
 
 	cc "github.com/ivanpirog/coloredcobra"
 	"github.com/spf13/cobra"
 )
 
-type Sheller interface {
-	Start(...func(*shell.Shell)) (*os.File, error)
-	Write([]byte) error
-	WriteString(string) error
+type Terminal interface {
+	io.ReadWriteCloser
+	Start(...func(*terminal.Options)) error
 }
 
-type Terminaler interface {
-	Start(...func(*terminal.Terminal))
-	Render() string
-	Write(bs []byte) error
-}
-
-type UIer interface {
-	Start(ui.Terminaler, ...func(*ui.UI)) error
+type SnapshotTerminal interface {
+	Terminal
+	HandlerForHTML() func(http.ResponseWriter, *http.Request)
+	HandlerForSVG() func(http.ResponseWriter, *http.Request)
 }
 
 type Messager interface {
@@ -34,11 +33,16 @@ type Messager interface {
 	Queue() chan string
 }
 
+type Server interface {
+	Start(...func(*server.Options))
+}
+
 type App struct {
-	Shell    Sheller
-	Terminal Terminaler
-	UI       UIer
-	Msg      Messager
+	Pseudo   Terminal
+	Emulator SnapshotTerminal
+	Visual   Terminal
+	Messager Messager
+	Server   Server
 
 	options Options
 }
@@ -63,7 +67,7 @@ func NewRootCmd(a App) *cobra.Command {
 		defaultShell = "sh"
 		defaultCols  = 80
 		defaultRows  = 24
-		defaultDebug = false
+		defaultDebug = true
 	)
 
 	cmd.Flags().StringVarP(&a.options.shell, "shell", "s", defaultShell, "Shell to use in terminal")
@@ -94,37 +98,61 @@ func Execute() {
 
 func NewApp() App {
 	return App{
-		Shell:    shell.New(),
-		Terminal: terminal.New(),
-		UI:       ui.New(),
-		Msg:      message.New(),
+		Pseudo:   pseudo.New(),
+		Emulator: emulator.New(),
+		Visual:   visual.New(),
+		Messager: message.New(),
+		Server:   server.New(),
 	}
 }
 
 func (a *App) Start() error {
-	ptmx, err := a.Shell.Start(
-		shell.WithShell(a.options.shell),
-		shell.WithCols(a.options.cols),
-		shell.WithRows(a.options.rows),
-	)
-	if err != nil {
-		return fmt.Errorf("unable to start shell: %w", err)
-	}
-	defer ptmx.Close()
-
-	a.Terminal.Start(
-		terminal.WithPTMX(ptmx),
-		terminal.WithDebug(8080),
-		terminal.WithMessager(a.Msg),
+	if err := a.Pseudo.Start(
+		terminal.WithCommand(a.options.shell),
 		terminal.WithCols(a.options.cols),
 		terminal.WithRows(a.options.rows),
-	)
+	); err != nil {
+		return fmt.Errorf("unable to start pseudo terminal: %w", err)
+	}
+	defer a.Pseudo.Close()
 
-	a.UI.Start(a.Terminal,
-		ui.WithQueue(a.Msg),
-		ui.WithCols(a.options.cols),
-		ui.WithRows(a.options.rows),
-	)
+	if err := a.Emulator.Start(
+		terminal.WithOutput(a.Pseudo),
+		terminal.WithMessager(a.Messager),
+		terminal.WithCols(a.options.cols),
+		terminal.WithRows(a.options.rows),
+	); err != nil {
+		return fmt.Errorf("unable to start emulator terminal: %w", err)
+	}
+
+	if a.options.debug {
+		mux := NewMux(a.Emulator)
+
+		a.Server.Start(
+			server.WithMux(mux),
+			server.WithSender(a.Messager),
+		)
+	}
+
+	go io.Copy(a.Emulator, a.Pseudo)
+
+	if err := a.Visual.Start(
+		terminal.WithInput(a.Emulator),
+		terminal.WithOutput(a.Pseudo),
+		terminal.WithMessager(a.Messager),
+		terminal.WithCols(a.options.cols),
+		terminal.WithRows(a.options.rows),
+	); err != nil {
+		return fmt.Errorf("unable to start visual terminal: %w", err)
+	}
 
 	return nil
+}
+
+func NewMux(st SnapshotTerminal) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", st.HandlerForSVG())
+	mux.HandleFunc("/html", st.HandlerForHTML())
+
+	return mux
 }
