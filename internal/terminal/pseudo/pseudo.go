@@ -6,14 +6,12 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/mikelorant/shellshot/internal/terminal"
-
 	"github.com/creack/pty"
 )
 
 type Pseudo struct {
 	ptmx *os.File
-	opts terminal.Options
+	opts Options
 }
 
 var errStart = errors.New("pseudo terminal not started")
@@ -24,11 +22,15 @@ const (
 	defaultRows = 24
 )
 
-func New() *Pseudo {
-	opts := terminal.Options{
+func New(options ...func(*Options)) *Pseudo {
+	opts := Options{
 		Cmd:  defaultCmd,
 		Cols: defaultCols,
 		Rows: defaultRows,
+	}
+
+	for _, o := range options {
+		o(&opts)
 	}
 
 	return &Pseudo{
@@ -36,11 +38,7 @@ func New() *Pseudo {
 	}
 }
 
-func (ps *Pseudo) Start(opts ...func(*terminal.Options)) error {
-	for _, o := range opts {
-		o(&ps.opts)
-	}
-
+func (ps *Pseudo) Start() error {
 	cmd := exec.Command(ps.opts.Cmd)
 
 	size := &pty.Winsize{

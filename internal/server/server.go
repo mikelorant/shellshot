@@ -5,27 +5,21 @@ import (
 	"net/http"
 )
 
-type Sender interface {
-	Send(string)
-}
-
 type Server struct {
 	opts Options
-}
-
-type Options struct {
-	port   int
-	mux    *http.ServeMux
-	sender Sender
 }
 
 const (
 	defaultPort = 8080
 )
 
-func New() *Server {
+func New(options ...func(*Options)) *Server {
 	opts := Options{
 		port: defaultPort,
+	}
+
+	for _, o := range options {
+		o(&opts)
 	}
 
 	return &Server{
@@ -33,11 +27,7 @@ func New() *Server {
 	}
 }
 
-func (s *Server) Start(opts ...func(*Options)) {
-	for _, o := range opts {
-		o(&s.opts)
-	}
-
+func (s *Server) Start() {
 	go func() {
 		err := s.Serve()
 		if err != nil && s.opts.sender != nil {
@@ -54,22 +44,4 @@ func (s *Server) Serve() error {
 	}
 
 	return http.ListenAndServe(addr, s.opts.mux)
-}
-
-func WithMux(mux *http.ServeMux) func(*Options) {
-	return func(o *Options) {
-		o.mux = mux
-	}
-}
-
-func WithPort(port int) func(*Options) {
-	return func(o *Options) {
-		o.port = port
-	}
-}
-
-func WithSender(sender Sender) func(*Options) {
-	return func(o *Options) {
-		o.sender = sender
-	}
 }

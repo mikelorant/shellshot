@@ -8,7 +8,6 @@ import (
 
 	"github.com/mikelorant/shellshot/internal/message"
 	"github.com/mikelorant/shellshot/internal/server"
-	"github.com/mikelorant/shellshot/internal/terminal"
 	"github.com/mikelorant/shellshot/internal/terminal/emulator"
 	"github.com/mikelorant/shellshot/internal/terminal/pseudo"
 	"github.com/mikelorant/shellshot/internal/terminal/visual"
@@ -17,49 +16,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type Terminal interface {
-	io.ReadWriteCloser
-	Start(...func(*terminal.Options)) error
-}
-
-type SnapshotTerminal interface {
-	Terminal
-	HandlerForHTML() func(http.ResponseWriter, *http.Request)
-	HandlerForSVG() func(http.ResponseWriter, *http.Request)
-}
-
-type Messager interface {
-	Send(string)
-	Queue() chan string
-}
-
-type Server interface {
-	Start(...func(*server.Options))
-}
-
-type App struct {
-	Pseudo   Terminal
-	Emulator SnapshotTerminal
-	Visual   Terminal
-	Messager Messager
-	Server   Server
-
-	options Options
+type Handlers interface {
+	HandlerForHTML() func(w http.ResponseWriter, _ *http.Request)
+	HandlerForSVG() func(w http.ResponseWriter, _ *http.Request)
 }
 
 type Options struct {
-	shell string
-	cols  int
-	rows  int
-	debug bool
+	Shell string
+	Cols  int
+	Rows  int
+	Debug bool
 }
 
-func NewRootCmd(a App) *cobra.Command {
+func NewRootCmd(exec func(Options) error) *cobra.Command {
+	var opts Options
+
 	cmd := &cobra.Command{
 		Use:   "shellshot",
 		Short: "shellshot is a shell recorder",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return a.Start()
+			return exec(opts)
 		},
 	}
 
@@ -70,10 +46,10 @@ func NewRootCmd(a App) *cobra.Command {
 		defaultDebug = true
 	)
 
-	cmd.Flags().StringVarP(&a.options.shell, "shell", "s", defaultShell, "Shell to use in terminal")
-	cmd.Flags().IntVarP(&a.options.cols, "columns", "c", defaultCols, "Terminal columns")
-	cmd.Flags().IntVarP(&a.options.rows, "rows", "r", defaultRows, "Terminal rows")
-	cmd.Flags().BoolVarP(&a.options.debug, "debug", "d", defaultDebug, "Enable debug server")
+	cmd.Flags().StringVarP(&opts.Shell, "shell", "s", defaultShell, "Shell to use in terminal")
+	cmd.Flags().IntVarP(&opts.Cols, "columns", "c", defaultCols, "Terminal columns")
+	cmd.Flags().IntVarP(&opts.Rows, "rows", "r", defaultRows, "Terminal rows")
+	cmd.Flags().BoolVarP(&opts.Debug, "debug", "d", defaultDebug, "Enable debug server")
 
 	cc.Init(&cc.Config{
 		RootCmd:         cmd,
@@ -90,69 +66,66 @@ func NewRootCmd(a App) *cobra.Command {
 }
 
 func Execute() {
-	if err := NewRootCmd(NewApp()).Execute(); err != nil {
+	if err := NewRootCmd(start).Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func NewApp() App {
-	return App{
-		Pseudo:   pseudo.New(),
-		Emulator: emulator.New(),
-		Visual:   visual.New(),
-		Messager: message.New(),
-		Server:   server.New(),
-	}
-}
+func start(opts Options) error {
+	msg := message.New()
 
-func (a *App) Start() error {
-	if err := a.Pseudo.Start(
-		terminal.WithCommand(a.options.shell),
-		terminal.WithCols(a.options.cols),
-		terminal.WithRows(a.options.rows),
-	); err != nil {
+	ps := pseudo.New(
+		pseudo.WithCommand(opts.Shell),
+		pseudo.WithCols(opts.Cols),
+		pseudo.WithRows(opts.Rows),
+	)
+
+	if err := ps.Start(); err != nil {
 		return fmt.Errorf("unable to start pseudo terminal: %w", err)
 	}
-	defer a.Pseudo.Close()
+	defer ps.Close()
 
-	if err := a.Emulator.Start(
-		terminal.WithOutput(a.Pseudo),
-		terminal.WithMessager(a.Messager),
-		terminal.WithCols(a.options.cols),
-		terminal.WithRows(a.options.rows),
-	); err != nil {
-		return fmt.Errorf("unable to start emulator terminal: %w", err)
-	}
+	em := emulator.New(
+		emulator.WithOutput(ps),
+		emulator.WithCols(opts.Cols),
+		emulator.WithRows(opts.Rows),
+	)
 
-	if a.options.debug {
-		mux := NewMux(a.Emulator)
+	em.Start()
 
-		a.Server.Start(
+	if opts.Debug {
+		mux := NewMux(em)
+
+		srv := server.New(
 			server.WithMux(mux),
-			server.WithSender(a.Messager),
+			server.WithSender(msg),
 		)
+
+		srv.Start()
 	}
 
-	go io.Copy(a.Emulator, a.Pseudo)
+	go io.Copy(em, ps)
 
-	if err := a.Visual.Start(
-		terminal.WithInput(a.Emulator),
-		terminal.WithOutput(a.Pseudo),
-		terminal.WithMessager(a.Messager),
-		terminal.WithCols(a.options.cols),
-		terminal.WithRows(a.options.rows),
-	); err != nil {
+	vs := visual.New(
+		visual.WithInput(em),
+		visual.WithOutput(ps),
+		visual.WithQueue(msg),
+		visual.WithCols(opts.Cols),
+		visual.WithRows(opts.Rows),
+	)
+
+	if err := vs.Start(); err != nil {
 		return fmt.Errorf("unable to start visual terminal: %w", err)
 	}
 
 	return nil
 }
 
-func NewMux(st SnapshotTerminal) *http.ServeMux {
+func NewMux(hs Handlers) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", st.HandlerForSVG())
-	mux.HandleFunc("/html", st.HandlerForHTML())
+	mux.HandleFunc("/", hs.HandlerForSVG())
+	mux.HandleFunc("/html", hs.HandlerForHTML())
 
 	return mux
 }

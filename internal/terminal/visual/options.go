@@ -1,28 +1,24 @@
-package terminal
+package visual
 
 import (
 	"io"
 )
 
-type Messager interface {
-	Send(string)
+type Renderer interface {
+	Render() string
+}
+
+type Queuer interface {
 	Queue() chan string
 }
 
 type Options struct {
-	Cmd      string
-	Cols     int
-	Rows     int
-	FPS      int
-	Input    io.Reader
-	Output   io.Writer
-	Messager Messager
-}
-
-func WithCommand(cmd string) func(*Options) {
-	return func(o *Options) {
-		o.Cmd = cmd
-	}
+	Cols   int
+	Rows   int
+	FPS    int
+	Input  Renderer
+	Output io.Writer
+	Queue  Queuer
 }
 
 func WithCols(cols int) func(*Options) {
@@ -37,9 +33,9 @@ func WithRows(rows int) func(*Options) {
 	}
 }
 
-func WithInput(r io.Reader) func(*Options) {
+func WithInput(rend Renderer) func(*Options) {
 	return func(o *Options) {
-		o.Input = r
+		o.Input = rend
 	}
 }
 
@@ -55,8 +51,8 @@ func WithFPS(fps int) func(*Options) {
 	}
 }
 
-func WithMessager(msger Messager) func(*Options) {
+func WithQueue(queue Queuer) func(*Options) {
 	return func(o *Options) {
-		o.Messager = msger
+		o.Queue = queue
 	}
 }

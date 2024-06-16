@@ -2,20 +2,13 @@ package emulator
 
 import (
 	"bytes"
-	"fmt"
-	"sync"
-
-	"github.com/mikelorant/shellshot/internal/terminal"
 
 	"github.com/vito/midterm"
 )
 
 type Emulator struct {
-	vt     *midterm.Terminal
-	opts   terminal.Options
-	update chan bool
-	buf    bytes.Buffer
-	mu     sync.Mutex
+	vt   *midterm.Terminal
+	opts Options
 }
 
 const (
@@ -25,23 +18,22 @@ const (
 	defaultCursorVisible = true
 )
 
-func New() *Emulator {
-	opts := terminal.Options{
+func New(options ...func(*Options)) *Emulator {
+	opts := Options{
 		Cols: defaultCols,
 		Rows: defaultRows,
 	}
 
+	for _, o := range options {
+		o(&opts)
+	}
+
 	return &Emulator{
-		opts:   opts,
-		update: make(chan bool, 1),
+		opts: opts,
 	}
 }
 
-func (em *Emulator) Start(opts ...func(*terminal.Options)) error {
-	for _, o := range opts {
-		o(&em.opts)
-	}
-
+func (em *Emulator) Start() {
 	term := midterm.NewTerminal(em.opts.Rows, em.opts.Cols)
 	term.Raw = defaultRaw
 	term.CursorVisible = defaultCursorVisible
@@ -51,44 +43,18 @@ func (em *Emulator) Start(opts ...func(*terminal.Options)) error {
 	}
 
 	em.vt = term
-
-	return nil
 }
 
-func (em *Emulator) Read(p []byte) (int, error) {
-	<-em.update
+func (em *Emulator) Render() string {
+	var buf bytes.Buffer
 
-	if err := em.vt.Render(&em.buf); err != nil {
-		return 0, fmt.Errorf("unable to render: %w", err)
+	if err := em.vt.Render(&buf); err != nil {
+		return ""
 	}
 
-	n, err := em.buf.Read(p)
-	if err != nil {
-		return n, fmt.Errorf("unable to read from buffer: %w", err)
-	}
-
-	if em.buf.Len() > 0 {
-		em.Update()
-	}
-
-	return n, err
+	return buf.String()
 }
 
 func (em *Emulator) Write(p []byte) (int, error) {
-	em.Update()
-
 	return em.vt.Write(p)
-}
-
-func (em *Emulator) Close() error {
-	return nil
-}
-
-func (em *Emulator) Update() {
-	em.mu.Lock()
-	defer em.mu.Unlock()
-
-	if len(em.update) == 0 {
-		em.update <- true
-	}
 }

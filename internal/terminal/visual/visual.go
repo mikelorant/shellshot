@@ -3,9 +3,6 @@ package visual
 import (
 	"bytes"
 	"fmt"
-	"io"
-
-	"github.com/mikelorant/shellshot/internal/terminal"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -17,7 +14,7 @@ type Visual struct {
 }
 
 type Model struct {
-	opts terminal.Options
+	opts Options
 	buf  *bytes.Buffer
 	msg  string
 	sigc bool
@@ -34,11 +31,15 @@ const (
 	defaultFPS  = 20
 )
 
-func New() *Visual {
-	opts := terminal.Options{
+func New(options ...func(*Options)) *Visual {
+	opts := Options{
 		Cols: defaultCols,
 		Rows: defaultRows,
 		FPS:  defaultFPS,
+	}
+
+	for _, o := range options {
+		o(&opts)
 	}
 
 	model := Model{
@@ -51,31 +52,13 @@ func New() *Visual {
 	}
 }
 
-func (v *Visual) Start(opts ...func(*terminal.Options)) error {
-	for _, o := range opts {
-		o(&v.model.opts)
-	}
-
+func (v *Visual) Start() error {
 	prog := tea.NewProgram(v.model)
-
-	go io.Copy(v, v.model.opts.Input)
 
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("unable to start program: %w", err)
 	}
 
-	return nil
-}
-
-func (v *Visual) Read(_ []byte) (n int, err error) {
-	return 0, nil
-}
-
-func (v *Visual) Write(p []byte) (n int, err error) {
-	return v.model.buf.Write(p)
-}
-
-func (v *Visual) Close() error {
 	return nil
 }
 
@@ -108,9 +91,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
-	queue := m.opts.Messager.Queue()
-	if len(queue) != 0 {
-		m.msg = <-queue
+	q := m.opts.Queue.Queue()
+	if len(q) != 0 {
+		m.msg = <-q
 	}
 
 	return m, nil
@@ -121,9 +104,9 @@ func (m Model) View() string {
 		Width(m.opts.Cols).
 		Height(m.opts.Rows).
 		BorderStyle(lipgloss.NormalBorder()).
-		Render(m.buf.String())
+		Render(m.opts.Input.Render())
 
-	if m.opts.Messager == nil {
+	if m.opts.Queue == nil {
 		return term
 	}
 
