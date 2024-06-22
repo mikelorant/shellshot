@@ -8,7 +8,7 @@ import (
 	"github.com/mikelorant/shellshot/internal/frame"
 )
 
-func (e *Emulator) HandlerForHTML() func(w http.ResponseWriter, _ *http.Request) {
+func (t *Terminal) HandlerForHTML() func(w http.ResponseWriter, _ *http.Request) {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		// w.Header().Set("Content-Type", "text/html")
 
@@ -21,16 +21,16 @@ func (e *Emulator) HandlerForHTML() func(w http.ResponseWriter, _ *http.Request)
 		`)
 
 		fmt.Fprint(w, "<body>")
-		fmt.Fprint(w, e.vt.HTML())
+		fmt.Fprint(w, t.vt.HTML())
 		fmt.Fprint(w, "</body>")
 	}
 }
 
-func (e *Emulator) HandlerForSVG() func(w http.ResponseWriter, _ *http.Request) {
+func (t *Terminal) HandlerForSVG() func(w http.ResponseWriter, _ *http.Request) {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		var buf bytes.Buffer
 
-		if err := e.vt.Render(&buf); err != nil {
+		if err := t.vt.Render(&buf); err != nil {
 			return
 		}
 

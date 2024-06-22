@@ -1,25 +1,25 @@
 package pseudo
 
 type Options struct {
-	Cmd  string
-	Cols int
-	Rows int
+	cmd  string
+	cols int
+	rows int
 }
 
 func WithCommand(cmd string) func(*Options) {
 	return func(o *Options) {
-		o.Cmd = cmd
+		o.cmd = cmd
 	}
 }
 
 func WithCols(cols int) func(*Options) {
 	return func(o *Options) {
-		o.Cols = cols
+		o.cols = cols
 	}
 }
 
 func WithRows(rows int) func(*Options) {
 	return func(o *Options) {
-		o.Rows = rows
+		o.rows = rows
 	}
 }

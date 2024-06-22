@@ -12,47 +12,51 @@ type Queuer interface {
 	Queue() chan string
 }
 
+type Waiter interface {
+	Wait()
+}
+
 type Options struct {
-	Cols   int
-	Rows   int
-	FPS    int
-	Input  Renderer
-	Output io.Writer
-	Queue  Queuer
+	cols   int
+	rows   int
+	render Renderer
+	fwdKey io.Writer
+	queue  Queuer
+	wait   Waiter
 }
 
 func WithCols(cols int) func(*Options) {
 	return func(o *Options) {
-		o.Cols = cols
+		o.cols = cols
 	}
 }
 
 func WithRows(rows int) func(*Options) {
 	return func(o *Options) {
-		o.Rows = rows
+		o.rows = rows
 	}
 }
 
-func WithInput(rend Renderer) func(*Options) {
+func WithRender(render Renderer) func(*Options) {
 	return func(o *Options) {
-		o.Input = rend
+		o.render = render
 	}
 }
 
-func WithOutput(w io.Writer) func(*Options) {
+func WithForwardKeys(fk io.Writer) func(*Options) {
 	return func(o *Options) {
-		o.Output = w
-	}
-}
-
-func WithFPS(fps int) func(*Options) {
-	return func(o *Options) {
-		o.FPS = fps
+		o.fwdKey = fk
 	}
 }
 
 func WithQueue(queue Queuer) func(*Options) {
 	return func(o *Options) {
-		o.Queue = queue
+		o.queue = queue
+	}
+}
+
+func WithWaiter(wait Waiter) func(*Options) {
+	return func(o *Options) {
+		o.wait = wait
 	}
 }

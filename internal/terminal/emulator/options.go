@@ -5,25 +5,25 @@ import (
 )
 
 type Options struct {
-	Cols   int
-	Rows   int
-	Output io.Writer
+	cols    int
+	rows    int
+	fwdResp io.Writer
 }
 
 func WithCols(cols int) func(*Options) {
 	return func(o *Options) {
-		o.Cols = cols
+		o.cols = cols
 	}
 }
 
 func WithRows(rows int) func(*Options) {
 	return func(o *Options) {
-		o.Rows = rows
+		o.rows = rows
 	}
 }
 
-func WithOutput(w io.Writer) func(*Options) {
+func WithForwardResponses(w io.Writer) func(*Options) {
 	return func(o *Options) {
-		o.Output = w
+		o.fwdResp = w
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/creack/pty"
 )
 
-type Pseudo struct {
+type Terminal struct {
 	ptmx *os.File
 	opts Options
 }
@@ -22,28 +22,28 @@ const (
 	defaultRows = 24
 )
 
-func New(options ...func(*Options)) *Pseudo {
+func New(options ...func(*Options)) *Terminal {
 	opts := Options{
-		Cmd:  defaultCmd,
-		Cols: defaultCols,
-		Rows: defaultRows,
+		cmd:  defaultCmd,
+		cols: defaultCols,
+		rows: defaultRows,
 	}
 
 	for _, o := range options {
 		o(&opts)
 	}
 
-	return &Pseudo{
+	return &Terminal{
 		opts: opts,
 	}
 }
 
-func (ps *Pseudo) Start() error {
-	cmd := exec.Command(ps.opts.Cmd)
+func (t *Terminal) Start() error {
+	cmd := exec.Command(t.opts.cmd)
 
 	size := &pty.Winsize{
-		Cols: uint16(ps.opts.Cols),
-		Rows: uint16(ps.opts.Rows),
+		Cols: uint16(t.opts.cols),
+		Rows: uint16(t.opts.rows),
 	}
 
 	ptmx, err := pty.StartWithSize(cmd, size)
@@ -51,31 +51,31 @@ func (ps *Pseudo) Start() error {
 		return fmt.Errorf("unable to start pseudo terminal: %w", err)
 	}
 
-	ps.ptmx = ptmx
+	t.ptmx = ptmx
 
 	return nil
 }
 
-func (ps *Pseudo) Write(p []byte) (int, error) {
-	if ps.ptmx == nil {
+func (t *Terminal) Write(p []byte) (int, error) {
+	if t.ptmx == nil {
 		return 0, errStart
 	}
 
-	return ps.ptmx.Write(p)
+	return t.ptmx.Write(p)
 }
 
-func (ps *Pseudo) Read(p []byte) (n int, err error) {
-	if ps.ptmx == nil {
+func (t *Terminal) Read(p []byte) (int, error) {
+	if t.ptmx == nil {
 		return 0, errStart
 	}
 
-	return ps.ptmx.Read(p)
+	return t.ptmx.Read(p)
 }
 
-func (ps *Pseudo) Close() error {
-	if ps.ptmx == nil {
+func (t *Terminal) Close() error {
+	if t.ptmx == nil {
 		return nil
 	}
 
-	return ps.ptmx.Close()
+	return t.ptmx.Close()
 }

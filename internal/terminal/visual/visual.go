@@ -2,40 +2,46 @@ package visual
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-type Visual struct {
-	prog  tea.Program
-	model Model
+type Terminal struct {
+	prog *tea.Program
+	opts Options
 }
 
 type Model struct {
-	opts Options
-	buf  *bytes.Buffer
-	msg  string
-	sigc bool
+	buf    *bytes.Buffer
+	render Renderer
+	fwdKey io.Writer
+	queue  Queuer
+	msg    string
+	sigc   bool
+	cols   int
+	rows   int
 }
 
-type (
-	exitMsg error
-	ptyMsg  []byte
-)
+type signal int
 
 const (
 	defaultCols = 80
 	defaultRows = 24
-	defaultFPS  = 20
+
+	exit signal = iota
+	refresh
 )
 
-func New(options ...func(*Options)) *Visual {
+func New(options ...func(*Options)) *Terminal {
 	opts := Options{
-		Cols: defaultCols,
-		Rows: defaultRows,
-		FPS:  defaultFPS,
+		cols: defaultCols,
+		rows: defaultRows,
 	}
 
 	for _, o := range options {
@@ -43,19 +49,45 @@ func New(options ...func(*Options)) *Visual {
 	}
 
 	model := Model{
-		opts: opts,
-		buf:  new(bytes.Buffer),
+		buf:    new(bytes.Buffer),
+		render: opts.render,
+		fwdKey: opts.fwdKey,
+		queue:  opts.queue,
+		cols:   opts.cols,
+		rows:   opts.rows,
 	}
 
-	return &Visual{
-		model: model,
+	return &Terminal{
+		prog: tea.NewProgram(model),
+		opts: opts,
 	}
 }
 
-func (v *Visual) Start() error {
-	prog := tea.NewProgram(v.model)
+func (t *Terminal) Start() error {
+	go func() {
+		for {
+			t.opts.wait.Wait()
 
-	if _, err := prog.Run(); err != nil {
+			t.prog.Send(refresh)
+		}
+	}()
+
+	go func() {
+		for {
+			if _, err := t.opts.fwdKey.Write(nil); err != nil {
+				var pathError *fs.PathError
+				if errors.As(err, &pathError) {
+					t.prog.Send(exit)
+
+					break
+				}
+			}
+
+			time.Sleep(20 * time.Millisecond)
+		}
+	}()
+
+	if _, err := t.prog.Run(); err != nil {
 		return fmt.Errorf("unable to start program: %w", err)
 	}
 
@@ -71,27 +103,35 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
-			if m.sigc {
-				return m, tea.Quit
-			}
-
+		switch {
+		case msg.String() == "ctrl+c" && m.sigc:
+			return m, tea.Quit
+		case msg.String() == "ctrl+c":
 			m.sigc = true
-		} else {
+		default:
 			m.sigc = false
 		}
 
+		var key string
+
 		switch len(msg.Runes) {
 		case 0:
-			m.opts.Output.Write([]byte(keys[msg.String()]))
+			key = keys[msg.String()]
 		default:
-			m.opts.Output.Write([]byte(string(msg.Runes)))
+			key = string(msg.Runes)
 		}
-	case exitMsg:
-		return m, tea.Quit
+
+		m.fwdKey.Write([]byte(key))
+
+	case signal:
+		switch msg {
+		case exit:
+			return m, tea.Quit
+		default:
+		}
 	}
 
-	q := m.opts.Queue.Queue()
+	q := m.queue.Queue()
 	if len(q) != 0 {
 		m.msg = <-q
 	}
@@ -101,20 +141,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) View() string {
 	term := lipgloss.NewStyle().
-		Width(m.opts.Cols).
-		Height(m.opts.Rows).
+		Width(m.cols).
+		Height(m.rows).
 		BorderStyle(lipgloss.NormalBorder()).
-		Render(m.opts.Input.Render())
-
-	if m.opts.Queue == nil {
-		return term
-	}
+		Render(m.render.Render())
 
 	status := lipgloss.NewStyle().
-		Width(m.opts.Cols).
+		Width(m.cols).
 		Height(1).
 		BorderStyle(lipgloss.NormalBorder()).
 		MarginTop(1).
+		MarginBottom(1).
 		Render(m.msg)
 
 	return lipgloss.JoinVertical(lipgloss.Left, term, status)
