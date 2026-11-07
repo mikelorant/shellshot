@@ -40,6 +40,12 @@ const chunkQueueLen = 16
 // After the final frame Run waits for the process and returns its exit code;
 // a non-zero exit code is not an error.
 //
+// If cfg.Events is set it also receives the raw output: each chunk is passed
+// to Events.Output, stamped with the time since Run started at which the read
+// returned, before the chunk is written to the terminal. After the process has
+// been waited for, Events.Exit receives the exit code. Nothing is sent while
+// the process is idle. An Events error aborts the run like a sink error.
+//
 // If ctx is cancelled Run closes proc and returns an error wrapping ctx.Err().
 // A sink error, terminal error or non-EOF read error also aborts the run with
 // a wrapped error. On every path Run closes the terminal and proc and does not
@@ -95,12 +101,13 @@ type waitResult struct {
 // run is the main loop. It returns once the process has exited or the run
 // has been aborted, and joins every goroutine it started.
 func (s *session) run(ctx context.Context) (int, error) {
-	chunks := make(chan []byte, chunkQueueLen)
+	s.start = s.cfg.Clock() // set before the reader starts: it stamps chunks with it
+	chunks := make(chan chunk, chunkQueueLen)
 	stop := make(chan struct{})
 	var readErr error // written by the reader before it closes chunks
 	go func() {
 		defer close(chunks)
-		readErr = pump(s.proc, chunks, stop)
+		readErr = pump(s.proc, chunks, stop, s.elapsed)
 	}()
 
 	var waited <-chan waitResult
@@ -114,7 +121,6 @@ func (s *session) run(ctx context.Context) (int, error) {
 		}
 	}()
 
-	s.start = s.cfg.Clock()
 	ticks, stopTicker := s.cfg.Ticker(s.cfg.Interval)
 	defer stopTicker()
 
@@ -131,11 +137,16 @@ loop:
 		select {
 		case <-ctx.Done():
 			return 0, cancelError(ctx.Err())
-		case chunk, ok := <-chunks:
+		case c, ok := <-chunks:
 			if !ok {
 				break loop
 			}
-			if _, err := s.term.Write(chunk); err != nil {
+			if s.cfg.Events != nil {
+				if err := s.cfg.Events.Output(c.at, c.b); err != nil {
+					return 0, fmt.Errorf("session: events: %w", err)
+				}
+			}
+			if _, err := s.term.Write(c.b); err != nil {
 				return 0, fmt.Errorf("session: write terminal: %w", err)
 			}
 			s.dirty = true
@@ -175,6 +186,11 @@ loop:
 		if r.err != nil {
 			return 0, fmt.Errorf("session: wait for process: %w", r.err)
 		}
+		if s.cfg.Events != nil {
+			if err := s.cfg.Events.Exit(s.elapsed(), r.code); err != nil {
+				return 0, fmt.Errorf("session: events: %w", err)
+			}
+		}
 		return r.code, nil
 	}
 }
@@ -212,15 +228,24 @@ func (s *session) elapsed() time.Duration { return s.cfg.Clock().Sub(s.start) }
 // cancelError wraps a context error so errors.Is(err, ctx.Err()) holds.
 func cancelError(err error) error { return fmt.Errorf("session: %w", err) }
 
+// chunk is one read from the process, stamped with the time since the session
+// started at which the read returned.
+type chunk struct {
+	at time.Duration
+	b  []byte
+}
+
 // pump copies r to out until EOF, a read error, or stop is closed. Each chunk
-// is a fresh copy, so the receiver may keep it. io.EOF is not an error.
-func pump(r io.Reader, out chan<- []byte, stop <-chan struct{}) error {
+// is a fresh copy, so the receiver may keep it, and is stamped with elapsed()
+// as soon as Read returns. io.EOF is not an error.
+func pump(r io.Reader, out chan<- chunk, stop <-chan struct{}, elapsed func() time.Duration) error {
 	buf := make([]byte, readBufferSize)
 	for {
 		n, err := r.Read(buf)
 		if n > 0 {
+			c := chunk{at: elapsed(), b: append([]byte(nil), buf[:n]...)}
 			select {
-			case out <- append([]byte(nil), buf[:n]...):
+			case out <- c:
 			case <-stop:
 				return nil
 			}
