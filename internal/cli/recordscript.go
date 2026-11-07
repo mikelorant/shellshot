@@ -5,12 +5,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/michaellorant/shellshot/internal/live"
+	"github.com/michaellorant/shellshot/internal/pty"
+	"github.com/michaellorant/shellshot/internal/recording/bin"
 	"github.com/michaellorant/shellshot/internal/script"
 	"github.com/michaellorant/shellshot/internal/script/run"
+	"github.com/michaellorant/shellshot/internal/session"
+	"github.com/michaellorant/shellshot/internal/vt/ghostty"
 )
 
 // scriptOptions are the flags of "record" that belong to --script.
@@ -76,8 +84,7 @@ func runRecordScript(cmd *cobra.Command, so scriptOptions, opts captureOptions, 
 		Cols: opts.Cols, ColsChanged: f.Changed("cols"),
 		Rows: opts.Rows, RowsChanged: f.Changed("rows"),
 	}, os.Environ(), termCols, termRows)
-	_, _, _ = so, wopts, set
-	return errors.New("running a script is not implemented yet; use --list")
+	return runScript(cmd, so, ro, wopts, plan, set)
 }
 
 // loadPlan reads, checks and lowers the script at path. Diagnostics go to
@@ -192,4 +199,116 @@ func lookupEnv(env []string, key string) string {
 		}
 	}
 	return v
+}
+
+// trackedProcess notes whether the process was closed before it had exited,
+// which tells a shell that left on its own from one that shellshot had to
+// kill after the script ended.
+type trackedProcess struct {
+	*pty.Process
+	waited atomic.Bool
+	killed atomic.Bool
+}
+
+// Wait implements live.Process.
+func (t *trackedProcess) Wait() (int, error) {
+	code, err := t.Process.Wait()
+	t.waited.Store(true)
+	return code, err
+}
+
+// Close implements live.Process.
+func (t *trackedProcess) Close() error {
+	if !t.waited.Load() {
+		t.killed.Store(true)
+	}
+	return t.Process.Close()
+}
+
+// runScript runs plan on a pty and records it to set.Output. The recording is
+// finished and kept on every path once it has been created.
+func runScript(cmd *cobra.Command, so scriptOptions, ro recordOptions, wopts bin.WriterOptions, plan *run.Plan, set scriptSettings) error {
+	errOut := cmd.ErrOrStderr()
+	ctx := cmd.Context()
+
+	holder := &termHolder{}
+	encoder := &lazyKeys{holder: holder}
+	defer encoder.close()
+	exec, err := run.New(plan, run.Deps{Keys: encoder, File: so.File})
+	if err != nil {
+		return fmt.Errorf("prepare script: %w", err)
+	}
+	drv := newScriptDriver(exec)
+
+	id, err := newSessionID()
+	if err != nil {
+		return err
+	}
+	if ro.RecordInput {
+		fmt.Fprintln(errOut, inputNotice)
+	}
+	proc, err := pty.Start(ctx, pty.Config{
+		Command: set.Argv[0],
+		Args:    set.Argv[1:],
+		Env:     set.Env,
+		Dir:     set.Dir,
+		Cols:    set.Cols,
+		Rows:    set.Rows,
+	})
+	if err != nil {
+		return fmt.Errorf("start %s: %w", set.Argv[0], err)
+	}
+	tracked := &trackedProcess{Process: proc}
+	defer func() { _ = tracked.Close() }()
+
+	f, err := os.Create(set.Output)
+	if err != nil {
+		return fmt.Errorf("create recording: %w", err)
+	}
+	wopts.Meta = map[string]string{"script": filepath.Base(so.File)}
+	w, err := bin.NewWriter(f, buildHead(headInputs{
+		Cols:        set.Cols,
+		Rows:        set.Rows,
+		Argv:        set.Argv,
+		Started:     time.Now(),
+		Getenv:      func(k string) string { return lookupEnv(set.Env, k) },
+		SessionID:   id,
+		RecordInput: ro.RecordInput,
+	}), wopts)
+	if err != nil {
+		_ = f.Close()
+		return fmt.Errorf("write recording %s: %w", set.Output, err)
+	}
+	sink := newBinSink(w, time.Now)
+
+	var p live.Process = tracked
+	if so.Watch {
+		p = live.Tee(p, cmd.OutOrStdout())
+	}
+	if ro.RecordInput {
+		p = inputRecorder{Process: p, sink: sink}
+	}
+	cfg := session.Config{
+		FPS:           tickFPS,
+		Cols:          set.Cols,
+		Rows:          set.Rows,
+		Driver:        drv,
+		ShutdownGrace: run.ExitGrace,
+	}
+	sink.configure(&cfg)
+
+	status, runErr := session.Run(ctx, p, holder.factory(ghostty.New), cfg, session.SinkFunc(discardFrame))
+	closeErr := sink.close()
+	if cerr := f.Close(); closeErr == nil {
+		closeErr = cerr
+	}
+	if runErr != nil {
+		return runErr
+	}
+	if closeErr != nil {
+		return fmt.Errorf("write recording %s: %w", set.Output, closeErr)
+	}
+	st := sink.stats()
+	fmt.Fprintf(errOut, "recorded %d events (%.1f KB) to %s\n", st.Events, float64(st.BytesWritten)/1024, set.Output)
+	return reportExit(errOut, status, ro.IgnoreExit)
 }
