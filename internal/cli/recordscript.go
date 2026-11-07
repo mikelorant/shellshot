@@ -13,13 +13,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/michaellorant/shellshot/internal/live"
-	"github.com/michaellorant/shellshot/internal/pty"
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/script"
-	"github.com/michaellorant/shellshot/internal/script/run"
-	"github.com/michaellorant/shellshot/internal/session"
-	"github.com/michaellorant/shellshot/internal/vt/ghostty"
+	"github.com/mikelorant/shellshot/internal/live"
+	"github.com/mikelorant/shellshot/internal/pty"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/script"
+	"github.com/mikelorant/shellshot/internal/script/run"
+	"github.com/mikelorant/shellshot/internal/session"
+	"github.com/mikelorant/shellshot/internal/vt/ghostty"
 )
 
 // scriptOptions are the flags of "record" that belong to --script.

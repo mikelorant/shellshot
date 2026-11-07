@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/michaellorant/shellshot/internal/export/format"
-	"github.com/michaellorant/shellshot/internal/export/gif"
+	"github.com/mikelorant/shellshot/internal/export/format"
+	"github.com/mikelorant/shellshot/internal/export/gif"
 )
 
 // addGIFFlags registers the GIF options of export on cmd.

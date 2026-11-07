@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
 )
 
 // defaultRecordingFile is the output file of "shellshot record" without -o.

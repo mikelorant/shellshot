@@ -3,7 +3,7 @@ package session
 import (
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // Sink receives the frames produced by a session, in order. Frame is always

@@ -13,10 +13,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/recording/bin/chunk"
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
-	"github.com/michaellorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin/chunk"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/recording/bin/head"
 )
 
 func TestRecordFlagDefaults(t *testing.T) {

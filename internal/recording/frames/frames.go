@@ -74,11 +74,11 @@ import (
 	"slices"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
-	"github.com/michaellorant/shellshot/internal/recording/bin/head"
-	"github.com/michaellorant/shellshot/internal/snapshot"
-	"github.com/michaellorant/shellshot/internal/vt"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/vt"
 )
 
 // DefaultFPS is the sampling rate used when Options.FPS is not positive. It

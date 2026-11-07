@@ -51,7 +51,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // Options controls how frame timestamps become step delays.

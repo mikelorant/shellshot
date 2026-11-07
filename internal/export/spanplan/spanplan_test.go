@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
-	"github.com/michaellorant/shellshot/internal/recording/spans"
+	"github.com/mikelorant/shellshot/internal/export/timeline"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/recording/spans"
 )
 
 const sec = time.Second

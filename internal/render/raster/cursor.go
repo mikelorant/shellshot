@@ -3,7 +3,7 @@ package raster
 import (
 	"image"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // CursorStyle selects how the cursor is drawn.

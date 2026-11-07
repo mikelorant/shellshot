@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // wantWidths checks line y's width entries and that the whole snapshot is

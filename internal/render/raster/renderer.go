@@ -12,9 +12,9 @@ import (
 	xfont "golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 
-	"github.com/michaellorant/shellshot/internal/render/font"
-	"github.com/michaellorant/shellshot/internal/render/theme"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/render/font"
+	"github.com/mikelorant/shellshot/internal/render/theme"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // Defaults applied by New to zero Options fields.

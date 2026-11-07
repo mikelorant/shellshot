@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/recording/bin/head"
-	"github.com/michaellorant/shellshot/internal/recording/frames"
-	"github.com/michaellorant/shellshot/internal/snapshot"
-	"github.com/michaellorant/shellshot/internal/vt/ghostty"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/recording/frames"
+	"github.com/mikelorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/vt/ghostty"
 )
 
 // TestReplayThroughGhostty writes a real binary recording, replays it through

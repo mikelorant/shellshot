@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/export/apng"
+	"github.com/mikelorant/shellshot/internal/export/apng"
 )
 
 // maxAPNGDelay is the longest delay one APNG frame can carry.

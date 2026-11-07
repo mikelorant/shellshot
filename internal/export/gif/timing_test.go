@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/export/gif"
-	"github.com/michaellorant/shellshot/internal/export/pipeline"
-	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/export/gif"
+	"github.com/mikelorant/shellshot/internal/export/pipeline"
+	"github.com/mikelorant/shellshot/internal/export/timeline"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // alternating returns n 2x2 frames that differ from their neighbours, so the

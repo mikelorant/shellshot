@@ -11,11 +11,11 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/recording/bin/head"
-	"github.com/michaellorant/shellshot/internal/render/emoji"
-	"github.com/michaellorant/shellshot/internal/render/font"
-	"github.com/michaellorant/shellshot/internal/render/raster"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/render/emoji"
+	"github.com/mikelorant/shellshot/internal/render/font"
+	"github.com/mikelorant/shellshot/internal/render/raster"
 )
 
 // The emoji of the recording below, in order, each two cells wide and

@@ -7,7 +7,7 @@ import (
 )
 
 // Version is the shellshot version; override at build time with
-// -ldflags "-X github.com/michaellorant/shellshot/internal/cli.Version=...".
+// -ldflags "-X github.com/mikelorant/shellshot/internal/cli.Version=...".
 var Version = "dev"
 
 func newVersionCmd() *cobra.Command {

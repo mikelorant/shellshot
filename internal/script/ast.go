@@ -3,7 +3,7 @@ package script
 import (
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/script/keys"
 )
 
 // Script is a parsed script file: the settings and the items (steps and

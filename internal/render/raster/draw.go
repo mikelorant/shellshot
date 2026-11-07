@@ -6,8 +6,8 @@ import (
 	xfont "golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 
-	"github.com/michaellorant/shellshot/internal/render/sprite"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/render/sprite"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // cell is one grapheme cluster of a line placed on the grid with its final

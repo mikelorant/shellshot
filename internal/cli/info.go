@@ -11,10 +11,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
-	"github.com/michaellorant/shellshot/internal/recording/bin/head"
-	"github.com/michaellorant/shellshot/internal/recording/spans"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/recording/spans"
 )
 
 // newInfoCmd builds "shellshot info", which prints the header and statistics

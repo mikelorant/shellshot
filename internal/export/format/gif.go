@@ -1,8 +1,8 @@
 package format
 
 import (
-	"github.com/michaellorant/shellshot/internal/export/gif"
-	"github.com/michaellorant/shellshot/internal/export/pipeline"
+	"github.com/mikelorant/shellshot/internal/export/gif"
+	"github.com/mikelorant/shellshot/internal/export/pipeline"
 )
 
 // gifFormat returns the animated GIF format.

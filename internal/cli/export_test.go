@@ -15,11 +15,11 @@ import (
 
 	kettek "github.com/kettek/apng"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/recording/bin/head"
-	"github.com/michaellorant/shellshot/internal/render/font"
-	"github.com/michaellorant/shellshot/internal/render/raster"
-	"github.com/michaellorant/shellshot/internal/render/theme"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/render/font"
+	"github.com/mikelorant/shellshot/internal/render/raster"
+	"github.com/mikelorant/shellshot/internal/render/theme"
 )
 
 const (

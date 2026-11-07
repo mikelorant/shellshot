@@ -7,9 +7,9 @@ package run
 import (
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
-	"github.com/michaellorant/shellshot/internal/script"
-	"github.com/michaellorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/script"
+	"github.com/mikelorant/shellshot/internal/script/keys"
 )
 
 // Defaults of the behaviour settings and the fixed times of the end-of-script

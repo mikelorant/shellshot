@@ -13,7 +13,7 @@ import (
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/font/sfnt"
 
-	"github.com/michaellorant/shellshot/internal/render/emoji"
+	"github.com/mikelorant/shellshot/internal/render/emoji"
 )
 
 // dpi is 72 so that a face size in points equals its size in pixels.

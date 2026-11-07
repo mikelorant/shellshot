@@ -18,7 +18,7 @@ Requirements: Go 1.26 or newer with cgo, a C toolchain (Xcode command line tools
 Apple silicon is tested; other platforms are not supported.
 
 ```sh
-git clone https://github.com/michaellorant/shellshot.git
+git clone https://github.com/mikelorant/shellshot.git
 cd shellshot
 make deps     # fetches the pinned libghostty source and builds it with zig
 make build    # writes bin/shellshot

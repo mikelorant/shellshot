@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/image/font/sfnt"
 
-	"github.com/michaellorant/shellshot/internal/render/raster"
-	"github.com/michaellorant/shellshot/internal/render/sprite"
+	"github.com/mikelorant/shellshot/internal/render/raster"
+	"github.com/mikelorant/shellshot/internal/render/sprite"
 )
 
 // defs is the registry of the shared shapes a document defines once and

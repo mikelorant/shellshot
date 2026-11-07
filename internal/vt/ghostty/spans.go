@@ -6,7 +6,7 @@ import (
 
 	libghostty "go.mitchellh.com/libghostty"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // rowLayout is the rune-index layout of one trimmed row: its styled runs and

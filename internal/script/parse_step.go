@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/script/keys"
 )
 
 // step parses a command line: run, type, press, wait, sleep or mark. It

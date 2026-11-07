@@ -3,7 +3,7 @@
 // never imports cgo and can be tested with fakes.
 package vt
 
-import "github.com/michaellorant/shellshot/internal/snapshot"
+import "github.com/mikelorant/shellshot/internal/snapshot"
 
 // Terminal is a headless terminal emulator. Implementations are NOT safe for
 // concurrent use; callers must serialise access.

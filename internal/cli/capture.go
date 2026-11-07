@@ -7,11 +7,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/michaellorant/shellshot/internal/live"
-	"github.com/michaellorant/shellshot/internal/pty"
-	"github.com/michaellorant/shellshot/internal/session"
-	"github.com/michaellorant/shellshot/internal/snapshot"
-	"github.com/michaellorant/shellshot/internal/vt/ghostty"
+	"github.com/mikelorant/shellshot/internal/live"
+	"github.com/mikelorant/shellshot/internal/pty"
+	"github.com/mikelorant/shellshot/internal/session"
+	"github.com/mikelorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/vt/ghostty"
 )
 
 // eot is the end-of-transmission byte (Ctrl-D) a terminal sends for EOF.

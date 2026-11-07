@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin/head"
 )
 
 func runReplayCmd(t *testing.T, args ...string) (code int, stdout, stderr string) {

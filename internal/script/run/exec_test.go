@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/script"
-	"github.com/michaellorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/script"
+	"github.com/mikelorant/shellshot/internal/script/keys"
 )
 
 // textScreen is a fixed screen.

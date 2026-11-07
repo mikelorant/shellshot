@@ -4,11 +4,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/script/keys"
-	"github.com/michaellorant/shellshot/internal/script/run"
-	"github.com/michaellorant/shellshot/internal/session"
-	"github.com/michaellorant/shellshot/internal/vt"
-	"github.com/michaellorant/shellshot/internal/vt/ghostty"
+	"github.com/mikelorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/script/run"
+	"github.com/mikelorant/shellshot/internal/session"
+	"github.com/mikelorant/shellshot/internal/vt"
+	"github.com/mikelorant/shellshot/internal/vt/ghostty"
 )
 
 // scriptExecutor is the part of *run.Executor that scriptDriver uses.

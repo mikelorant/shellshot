@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/michaellorant/shellshot/internal/replay"
+	"github.com/mikelorant/shellshot/internal/replay"
 )
 
 // newReplayCmd builds "shellshot replay", which plays a recording to stdout

@@ -4,8 +4,8 @@ import (
 	"math/rand/v2"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
-	"github.com/michaellorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/script/keys"
 )
 
 // Keys turns key presses and typed text into the bytes sent to the child. The

@@ -3,7 +3,7 @@ package ghostty
 import (
 	libghostty "go.mitchellh.com/libghostty"
 
-	"github.com/michaellorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/script/keys"
 )
 
 // keyEntry is what the libghostty encoder needs to know about one key

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/render/raster"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/export/timeline"
+	"github.com/mikelorant/shellshot/internal/render/raster"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // fuzzRunes is what random lines are made of: ASCII, markup characters, wide

@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/script"
+	"github.com/mikelorant/shellshot/internal/script"
 )
 
 // TestExampleScripts parses and validates every contrib/examples/scripts/*.script file.

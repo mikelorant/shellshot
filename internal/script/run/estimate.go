@@ -5,7 +5,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
 )
 
 // Estimate is the expected real-time length of a Plan, from the plan alone.

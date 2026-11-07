@@ -15,8 +15,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/export/timeline"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // Source yields recorded frames in order. Next returns io.EOF after the last

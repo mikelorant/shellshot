@@ -12,8 +12,8 @@ import (
 
 	kettek "github.com/kettek/apng"
 
-	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/export/timeline"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // sliceSource yields frames, then failAfter's error (or io.EOF).

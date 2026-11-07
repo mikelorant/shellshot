@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin/head"
 )
 
 // fixedNow is the writer clock for fixtures: flushing is then decided by

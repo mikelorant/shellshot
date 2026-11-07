@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/export/gif"
+	"github.com/mikelorant/shellshot/internal/export/gif"
 )
 
 func TestExactPaletteRoundTripsPixelExact(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 const (

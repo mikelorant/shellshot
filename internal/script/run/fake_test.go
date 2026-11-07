@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/script/keys"
 )
 
 // fakeKeys encodes the keys the tests use. A chord or text containing

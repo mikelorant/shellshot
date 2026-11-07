@@ -22,9 +22,9 @@ import (
 	"image"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/render/font"
-	"github.com/michaellorant/shellshot/internal/render/raster"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/render/font"
+	"github.com/mikelorant/shellshot/internal/render/raster"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // TextMode says how glyphs are written.

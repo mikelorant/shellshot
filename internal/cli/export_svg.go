@@ -6,12 +6,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/michaellorant/shellshot/internal/export/format"
-	"github.com/michaellorant/shellshot/internal/export/pipeline"
-	"github.com/michaellorant/shellshot/internal/export/svg"
-	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/render/font"
-	"github.com/michaellorant/shellshot/internal/render/raster"
+	"github.com/mikelorant/shellshot/internal/export/format"
+	"github.com/mikelorant/shellshot/internal/export/pipeline"
+	"github.com/mikelorant/shellshot/internal/export/svg"
+	"github.com/mikelorant/shellshot/internal/export/timeline"
+	"github.com/mikelorant/shellshot/internal/render/font"
+	"github.com/mikelorant/shellshot/internal/render/raster"
 )
 
 // svgFlags holds the values of the flags that only SVG output uses.

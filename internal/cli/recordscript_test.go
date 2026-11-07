@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/script"
-	"github.com/michaellorant/shellshot/internal/script/run"
+	"github.com/mikelorant/shellshot/internal/script"
+	"github.com/mikelorant/shellshot/internal/script/run"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")

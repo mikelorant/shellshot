@@ -14,10 +14,10 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/render/font"
-	"github.com/michaellorant/shellshot/internal/render/raster"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/export/timeline"
+	"github.com/mikelorant/shellshot/internal/render/font"
+	"github.com/mikelorant/shellshot/internal/render/raster"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files in testdata")

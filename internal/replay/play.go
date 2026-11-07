@@ -10,7 +10,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // ErrInvalidSpeed is returned by Play when Options.Speed is negative, NaN or

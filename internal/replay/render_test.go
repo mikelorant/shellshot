@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 func TestRenderColor(t *testing.T) {

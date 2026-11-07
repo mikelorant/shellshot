@@ -12,10 +12,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/michaellorant/shellshot/internal/export/pipeline"
-	"github.com/michaellorant/shellshot/internal/export/svg"
-	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/export/webp"
+	"github.com/mikelorant/shellshot/internal/export/pipeline"
+	"github.com/mikelorant/shellshot/internal/export/svg"
+	"github.com/mikelorant/shellshot/internal/export/timeline"
+	"github.com/mikelorant/shellshot/internal/export/webp"
 )
 
 // Settings holds the export knobs the formats share. A format ignores the

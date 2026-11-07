@@ -1,4 +1,4 @@
-module github.com/michaellorant/shellshot
+module github.com/mikelorant/shellshot
 
 go 1.26.0
 
