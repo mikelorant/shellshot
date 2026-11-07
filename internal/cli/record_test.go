@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -307,14 +308,25 @@ func TestRecordInputSharesOriginWithOutput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.shot")
 	pr, pw := io.Pipe()
 	defer pw.Close()
+	// The input is sent 300 ms after the command has printed "ready", so the
+	// session has started by then, however long starting it took under load.
+	ready := &signalWriter{want: "ready", seen: make(chan struct{})}
+	stop := make(chan struct{})
+	defer close(stop)
 	go func() {
+		select {
+		case <-ready.seen:
+		case <-stop:
+			return
+		}
 		time.Sleep(300 * time.Millisecond)
 		_, _ = pw.Write([]byte("late\n"))
 	}()
-	var stdout, stderr bytes.Buffer
-	args := []string{"record", "-o", path, "--cols", "40", "--rows", "6", "--record-input", "-c", "read x; echo got:$x"}
+	var stderr bytes.Buffer
+	stdout := ready
+	args := []string{"record", "-o", path, "--cols", "40", "--rows", "6", "--record-input", "-c", "echo ready; read x; echo got:$x"}
 	done := make(chan int, 1)
-	go func() { done <- runWithStdin(context.Background(), args, pr, &stdout, &stderr) }()
+	go func() { done <- runWithStdin(context.Background(), args, pr, stdout, &stderr) }()
 	select {
 	case code := <-done:
 		if code != 0 {
@@ -344,6 +356,27 @@ func TestRecordInputSharesOriginWithOutput(t *testing.T) {
 	if gotAt < inAt || gotAt-inAt > time.Second {
 		t.Errorf("OUT got:late at %v, IN at %v: want output shortly after the input", gotAt, inAt)
 	}
+}
+
+// signalWriter closes seen once what was written to it contains want.
+type signalWriter struct {
+	want string
+	seen chan struct{}
+
+	mu   sync.Mutex
+	buf  bytes.Buffer
+	done bool
+}
+
+func (w *signalWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.buf.Write(p)
+	if !w.done && strings.Contains(w.buf.String(), w.want) {
+		w.done = true
+		close(w.seen)
+	}
+	return len(p), nil
 }
 
 func TestRecordCoalesceMergesOutputs(t *testing.T) {
