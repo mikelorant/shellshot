@@ -60,23 +60,31 @@ func TestReplayColorFlag(t *testing.T) {
 func TestReplayPlaysFramesInOrder(t *testing.T) {
 	t.Parallel()
 	path := writeFile(t, "demo.shot", simpleRecording(t))
-	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000")
-	if code != 0 {
-		t.Fatalf("exit code = %d, stderr = %q", code, stderr)
-	}
-	// Blank screen, "first", then both rows: three frames of two lines each.
-	if want := "\n\nfirst\n\nfirst\nsecond\n"; stdout != want {
-		t.Errorf("stdout = %q, want %q", stdout, want)
-	}
-	if stderr != "" {
-		t.Errorf("stderr = %q, want empty", stderr)
+	// The blank screen before the first output is dropped unless kept.
+	for _, tt := range []struct {
+		args []string
+		want string
+	}{
+		{nil, "first\n\nfirst\nsecond\n"},
+		{[]string{"--keep-leading-blank"}, "\n\nfirst\n\nfirst\nsecond\n"},
+	} {
+		code, stdout, stderr := runReplayCmd(t, append([]string{path, "--speed", "1000"}, tt.args...)...)
+		if code != 0 {
+			t.Fatalf("%v: exit code = %d, stderr = %q", tt.args, code, stderr)
+		}
+		if stdout != tt.want {
+			t.Errorf("%v: stdout = %q, want %q", tt.args, stdout, tt.want)
+		}
+		if stderr != "" {
+			t.Errorf("%v: stderr = %q, want empty", tt.args, stderr)
+		}
 	}
 }
 
 func TestReplayClearFlag(t *testing.T) {
 	t.Parallel()
 	path := writeFile(t, "demo.shot", simpleRecording(t))
-	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear")
+	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear", "--keep-leading-blank")
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %q", code, stderr)
 	}
@@ -128,7 +136,7 @@ func TestReplayFPSChangesFrameCount(t *testing.T) {
 	})
 	path := writeFile(t, "fps.shot", data)
 	for fps, want := range map[string]int{"10": 2, "1000": 3} { // blank + final, or blank + a + final
-		_, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear", "--fps", fps)
+		_, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear", "--keep-leading-blank", "--fps", fps)
 		if n := strings.Count(stdout, frameStart); n != want {
 			t.Errorf("--fps %s: %d frames, want %d (stderr %q)", fps, n, want, stderr)
 		}
@@ -148,11 +156,101 @@ func TestReplayIdleGapIsInstant(t *testing.T) {
 	if elapsed := time.Since(start); elapsed > 3*time.Second {
 		t.Errorf("replay took %v, want well under the 5 minute gap", elapsed)
 	}
-	if n := strings.Count(stdout, frameStart); n < 3 || n > 5 {
-		t.Errorf("%d frames for a recording with two bursts, want 3 to 5", n)
+	if n := strings.Count(stdout, frameStart); n < 2 || n > 4 {
+		t.Errorf("%d frames for a recording with two bursts, want 2 to 4", n)
 	}
 	if !strings.Contains(stdout, "after") {
 		t.Errorf("final frame missing: %q", stdout)
+	}
+}
+
+func TestReplayHelpShowsIdleFlags(t *testing.T) {
+	t.Parallel()
+	code, stdout, stderr := runReplayCmd(t, "--help")
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %q", code, stderr)
+	}
+	for _, want := range []string{
+		"--idle-limit duration",
+		"longest pause between frames, before --speed (0 for no limit)",
+		"(default 2s)",
+		"--keep-leading-blank",
+		"keep a blank screen at the start of the animation",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("replay --help lacks %q:\n%s", want, stdout)
+		}
+	}
+}
+
+// A long pause is capped by --idle-limit (2s by default) and the blank screen
+// before the first output is dropped, using a fake sleeper so the test does
+// not wait.
+func TestReplayIdleLimitCapsPauses(t *testing.T) {
+	t.Parallel()
+	path := writeFile(t, "idle.shot", idleGapRecording(t))
+	sleeps := func(opts replay.Options) []time.Duration {
+		var got []time.Duration
+		if opts.Speed == 0 {
+			opts.Speed = 1
+		}
+		opts.Sleep = func(_ context.Context, d time.Duration) error {
+			got = append(got, d)
+			return nil
+		}
+		cmd := &cobra.Command{}
+		cmd.SetContext(t.Context())
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+		if err := runReplay(cmd, path, 60, opts); err != nil {
+			t.Fatalf("runReplay() error = %v", err)
+		}
+		return got
+	}
+	if def := newReplayCmd().Flags().Lookup("idle-limit").DefValue; def != "2s" {
+		t.Errorf("--idle-limit default = %q, want 2s", def)
+	}
+	// The recording is blank for 10ms, "before" for 5 minutes, then "after".
+	for _, tt := range []struct {
+		name string
+		opts replay.Options
+		want []time.Duration
+	}{
+		{"default", replay.Options{IdleLimit: 2 * time.Second, TrimLeadingBlank: true}, []time.Duration{2 * time.Second}},
+		{"speed", replay.Options{IdleLimit: 2 * time.Second, TrimLeadingBlank: true, Speed: 4}, []time.Duration{500 * time.Millisecond}},
+		{"no limit", replay.Options{TrimLeadingBlank: true}, []time.Duration{5 * time.Minute}},
+		{"keep blank", replay.Options{IdleLimit: 2 * time.Second}, []time.Duration{10 * time.Millisecond, 2 * time.Second}},
+	} {
+		// Frame times sit on the 60 fps grid, so allow a frame of slack.
+		got := sleeps(tt.opts)
+		if len(got) != len(tt.want) {
+			t.Errorf("%s: sleeps = %v, want %v", tt.name, got, tt.want)
+			continue
+		}
+		for i := range got {
+			if d := got[i] - tt.want[i]; d < -20*time.Millisecond || d > 20*time.Millisecond {
+				t.Errorf("%s: sleeps = %v, want %v", tt.name, got, tt.want)
+				break
+			}
+		}
+	}
+}
+
+// The --idle-limit flag reaches Play: a 10ms limit replays the 5 minute pause
+// at once, and a negative limit is refused.
+func TestReplayIdleLimitFlag(t *testing.T) {
+	t.Parallel()
+	path := writeFile(t, "idle.shot", idleGapRecording(t))
+	start := time.Now()
+	if code, _, stderr := runReplayCmd(t, path, "--idle-limit", "10ms"); code != 0 {
+		t.Fatalf("exit code = %d, stderr = %q", code, stderr)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Errorf("replay with --idle-limit 10ms took %v, want well under the 5 minute pause", elapsed)
+	}
+	code, _, stderr := runReplayCmd(t, path, "--idle-limit", "-1s")
+	if code == 0 || !strings.Contains(stderr, "invalid --idle-limit") {
+		t.Errorf("exit code = %d, stderr = %q, want an invalid --idle-limit error", code, stderr)
 	}
 }
 

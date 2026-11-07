@@ -137,6 +137,87 @@ func TestPlayTiming(t *testing.T) {
 	}
 }
 
+// TestPlayIdleLimitAndLeadingBlank covers the policy Play shares with export: a
+// blank first frame is dropped at any length, and each wait is capped at
+// IdleLimit before Speed divides it.
+func TestPlayIdleLimitAndLeadingBlank(t *testing.T) {
+	sec := time.Second
+	frames := []snapshot.Frame{frame(0, ""), frame(30*sec, "a"), frame(31*sec, "b"), frame(90*sec, "c")}
+	tests := []struct {
+		name      string
+		opts      Options
+		wantSleep []time.Duration
+		wantShown []string
+	}{
+		{
+			name:      "default policy",
+			opts:      Options{IdleLimit: 2 * sec, TrimLeadingBlank: true},
+			wantSleep: []time.Duration{sec, 2 * sec},
+			wantShown: []string{"a", "b", "c"},
+		},
+		{
+			name:      "no idle limit plays the full gaps",
+			opts:      Options{TrimLeadingBlank: true},
+			wantSleep: []time.Duration{sec, 59 * sec},
+			wantShown: []string{"a", "b", "c"},
+		},
+		{
+			name:      "speed divides the capped waits",
+			opts:      Options{IdleLimit: 2 * sec, TrimLeadingBlank: true, Speed: 2},
+			wantSleep: []time.Duration{sec / 2, sec},
+			wantShown: []string{"a", "b", "c"},
+		},
+		{
+			name:      "keeping the leading blank shows it for the capped wait",
+			opts:      Options{IdleLimit: 2 * sec},
+			wantSleep: []time.Duration{2 * sec, sec, 2 * sec},
+			wantShown: []string{"", "a", "b", "c"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []time.Duration
+			var out bytes.Buffer
+			tt.opts.Sleep = func(_ context.Context, d time.Duration) error {
+				got = append(got, d)
+				return nil
+			}
+			if err := Play(t.Context(), &sliceSource{frames: slices.Clone(frames)}, &out, tt.opts); err != nil {
+				t.Fatalf("Play() error = %v", err)
+			}
+			if !slices.Equal(got, tt.wantSleep) {
+				t.Errorf("sleeps = %v, want %v", got, tt.wantSleep)
+			}
+			var want strings.Builder
+			for _, l := range tt.wantShown {
+				want.WriteString(Render(snapshot.Snapshot{Cols: 10, Rows: 1, Lines: []string{l}}, RenderOptions{}))
+			}
+			if out.String() != want.String() {
+				t.Errorf("output = %q, want %q", out.String(), want.String())
+			}
+		})
+	}
+}
+
+// A lone blank frame is still shown, and frames read before a source failure
+// are played before the error is returned.
+func TestPlayLoneBlankAndSourceError(t *testing.T) {
+	var out bytes.Buffer
+	if err := Play(t.Context(), &sliceSource{frames: []snapshot.Frame{frame(0, "")}}, &out, Options{TrimLeadingBlank: true}); err != nil {
+		t.Fatalf("Play() error = %v", err)
+	}
+	if want := Render(snapshot.Snapshot{Cols: 10, Rows: 1, Lines: []string{""}}, RenderOptions{}); out.String() != want {
+		t.Errorf("output = %q, want the lone blank frame %q", out.String(), want)
+	}
+
+	boom := errors.New("boom")
+	out.Reset()
+	err := Play(t.Context(), &sliceSource{frames: []snapshot.Frame{frame(0, "a")}, err: boom}, &out, Options{})
+	if !errors.Is(err, boom) || out.Len() == 0 {
+		t.Errorf("error = %v, output = %q, want boom after the first frame was written", err, out.String())
+	}
+}
+
 func TestPlayClearOutput(t *testing.T) {
 	var out bytes.Buffer
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a"), frame(time.Second, "b")}}
@@ -166,7 +247,11 @@ func (c *countingWriter) Write(p []byte) (int, error) {
 // written.
 func TestPlayWritesOnceAndCropsFrames(t *testing.T) {
 	big := snapshot.Snapshot{Cols: 6, Rows: 4, Lines: []string{"abcdef", "ghijkl", "mnopqr", "stuvwx"}}
-	src := &sliceSource{frames: []snapshot.Frame{{At: 0, Snapshot: big}, {At: time.Second, Snapshot: big}}}
+	// The second frame differs only in a row that is cropped away: equal
+	// consecutive frames would be merged into one.
+	other := big
+	other.Lines = []string{"ABCDEF", "ghijkl", "mnopqr", "stuvwx"}
+	src := &sliceSource{frames: []snapshot.Frame{{At: 0, Snapshot: big}, {At: time.Second, Snapshot: other}}}
 	var w countingWriter
 	err := Play(t.Context(), src, &w, Options{
 		Clear: true, Color: true, Cols: 3, Rows: 2,
