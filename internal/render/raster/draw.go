@@ -7,6 +7,7 @@ import (
 	xfont "golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 
+	"github.com/michaellorant/shellshot/internal/render/sprite"
 	"github.com/michaellorant/shellshot/internal/snapshot"
 )
 
@@ -64,6 +65,9 @@ func (r *Renderer) drawLine(img *image.RGBA, s snapshot.Snapshot, row int) {
 		}
 		if !hasInk(c) {
 			continue
+		}
+		if o := r.cellOrigin(col, row); !mark && sprite.Draw(img, c, image.Rect(o.X, o.Y, o.X+s.CellWidth(row, i-1)*r.metrics.CellWidth, o.Y+r.metrics.CellHeight), st.fg) {
+			continue // procedurally drawn: box, block, braille, powerline
 		}
 		if !ok {
 			r.fallback(img, c, col, row, st)
