@@ -200,7 +200,7 @@ type Segment struct {
 4. Dedup and min-delay folding run after, unchanged; they only move time. A hold-lengthened step is not folded (inference; add a test).
 5. `timeline` stays pure; `cli/export` converts spans to segments.
 
-**B. `frames` forced sample at span boundaries (unverified area).** After a hidden span the screen has changed but no output may follow; without a forced sample the post-hidden screen is never emitted. Add `frames.Options.Boundaries []time.Duration`: close the group and emit a frame if the screen differs.
+**B. `frames` forced sample at span boundaries (unverified area).** After a hidden span the screen has changed but no output may follow; without a forced sample the post-hidden screen is never emitted. Add `frames.Options.Boundaries []time.Duration` (**implemented**): at each boundary the iterator emits a forced frame stamped exactly at that time showing the screen with all events at or before it applied, even if the screen is unchanged (unsorted/duplicates are normalised, negatives are an error, idle gaps stay O(events); see the `frames` package documentation for the interaction with the grid, the final frame and `OmitFinal`).
 
 **C. Span pre-scan** shared by `info` and export (`spans.Scan(reader)` via `bin.OpenAt`, plus `meta` hints). The pipeline signature is unchanged.
 

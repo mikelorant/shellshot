@@ -2,6 +2,7 @@ package frames_test
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 	"time"
 
@@ -77,5 +78,63 @@ func TestReplayThroughGhostty(t *testing.T) {
 	}
 	if f2.Snapshot.Lines[0] != "red" || f2.Snapshot.Lines[1] != "plain" {
 		t.Errorf("frame 2 lines = %q", f2.Snapshot.Lines)
+	}
+}
+
+// TestBoundariesInIdleGapThroughGhostty records output, a 10s idle gap and more
+// output, and checks that boundaries inside the gap yield forced frames that
+// show the unchanged screen at exactly the boundary times.
+func TestBoundariesInIdleGapThroughGhostty(t *testing.T) {
+	var buf bytes.Buffer
+	now := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+	w, err := bin.NewWriter(&buf, head.Head{Cols: 20, Rows: 4}, bin.WriterOptions{Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Output(100*time.Millisecond, []byte("before\r\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Output(10100*time.Millisecond, []byte("after")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := bin.NewReader(bytes.NewReader(buf.Bytes()), bin.ReaderOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Unsorted, with a duplicate, and one boundary after the end.
+	it, err := frames.New(r, frames.Options{
+		FPS:        10,
+		Factory:    ghostty.New,
+		Boundaries: []time.Duration{7500 * time.Millisecond, 2 * time.Second, 5 * time.Second, 2 * time.Second, 12 * time.Second},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := frames.Collect(it)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantAt := []time.Duration{0, 100 * time.Millisecond, 2 * time.Second, 5 * time.Second, 7500 * time.Millisecond, 10100 * time.Millisecond, 12 * time.Second}
+	var gotAt []time.Duration
+	for _, f := range got {
+		gotAt = append(gotAt, f.At)
+	}
+	if !slices.Equal(gotAt, wantAt) {
+		t.Fatalf("frame times = %v, want %v", gotAt, wantAt)
+	}
+	for _, i := range []int{2, 3, 4} {
+		if !got[i].Snapshot.Equal(got[1].Snapshot) || got[i].Snapshot.Lines[0] != "before" {
+			t.Errorf("frame %d at %v = %q, want the screen of frame 1", i, got[i].At, got[i].Snapshot.Lines)
+		}
+	}
+	for _, i := range []int{5, 6} {
+		if l := got[i].Snapshot.Lines; l[0] != "before" || l[1] != "after" {
+			t.Errorf("frame %d at %v = %q", i, got[i].At, l)
+		}
 	}
 }
