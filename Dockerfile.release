@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1
+#
+# shellshot release image: the binaries that GoReleaser built, without compiling anything. The
+# release workflow extracts shellshot from the linux tar.gz archives into a build context laid out
+# as linux/amd64/shellshot and linux/arm64/shellshot, so the image holds exactly the bits of the
+# release archives. Build from source with the Dockerfile instead.
+#
+#   docker buildx build -f Dockerfile.release --platform linux/amd64,linux/arm64 <context>
+#
+# The only RUN step is a useradd in the target's own Debian image (QEMU for the non-native arch).
+FROM debian:bookworm-slim
+
+ARG TARGETARCH
+ARG VERSION=dev
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="shellshot" \
+      org.opencontainers.image.source="https://github.com/mikelorant/shellshot" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}"
+
+# bash comes with the base image; the binary only needs libc.
+RUN useradd --uid 1000 --create-home --shell /bin/bash shellshot \
+ && install -d -o shellshot -g shellshot /work
+
+COPY --chmod=0755 linux/${TARGETARCH}/shellshot /usr/local/bin/shellshot
+
+ENV TERM=xterm-256color LANG=C.UTF-8 SHELL=/bin/bash
+USER shellshot
+WORKDIR /work
+ENTRYPOINT ["shellshot"]
+CMD ["--help"]

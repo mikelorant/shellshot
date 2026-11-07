@@ -248,6 +248,9 @@ func TestDriverMarksAndSpansAreOrderedBetweenOutput(t *testing.T) {
 		return Step{Deadline: time.Hour}, nil
 	}}
 	h, ev := startDriverRun(t, d, nil)
+	// Run emits the first frame before its first poll: without this wait, "x" can arrive in
+	// that gap and be written ahead of poll 0, which shifts every later poll by one chunk.
+	h.polled(d, 1)
 	h.clock.advance(100 * time.Millisecond)
 	h.output("x")
 	h.settle() // the poll that follows the chunk is done before the clock moves
