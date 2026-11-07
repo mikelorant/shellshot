@@ -512,3 +512,162 @@ func TestStats(t *testing.T) {
 		t.Fatalf("BytesWritten = %d, buffer %d", st.BytesWritten, buf.Len())
 	}
 }
+
+// BenchmarkWriteEventSmall measures one small event, OUT (the common case of a
+// busy terminal) or IN. allocs/op is the number to watch: the writer must copy
+// the payload once and amortise that over a run or a block.
+func BenchmarkWriteEventSmall(b *testing.B) {
+	for _, tc := range []struct {
+		name     string
+		kind     event.Kind
+		coalesce uint64
+	}{
+		{"out/plain", event.KindOut, 0},
+		{"out/coalesced", event.KindOut, 20},
+		{"in/plain", event.KindIn, 0},
+		{"in/coalesced", event.KindIn, 20},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			clock := newFakeClock()
+			h := testHead()
+			h.Flags |= head.FlagInputRecorded
+			w, err := NewWriter(io.Discard, h, WriterOptions{
+				Uncompressed:  true,
+				CoalesceTicks: tc.coalesce,
+				Now:           clock.Now,
+				FlushInterval: -1,
+			})
+			if err != nil {
+				b.Fatal(err)
+			}
+			p := bytes.Repeat([]byte("x"), 48)
+			b.SetBytes(int64(len(p)))
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := w.WriteEvent(time.Duration(i)*10*time.Microsecond, tc.kind, p); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// TestWriterOwnsEventData overwrites the caller's buffer right after each
+// WriteEvent, as the stdin pump does, and checks the recording still holds the
+// original bytes: for every event kind, merged and unmerged OUT, with
+// coalescing on and off, flushed mid-way and at close.
+func TestWriterOwnsEventData(t *testing.T) {
+	resize := event.ResizePayload{Cols: 80, Rows: 24, CellPxW: 8, CellPxH: 16}.Append(nil)
+	exit := event.NewExit(0, 3).Data
+	ms := time.Millisecond
+
+	type step struct {
+		at   time.Duration
+		kind event.Kind
+		data []byte
+	}
+	for _, tc := range []struct {
+		name      string
+		steps     []step
+		plain     []wantEvent // coalescing off
+		coalesced []wantEvent // coalescing on (20 ticks = 2ms); nil means same as plain
+	}{
+		{
+			name:      "out merged",
+			steps:     []step{{0, event.KindOut, []byte("hello")}, {ms, event.KindOut, []byte(" world")}},
+			plain:     []wantEvent{{0, event.KindOut, "hello"}, {ms, event.KindOut, " world"}},
+			coalesced: []wantEvent{{0, event.KindOut, "hello world"}},
+		},
+		{
+			name:  "out unmerged",
+			steps: []step{{0, event.KindOut, []byte("hello")}, {time.Second, event.KindOut, []byte("world")}},
+			plain: []wantEvent{{0, event.KindOut, "hello"}, {time.Second, event.KindOut, "world"}},
+		},
+		{
+			name: "in",
+			steps: []step{
+				{0, event.KindOut, []byte("pre")},
+				{ms, event.KindIn, []byte("keys")},
+				{2 * ms, event.KindOut, []byte("post")},
+			},
+			plain: []wantEvent{{0, event.KindOut, "pre"}, {ms, event.KindIn, "keys"}, {2 * ms, event.KindOut, "post"}},
+		},
+		{
+			name: "mark",
+			steps: []step{
+				{0, event.KindOut, []byte("pre")},
+				{ms, event.KindMark, []byte("label")},
+				{2 * ms, event.KindOut, []byte("post")},
+			},
+			plain: []wantEvent{{0, event.KindOut, "pre"}, {ms, event.KindMark, "label"}, {2 * ms, event.KindOut, "post"}},
+		},
+		{
+			name: "resize",
+			steps: []step{
+				{0, event.KindOut, []byte("pre")},
+				{ms, event.KindResize, resize},
+				{2 * ms, event.KindOut, []byte("post")},
+			},
+			plain: []wantEvent{{0, event.KindOut, "pre"}, {ms, event.KindResize, string(resize)}, {2 * ms, event.KindOut, "post"}},
+		},
+		{
+			name: "exit",
+			steps: []step{
+				{0, event.KindOut, []byte("pre")},
+				{ms, event.KindExit, exit},
+			},
+			plain: []wantEvent{{0, event.KindOut, "pre"}, {ms, event.KindExit, string(exit)}},
+		},
+		{
+			name: "consecutive non-out",
+			steps: []step{
+				{0, event.KindIn, []byte("a")},
+				{ms, event.KindIn, []byte("b")},
+				{2 * ms, event.KindMark, []byte("c")},
+			},
+			plain: []wantEvent{{0, event.KindIn, "a"}, {ms, event.KindIn, "b"}, {2 * ms, event.KindMark, "c"}},
+		},
+	} {
+		for _, coalesce := range []uint64{0, 20} {
+			t.Run(fmt.Sprintf("%s/coalesce=%d", tc.name, coalesce), func(t *testing.T) {
+				want := tc.plain
+				if coalesce > 0 && tc.coalesced != nil {
+					want = tc.coalesced
+				}
+				h := testHead()
+				h.Flags |= head.FlagInputRecorded
+				var out bytes.Buffer
+				w := mustWriter(t, &out, h, WriterOptions{Uncompressed: true, CoalesceTicks: coalesce})
+
+				buf := make([]byte, 64)
+				for i, s := range tc.steps {
+					n := copy(buf, s.data)
+					if err := w.WriteEvent(s.at, s.kind, buf[:n]); err != nil {
+						t.Fatal(err)
+					}
+					for j := range buf {
+						buf[j] = 0xEE // the pump's next read
+					}
+					// Flush mid-recording, but not inside a two-event merged run.
+					if len(tc.steps) > 2 && i == len(tc.steps)-2 {
+						if err := w.Flush(); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				if err := w.Close(); err != nil {
+					t.Fatal(err)
+				}
+				r, err := NewReader(&out, ReaderOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				evs, _ := drain(t, r)
+				if got := toWant(evs); !equalWant(got, want) {
+					t.Fatalf("events = %+v\nwant     %+v", got, want)
+				}
+			})
+		}
+	}
+}

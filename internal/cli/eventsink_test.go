@@ -88,7 +88,7 @@ func TestBinSinkInputIsStampedFromSessionOrigin(t *testing.T) {
 	}
 }
 
-func TestBinSinkInputCopiesDataWhileCoalescing(t *testing.T) {
+func TestBinSinkInputSurvivesPumpBufferReuseWhileCoalescing(t *testing.T) {
 	clk := &testClock{t: time.Unix(1000, 0)}
 	s, buf := newTestSink(t, head.FlagInputRecorded, bin.WriterOptions{Uncompressed: true, CoalesceTicks: 100}, clk)
 	s.start(clk.t)
@@ -97,7 +97,7 @@ func TestBinSinkInputCopiesDataWhileCoalescing(t *testing.T) {
 	if err := s.input(keys); err != nil {
 		t.Fatal(err)
 	}
-	copy(keys, "XXXXX") // the input pump reuses its buffer
+	copy(keys, "XXXXX") // the input pump reuses its buffer; bin.Writer owns the copy
 	if err := s.close(); err != nil {
 		t.Fatal(err)
 	}

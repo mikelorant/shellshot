@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"sync"
 	"time"
 
@@ -84,8 +83,7 @@ func (s *binSink) Exit(at time.Duration, status int) error {
 // since the session started (0 before it has). The writer is only valid for
 // input if its head sets head.FlagInputRecorded.
 //
-// p is copied here: bin.Writer keeps the data of non-output events by
-// reference while it coalesces, and the input pump reuses its buffer.
+// bin.Writer copies p, so the input pump may reuse its buffer at once.
 func (s *binSink) input(p []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -93,7 +91,7 @@ func (s *binSink) input(p []byte) error {
 	if s.started {
 		at = s.now().Sub(s.origin)
 	}
-	return s.w.Input(at, bytes.Clone(p))
+	return s.w.Input(at, p)
 }
 
 // close flushes the pending events and finishes the recording.
