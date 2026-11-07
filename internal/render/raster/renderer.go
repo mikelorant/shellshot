@@ -17,7 +17,7 @@ import (
 
 // Defaults applied by New to zero Options fields.
 const (
-	DefaultFontSize = 14.0
+	DefaultFontSize = 15.0
 	DefaultPadding  = 8
 	DefaultScale    = 1
 )
@@ -32,7 +32,8 @@ type Fonts interface {
 	// cells (cells wide, cellW x cellH pixels each) r occupies. ok is false
 	// if no font has r.
 	FitFace(r rune, bold, italic bool, sizePx float64, cellW, cellH, cells int) (face xfont.Face, ok bool, err error)
-	// Metrics returns the whole-pixel cell geometry at sizePx.
+	// Metrics returns the whole-pixel cell geometry for an em size of
+	// sizePx, and the em size (EmPx) the faces must be created at.
 	Metrics(sizePx float64) (font.Metrics, error)
 }
 
@@ -40,7 +41,10 @@ type Fonts interface {
 // Theme means theme.Default().
 type Options struct {
 	Theme theme.Theme
-	// FontSize is the em size in pixels before Scale is applied.
+	// FontSize is the requested em size in pixels before Scale is applied.
+	// The size actually drawn is adjusted by up to half a pixel of glyph
+	// advance so the cell width is a whole number of pixels (see
+	// font.Set.Metrics).
 	FontSize float64
 	// Padding is the border around the cell grid in pixels before Scale.
 	Padding int
@@ -55,9 +59,9 @@ type Options struct {
 type Renderer struct {
 	theme   theme.Theme
 	fonts   Fonts
-	sizePx  float64 // FontSize * Scale
-	pad     int     // Padding * Scale
-	metrics font.Metrics
+	sizePx  float64      // em size of the faces: metrics.EmPx
+	pad     int          // Padding * Scale
+	metrics font.Metrics // cell geometry in final pixels (Scale applied)
 	regular xfont.Face
 	faces   [4]xfont.Face // indexed by faceIndex(bold, italic)
 	cursor  CursorStyle
@@ -86,18 +90,27 @@ func New(f Fonts, o Options) (*Renderer, error) {
 	r := &Renderer{
 		theme:  o.Theme,
 		fonts:  f,
-		sizePx: o.FontSize * float64(o.Scale),
 		pad:    o.Padding * o.Scale,
 		cursor: o.Cursor,
 	}
-	m, err := f.Metrics(r.sizePx)
+	// Metrics are derived at scale 1 and multiplied, so Scale n is exactly
+	// n times the scale 1 layout.
+	m, err := f.Metrics(o.FontSize)
 	if err != nil {
 		return nil, fmt.Errorf("raster: font metrics: %w", err)
 	}
-	if m.CellWidth <= 0 || m.CellHeight <= 0 {
-		return nil, fmt.Errorf("raster: degenerate cell size %dx%d", m.CellWidth, m.CellHeight)
+	if m.CellWidth <= 0 || m.CellHeight <= 0 || !(m.EmPx > 0) {
+		return nil, fmt.Errorf("raster: degenerate cell size %dx%d at em %v", m.CellWidth, m.CellHeight, m.EmPx)
 	}
-	r.metrics = m
+	k := o.Scale
+	r.metrics = font.Metrics{
+		CellWidth:  m.CellWidth * k,
+		CellHeight: m.CellHeight * k,
+		Ascent:     m.Ascent * k,
+		Descent:    m.Descent * k,
+		EmPx:       m.EmPx * float64(k),
+	}
+	r.sizePx = r.metrics.EmPx
 	for i := range r.faces {
 		if r.faces[i], err = f.Face(i&1 != 0, i&2 != 0, r.sizePx); err != nil {
 			return nil, fmt.Errorf("raster: face %d: %w", i, err)

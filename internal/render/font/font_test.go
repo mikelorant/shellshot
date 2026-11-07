@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"math"
 	"testing"
 
 	"golang.org/x/image/math/fixed"
@@ -28,14 +29,48 @@ func TestDefaultLoads(t *testing.T) {
 	}
 }
 
-func TestMetricsGolden14px(t *testing.T) {
-	m, err := mustDefault(t).Metrics(14)
-	if err != nil {
-		t.Fatal(err)
+func TestMetricsGolden(t *testing.T) {
+	// JetBrains Mono: advance 0.6 em, ascent 1.02 em, descent 0.3 em, no gap.
+	for _, tc := range []struct {
+		size float64
+		want Metrics
+	}{
+		// 8.4 px advance rounds to 8, so the em shrinks to 8/0.6.
+		{14, Metrics{CellWidth: 8, CellHeight: 18, Ascent: 14, Descent: 4, EmPx: 8 / 0.6}},
+		// 0.6 em is already a whole number of pixels: nothing changes.
+		{15, Metrics{CellWidth: 9, CellHeight: 20, Ascent: 15, Descent: 5, EmPx: 15}},
+		// 9.6 px advance rounds up to 10, so the em grows to 10/0.6.
+		{16, Metrics{CellWidth: 10, CellHeight: 22, Ascent: 17, Descent: 5, EmPx: 10 / 0.6}},
+	} {
+		m, err := mustDefault(t).Metrics(tc.size)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m.CellWidth != tc.want.CellWidth || m.CellHeight != tc.want.CellHeight ||
+			m.Ascent != tc.want.Ascent || m.Descent != tc.want.Descent || math.Abs(m.EmPx-tc.want.EmPx) > 1e-9 {
+			t.Errorf("Metrics(%v) = %+v, want %+v", tc.size, m, tc.want)
+		}
 	}
-	want := Metrics{CellWidth: 9, CellHeight: 20, Ascent: 15, Descent: 5}
-	if m != want {
-		t.Errorf("Metrics(14) = %+v, want %+v", m, want)
+}
+
+// The cell width is the glyph advance: at EmPx an 'M' advances CellWidth to
+// within the 1/64 px resolution of face advances, and EmPx stays within half
+// a pixel of advance of the requested size.
+func TestMetricsPitchMatchesAdvance(t *testing.T) {
+	s := mustDefault(t)
+	for size := 6.0; size <= 48; size += 0.5 {
+		m, err := s.Metrics(size)
+		if err != nil {
+			t.Fatal(err)
+		}
+		face, _ := s.Face(false, false, m.EmPx)
+		adv, _ := face.GlyphAdvance('M')
+		if d := math.Abs(float64(adv)/64 - float64(m.CellWidth)); d > 0.05 {
+			t.Errorf("Metrics(%v): advance %.3f px, cell width %d", size, float64(adv)/64, m.CellWidth)
+		}
+		if d := math.Abs(m.EmPx-size) * 0.6; d > 0.5+1e-9 && m.CellWidth > 1 {
+			t.Errorf("Metrics(%v): EmPx %.3f moves the advance by %.2f px", size, m.EmPx, d)
+		}
 	}
 }
 
@@ -363,6 +398,27 @@ func TestFitFaceMissingAndInvalid(t *testing.T) {
 	for _, c := range [][4]int{{0, 20, 1, 14}, {9, 0, 1, 14}, {9, 20, 0, 14}, {9, 20, 1, 0}} {
 		if _, _, err := s.FitFace(0xF015, false, false, float64(c[3]), c[0], c[1], c[2]); err == nil {
 			t.Errorf("FitFace(%v): no error", c)
+		}
+	}
+}
+
+// Mixed regular/bold/italic text shares one cell grid, so every style of the
+// family must advance the same for every printable ASCII glyph.
+func TestStylesShareAdvance(t *testing.T) {
+	s := mustDefault(t)
+	for _, size := range []float64{14, 20} {
+		ref, _ := s.Face(false, false, size)
+		for _, st := range []struct{ bold, italic bool }{{true, false}, {false, true}, {true, true}} {
+			f, err := s.Face(st.bold, st.italic, size)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for r := rune('!'); r <= '~'; r++ {
+				want, _ := ref.GlyphAdvance(r)
+				if got, _ := f.GlyphAdvance(r); got != want {
+					t.Fatalf("size %v bold=%v italic=%v: advance of %q = %v, regular %v", size, st.bold, st.italic, r, got, want)
+				}
+			}
 		}
 	}
 }

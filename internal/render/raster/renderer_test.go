@@ -57,11 +57,11 @@ func TestSizeFromMetrics(t *testing.T) {
 		pad, scale int
 		cols, rows int
 	}{
-		{"defaults", Options{}, 14, 8, 1, 80, 24},
-		{"scale 2", Options{FontSize: 12, Padding: 5, Scale: 2}, 24, 10, 2, 7, 3},
+		{"defaults", Options{}, 15, 8, 1, 80, 24},
+		{"scale 2", Options{FontSize: 12, Padding: 5, Scale: 2}, 12, 10, 2, 7, 3},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := set.Metrics(tc.size)
+			m, err := set.Metrics(tc.size) // scale 1; Scale multiplies it
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -70,10 +70,10 @@ func TestSizeFromMetrics(t *testing.T) {
 				t.Fatal(err)
 			}
 			w, h := r.Size(tc.cols, tc.rows)
-			if want := tc.cols*m.CellWidth + 2*tc.pad; w != want {
+			if want := tc.cols*m.CellWidth*tc.scale + 2*tc.pad; w != want {
 				t.Errorf("width = %d, want %d", w, want)
 			}
-			if want := tc.rows*m.CellHeight + 2*tc.pad; h != want {
+			if want := tc.rows*m.CellHeight*tc.scale + 2*tc.pad; h != want {
 				t.Errorf("height = %d, want %d", h, want)
 			}
 			img, err := r.Render(plainSnapshot(tc.cols, make([]string, tc.rows)...))
