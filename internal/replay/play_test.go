@@ -66,7 +66,7 @@ func TestRender(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Render(tt.snap, tt.clear); got != tt.want {
+			if got := Render(tt.snap, RenderOptions{Clear: tt.clear}); got != tt.want {
 				t.Errorf("Render() = %q, want %q", got, tt.want)
 			}
 		})
@@ -128,7 +128,7 @@ func TestPlayTiming(t *testing.T) {
 			}
 			var wantOut strings.Builder
 			for _, f := range tt.frames {
-				wantOut.WriteString(Render(f.Snapshot, false))
+				wantOut.WriteString(Render(f.Snapshot, RenderOptions{}))
 			}
 			if out.String() != wantOut.String() {
 				t.Errorf("output = %q, want %q", out.String(), wantOut.String())
