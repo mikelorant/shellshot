@@ -5,3 +5,10 @@
 !internal/recording/bin/testdata/*.shot
 recordings/
 /dist/
+
+# Export output written next to the repo root while experimenting (anchored so committed assets in subdirectories are unaffected)
+/*.png
+/*.gif
+/*.webp
+/*.svg
+/*.apng
