@@ -422,7 +422,7 @@ const recordTimeout = 10 * time.Second
 
 // runRecordWithTimeout runs args with stdin and fails the test if Run does not
 // return within recordTimeout. An empty stdin is a pipe that stays open, not
-// an immediate EOF, so no Ctrl-D is sent to (and echoed by) the command.
+// an immediate EOF.
 func runRecordWithTimeout(t *testing.T, args []string, stdin string) (code int, stdout, stderr string) {
 	t.Helper()
 	var in io.Reader = strings.NewReader(stdin)
@@ -471,5 +471,33 @@ func assertOutputContains(t *testing.T, path, want string) {
 	}
 	if out := readRecording(t, data).out(); !strings.Contains(out, want) {
 		t.Errorf("OUT = %q, want it to contain %q", out, want)
+	}
+}
+
+// TestRecordPipedStdinEOFDoesNotEchoEOT checks that the Ctrl-D forwarded at
+// the end of stdin ends cat without the terminal echoing it into the
+// recording.
+func TestRecordPipedStdinEOFDoesNotEchoEOT(t *testing.T) {
+	data, _ := recordToFile(t, []string{"--cols", "40", "--rows", "5", "-c", "cat"}, "x\n")
+	if out, want := readRecording(t, data).out(), "x\r\nx\r\n"; out != want {
+		t.Errorf("OUT = %q, want %q (typed echo and cat's output, no echoed EOT)", out, want)
+	}
+}
+
+// TestRecordEmptyStdinSendsNoEOT checks that an stdin already at EOF (such as
+// /dev/null) records only the command's own output.
+func TestRecordEmptyStdinSendsNoEOT(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "x.shot")
+	var stdout, stderr bytes.Buffer
+	args := []string{"record", "-o", path, "--cols", "40", "--rows", "5", "-c", "printf hi"}
+	if code := runWithStdin(context.Background(), args, strings.NewReader(""), &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr %q)", code, stderr.String())
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read recording: %v", err)
+	}
+	if out := readRecording(t, data).out(); out != "hi" {
+		t.Errorf("OUT = %q, want exactly %q", out, "hi")
 	}
 }

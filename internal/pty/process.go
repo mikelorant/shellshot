@@ -122,6 +122,17 @@ func (p *Process) Resize(cols, rows int) error {
 	return nil
 }
 
+// DisableEOTEcho stops the terminal from echoing a Ctrl-D (EOT) byte written
+// afterwards, so it does not appear in the output as "^D". On macOS this
+// switches off all echo; on Linux only the ^X notation for control
+// characters. It is a no-op on other platforms and is not reversed.
+func (p *Process) DisableEOTEcho() error {
+	if err := disableEOTEcho(p.ptmx); err != nil {
+		return fmt.Errorf("pty: disable EOT echo: %w", err)
+	}
+	return nil
+}
+
 // Wait blocks until the process exits and returns its exit code. A non-zero
 // exit is not an error. A process killed by a signal reports 128+signal.
 func (p *Process) Wait() (int, error) {

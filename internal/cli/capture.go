@@ -64,7 +64,8 @@ func addCaptureFlags(cmd *cobra.Command, o *captureOptions, cols, rows int) {
 // If o.Live is set, the process output is also written to it as it arrives.
 // If o.Stdin is set, it is pumped to the process until the capture ends; a
 // blocked read of o.Stdin cannot be interrupted and lingers (see live.Pump).
-// With o.EOTOnStdinEOF, the end of o.Stdin is forwarded as Ctrl-D.
+// With o.EOTOnStdinEOF, the end of o.Stdin is forwarded as Ctrl-D (without
+// the terminal echoing it as ^D), unless o.Stdin was empty.
 func capture(ctx context.Context, o captureOptions) (exitCode int, err error) {
 	if len(o.Command) == 0 {
 		return -1, fmt.Errorf("no command given")
@@ -93,6 +94,10 @@ func capture(ctx context.Context, o captureOptions) (exitCode int, err error) {
 		var pumpOpts live.PumpOptions
 		if o.EOTOnStdinEOF {
 			pumpOpts.OnEOF = []byte{eot}
+			// Best effort: if echo cannot be switched off, the EOT is
+			// still sent so the child terminates, at the cost of a
+			// visible ^D.
+			pumpOpts.BeforeOnEOF = func() { _ = proc.DisableEOTEcho() }
 		}
 		live.PumpWith(pumpCtx, o.Stdin, p, pumpOpts)
 	}
