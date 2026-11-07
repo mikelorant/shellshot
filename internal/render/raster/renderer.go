@@ -41,6 +41,8 @@ type Options struct {
 	Padding int
 	// Scale is an integer factor applied to FontSize and Padding.
 	Scale int
+	// Cursor selects the cursor shape; the zero value is CursorBlock.
+	Cursor CursorStyle
 }
 
 // Renderer turns snapshots into images. It is not safe for concurrent use
@@ -52,6 +54,8 @@ type Renderer struct {
 	pad     int     // Padding * Scale
 	metrics font.Metrics
 	regular xfont.Face
+	faces   [4]xfont.Face // indexed by faceIndex(bold, italic)
+	cursor  CursorStyle
 }
 
 // New validates o, applies defaults and resolves the cell metrics from f.
@@ -71,14 +75,15 @@ func New(f Fonts, o Options) (*Renderer, error) {
 	if o.Scale == 0 {
 		o.Scale = DefaultScale
 	}
-	if !(o.FontSize > 0) || o.Padding < 0 || o.Scale < 1 {
-		return nil, fmt.Errorf("raster: invalid options: font size %v, padding %d, scale %d", o.FontSize, o.Padding, o.Scale)
+	if !(o.FontSize > 0) || o.Padding < 0 || o.Scale < 1 || o.Cursor > CursorNone {
+		return nil, fmt.Errorf("raster: invalid options: font size %v, padding %d, scale %d, cursor %d", o.FontSize, o.Padding, o.Scale, o.Cursor)
 	}
 	r := &Renderer{
 		theme:  o.Theme,
 		fonts:  f,
 		sizePx: o.FontSize * float64(o.Scale),
 		pad:    o.Padding * o.Scale,
+		cursor: o.Cursor,
 	}
 	m, err := f.Metrics(r.sizePx)
 	if err != nil {
@@ -88,9 +93,12 @@ func New(f Fonts, o Options) (*Renderer, error) {
 		return nil, fmt.Errorf("raster: degenerate cell size %dx%d", m.CellWidth, m.CellHeight)
 	}
 	r.metrics = m
-	if r.regular, err = f.Face(false, false, r.sizePx); err != nil {
-		return nil, fmt.Errorf("raster: regular face: %w", err)
+	for i := range r.faces {
+		if r.faces[i], err = f.Face(i&1 != 0, i&2 != 0, r.sizePx); err != nil {
+			return nil, fmt.Errorf("raster: face %d: %w", i, err)
+		}
 	}
+	r.regular = r.faces[0]
 	return r, nil
 }
 
@@ -109,8 +117,10 @@ func (r *Renderer) Render(s snapshot.Snapshot) (*image.RGBA, error) {
 	w, h := r.Size(s.Cols, s.Rows)
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	draw.Draw(img, img.Bounds(), image.NewUniform(r.theme.Background), image.Point{}, draw.Src)
+	cur := r.cursorCell(s)
 	for row := range s.Lines {
-		r.drawLine(img, s, row)
+		r.drawLine(img, s, row, cur)
 	}
+	r.drawCursorShape(img, cur)
 	return img, nil
 }
