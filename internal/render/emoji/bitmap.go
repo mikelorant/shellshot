@@ -39,6 +39,8 @@ type Bitmap struct {
 
 var _ Backend = (*Font)(nil)
 var _ Backend = (*Bitmap)(nil)
+var _ wholeSequencer = (*Font)(nil)
+var _ wholeSequencer = (*Bitmap)(nil)
 
 // ParseBitmap parses a CBLC/CBDT PNG font. The font needs a cmap and, for
 // multi-codepoint sequences, GSUB ligatures (ccmp or liga); the glyph
@@ -72,12 +74,29 @@ func ParseBitmap(data []byte) (*Bitmap, error) {
 // first rune is used. The image is cached and shared: callers must not
 // modify it.
 func (b *Bitmap) Image(cluster string, side int) (*image.RGBA, bool) {
+	return b.image(cluster, side, false)
+}
+
+// imageExact is Image without the first-rune fallback (see wholeSequencer).
+func (b *Bitmap) imageExact(cluster string, side int) (*image.RGBA, bool) {
+	return b.image(cluster, side, true)
+}
+
+// image implements Image and imageExact. A glyph that the cmap or a GSUB
+// ligature names but for which no strike has a bitmap is not drawn: the
+// result is false, never an empty image, so that a Chain moves on to its
+// next font.
+func (b *Bitmap) image(cluster string, side int, exact bool) (*image.RGBA, bool) {
 	if side <= 0 {
 		return nil, false
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	gid, ok := b.resolve(cluster, b.hasBitmap)
+	resolve := b.resolve
+	if exact {
+		resolve = b.resolveExact
+	}
+	gid, ok := resolve(cluster, b.hasBitmap)
 	if !ok {
 		return nil, false
 	}
