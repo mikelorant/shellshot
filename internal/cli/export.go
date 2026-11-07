@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/michaellorant/shellshot/internal/export/format"
 	"github.com/michaellorant/shellshot/internal/export/pipeline"
 	"github.com/michaellorant/shellshot/internal/export/spanplan"
 	"github.com/michaellorant/shellshot/internal/export/timeline"
@@ -24,7 +25,9 @@ import (
 
 // exportFlags holds the values of the export command's flags.
 type exportFlags struct {
-	output   string
+	output string
+	// format is the --format name, empty to infer it from output.
+	format   string
 	theme    string
 	fontSize float64
 	scale    int
@@ -67,7 +70,8 @@ func newExportCmd() *cobra.Command {
 		},
 	}
 	fl := cmd.Flags()
-	fl.StringVarP(&f.output, "output", "o", "", "output file, written as-is whatever its extension (default: FILE with the extension .png)")
+	fl.StringVarP(&f.output, "output", "o", "", "output file, written as-is (default: FILE with the extension of the format, .png for apng)")
+	fl.StringVar(&f.format, "format", "", "output format: "+strings.Join(format.Default().Names(), ", ")+" (default: from the extension of -o, else apng)")
 	fl.StringVar(&f.theme, "theme", "", "built-in theme name ("+strings.Join(theme.Names(), ", ")+") or a theme JSON file (default: "+theme.Default().Name+")")
 	fl.Float64Var(&f.fontSize, "font-size", raster.DefaultFontSize, "font size in pixels, before --scale (12 matches Ghostty font-size = 12 on a 2x display with --scale 2)")
 	fl.IntVar(&f.scale, "scale", raster.DefaultScale, "integer scale factor for font size and padding")
@@ -152,15 +156,44 @@ func resolveTheme(value string) (theme.Theme, error) {
 	return t, nil
 }
 
-// defaultExportPath returns path with its extension replaced by ".png". An
-// APNG is a valid PNG, and ".png" is the extension operating systems,
-// previews and upload dialogs recognise.
-func defaultExportPath(path string) string {
-	return strings.TrimSuffix(path, filepath.Ext(path)) + ".png"
+// defaultFormat is the format used when --format and the extension of -o do
+// not choose one.
+const defaultFormat = "apng"
+
+// resolveFormat returns the output format: the one named by name, else the
+// one that owns the extension of output, else (no -o, or -o without an
+// extension) the default. An unknown name or extension is an error that lists
+// the supported formats.
+func resolveFormat(reg *format.Registry, name, output string) (format.Format, error) {
+	supported := "supported: " + strings.Join(reg.Names(), ", ")
+	if name != "" {
+		f, ok := reg.Lookup(name)
+		if !ok {
+			return format.Format{}, fmt.Errorf("unknown --format %q (%s)", name, supported)
+		}
+		return f, nil
+	}
+	if ext := filepath.Ext(output); ext != "" {
+		f, ok := reg.ByExtension(output)
+		if !ok {
+			return format.Format{}, fmt.Errorf("cannot tell the output format from the extension %q of %s: use --format (%s)", ext, output, supported)
+		}
+		return f, nil
+	}
+	f, _ := reg.Lookup(defaultFormat)
+	return f, nil
+}
+
+// defaultExportPath returns path with its extension replaced by the first
+// extension of f (".png" for apng). An APNG is a valid PNG, and ".png" is the
+// extension operating systems, previews and upload dialogs recognise.
+func defaultExportPath(path string, f format.Format) string {
+	return strings.TrimSuffix(path, filepath.Ext(path)) + f.Extensions[0]
 }
 
 // runExport renders the recording at input to flags.output, or to input with
-// the extension .png. An explicit output path is used as typed.
+// the default extension of the output format. An explicit output path is used
+// as typed.
 func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	cursor, err := flags.validate()
 	if err != nil {
@@ -178,12 +211,20 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
+	// An -o that is the input is refused before its extension is judged.
 	output := flags.output
-	if output == "" {
-		output = defaultExportPath(input)
-	}
-	if sameFile(input, output) {
+	if output != "" && sameFile(input, output) {
 		return fmt.Errorf("export: output %s would overwrite the input recording", output)
+	}
+	outFormat, err := resolveFormat(format.Default(), flags.format, output)
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+	if output == "" {
+		output = defaultExportPath(input, outFormat)
+		if sameFile(input, output) {
+			return fmt.Errorf("export: output %s would overwrite the input recording", output)
+		}
 	}
 	emojiSet, _ := emoji.ParseSet(flags.emojiSet) // validated above
 	fonts, err := fontchain.New(fontchain.Options{
@@ -233,7 +274,7 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 			MinDelay:  flags.minDelay,
 			Segments:  plan.Segments,
 		},
-		Loops:    flags.loops,
+		NewSink:  outFormat.New(format.Settings{Loops: flags.loops}),
 		Progress: func(_, total int) { steps = total },
 	}
 	size, err := writeFileAtomic(output, func(f *os.File) error {
