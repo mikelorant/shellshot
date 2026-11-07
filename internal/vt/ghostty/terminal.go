@@ -35,6 +35,7 @@ type terminal struct {
 
 	cols, height int
 	rowBuf       []byte
+	cellBuf      []byte
 	closed       bool
 }
 
