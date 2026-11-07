@@ -3,6 +3,7 @@ package raster
 import (
 	"image"
 	"reflect"
+	"strings"
 	"testing"
 
 	xfont "golang.org/x/image/font"
@@ -20,6 +21,10 @@ const (
 	flagAU   = "\U0001F1E6\U0001F1FA"
 	keycap   = "1\uFE0F\u20E3"
 	rainbow  = "\U0001F3F3\uFE0F\u200D\U0001F308"
+	// femaleSign (with VS16) has a glyph without a bitmap in Apple's font;
+	// monarch (E18.0) is missing from it. Noto draws both.
+	femaleSign = "\u2640\uFE0F"
+	monarch    = "\U0001FACC"
 )
 
 // clusterSnapshot lays out a row of 10 columns: lead blanks, then the
@@ -246,6 +251,50 @@ func TestEmojiLookupOrder(t *testing.T) {
 	}
 }
 
+// failingEmoji fails the test when the renderer asks it for a cluster.
+type failingEmoji struct {
+	t     *testing.T
+	calls int
+}
+
+func (f *failingEmoji) Image(cluster string, _ int) (*image.RGBA, bool) {
+	f.calls++
+	f.t.Errorf("emoji backend asked for %+q", cluster)
+	return nil, false
+}
+
+// Text without emoji never reaches the colour emoji backend, so the built-in
+// fonts (which inflate on first use) cost nothing for it.
+func TestPlainTextNeverAsksForEmoji(t *testing.T) {
+	set, err := font.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &failingEmoji{t: t}
+	set.SetEmoji(backend)
+	r, err := New(set, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := plainSnapshot(30, "plain ASCII $ % 世界 한글 \uf015 ─│┌ ▀▄ ⠿")
+	s.Widths = [][]snapshot.Wide{wideAt(s.Lines[0], "世界한글")}
+	mustRender(t, r, s)
+	if backend.calls != 0 {
+		t.Errorf("%d emoji lookups for text without emoji", backend.calls)
+	}
+}
+
+// wideAt marks every rune of line that is in wide as two cells.
+func wideAt(line, wide string) []snapshot.Wide {
+	var out []snapshot.Wide
+	for i, c := range []rune(line) {
+		if strings.ContainsRune(wide, c) {
+			out = append(out, snapshot.Wide{Rune: i, Cells: 2})
+		}
+	}
+	return out
+}
+
 // wides2 reports a 2-cell base at rune 0 followed by zero-width runes up to n.
 func wides2(n int) []snapshot.Wide {
 	w := []snapshot.Wide{{Rune: 0, Cells: 2}}
@@ -343,17 +392,19 @@ func wideRunes(text string) []seg {
 	return out
 }
 
-// The emoji sheet: emoji sequences, CJK and mixed text, laid out as
+// The emoji sheet: emoji sequences from the Apple set, the ones Apple's font
+// lacks (U+2640 FE0F has a glyph but no bitmap; the E18.0 monarch butterfly
+// has no glyph at all) coming from Noto, CJK and mixed text, laid out as
 // libghostty with grapheme clustering reports them.
 func TestGoldenEmojiSheet(t *testing.T) {
 	r, _ := newTestRenderer(t, Options{FontSize: 20})
 	sp := narrow(" ")
 	rows := [][]seg{
-		{wide(grin), sp, wide(thumb), sp, wide(heartVS), sp, wide(family), sp, wide(flagAU), sp, wide(thumbMed), sp, wide(keycap)},
-		append(append(wideRunes("世界"), sp), append(wideRunes("한글"), append([]seg{sp}, wideRunes("こんにちは")...)...)...),
+		{wide(grin), sp, wide(thumbMed), sp, wide(heartVS), sp, wide(family), sp, wide(flagAU), sp, wide(keycap), sp, wide(rainbow)},
+		append([]seg{wide(femaleSign), sp, wide(monarch), sp}, append(wideRunes("世界"), append([]seg{sp}, append(wideRunes("한글"), append([]seg{sp}, wideRunes("こんにちは")...)...)...)...)...),
 		{narrow("o"), narrow("k"), sp, wide(grin), sp, narrow("d"), narrow("o"), narrow("n"), narrow("e"), sp, wide(rainbow), sp, narrow("e"), narrow("n"), narrow("d")},
 	}
-	s := snapshot.Snapshot{Cols: 24, Rows: len(rows)}
+	s := snapshot.Snapshot{Cols: 26, Rows: len(rows)}
 	for _, row := range rows {
 		line, wides := layoutLine(row...)
 		s.Lines = append(s.Lines, line)

@@ -6,14 +6,14 @@ import (
 )
 
 func TestLoadDetectsFontFormat(t *testing.T) {
-	b, err := Load(readAsset(t, "twemoji-mozilla/TwemojiMozilla.ttf"))
+	b, err := Load(buildColorFont(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if f, ok := b.(*Font); !ok {
-		t.Errorf("Twemoji loaded as %T, want *Font", b)
+		t.Errorf("COLR font loaded as %T, want *Font", b)
 	} else if _, drawn := f.Image(smiley, 16); !drawn {
-		t.Error("Twemoji backend drew nothing")
+		t.Error("COLR backend drew nothing")
 	}
 
 	b, err = Load(buildBitmapFont(t, testEmojiStrikes(t)))
@@ -48,8 +48,8 @@ func TestLoadPropagatesBackendErrors(t *testing.T) {
 	if _, err := Load(good[:len(good)-10]); err == nil {
 		t.Error("truncated bitmap font loaded")
 	}
-	twemoji := readAsset(t, "twemoji-mozilla/TwemojiMozilla.ttf")
-	if _, err := Load(twemoji[:len(twemoji)/2]); err == nil {
+	colr := buildColorFont(t)
+	if _, err := Load(colr[:len(colr)-40]); err == nil {
 		t.Error("truncated COLR font loaded")
 	}
 }

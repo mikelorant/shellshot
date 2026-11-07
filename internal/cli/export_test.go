@@ -587,7 +587,7 @@ func TestExportDrawsColourEmojiSequences(t *testing.T) {
 	if n := colourful(0, 2); n < 30 {
 		t.Errorf("grin: %d colourful pixels in its two cells", n)
 	}
-	if n := colourful(3, 2); n < 30 {
+	if n := colourful(3, 2); n < 15 { // Apple's family is a small mostly white icon
 		t.Errorf("family: %d colourful pixels in its two cells", n)
 	}
 	if n := colourful(2, 1) + colourful(5, 1) + colourful(6, 6); n != 0 {
