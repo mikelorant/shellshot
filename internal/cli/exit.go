@@ -40,6 +40,10 @@ func reportExit(w io.Writer, code int, ignore bool) error {
 	return ExitError{Code: code}
 }
 
-// exitScriptSyntax is the exit code of a script that does not parse, validate
-// or lower (docs/scripting.md, "Exit codes").
-const exitScriptSyntax = 2
+// Exit codes of "record --script" besides the ones a script failure carries
+// (run.ScriptError.ExitCode) and the exit status of the child
+// (docs/scripting.md, "Exit codes").
+const (
+	exitScriptSyntax = 2   // the script does not parse, validate or lower
+	exitCancelled    = 130 // the context was cancelled (Ctrl-C)
+)

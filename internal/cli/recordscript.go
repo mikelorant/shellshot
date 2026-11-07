@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -298,17 +299,76 @@ func runScript(cmd *cobra.Command, so scriptOptions, ro recordOptions, wopts bin
 	sink.configure(&cfg)
 
 	status, runErr := session.Run(ctx, p, holder.factory(ghostty.New), cfg, session.SinkFunc(discardFrame))
+	closedByUs := tracked.killed.Load()
 	closeErr := sink.close()
 	if cerr := f.Close(); closeErr == nil {
 		closeErr = cerr
 	}
-	if runErr != nil {
-		return runErr
-	}
-	if closeErr != nil {
+	if runErr == nil && closeErr != nil {
 		return fmt.Errorf("write recording %s: %w", set.Output, closeErr)
 	}
-	st := sink.stats()
-	fmt.Fprintf(errOut, "recorded %d events (%.1f KB) to %s\n", st.Events, float64(st.BytesWritten)/1024, set.Output)
-	return reportExit(errOut, status, ro.IgnoreExit)
+	if runErr == nil {
+		st := sink.stats()
+		fmt.Fprintf(errOut, "recorded %d events (%.1f KB) to %s\n", st.Events, float64(st.BytesWritten)/1024, set.Output)
+	}
+	return reportScriptResult(errOut, scriptResult{
+		Path:       set.Output,
+		Err:        runErr,
+		Status:     status,
+		ClosedByUs: closedByUs,
+		IgnoreExit: ro.IgnoreExit,
+		Screen:     drv.lastScreen(),
+	})
+}
+
+// scriptResult is how a script run ended.
+type scriptResult struct {
+	// Path is the recording.
+	Path string
+	// Err is the error of session.Run; nil when the script completed.
+	Err error
+	// Status is the exit status of the child when Err is nil.
+	Status int
+	// ClosedByUs is true when the child had to be closed by shellshot after
+	// the script ended.
+	ClosedByUs bool
+	IgnoreExit bool
+	// Screen is the last screen the script looked at.
+	Screen string
+}
+
+// reportScriptResult tells the user how the run ended on w and returns the
+// error that makes shellshot exit with the code of the table in
+// docs/scripting.md: nil for 0, an ExitError for the codes that are not
+// errors of shellshot itself, or a plain error for exit code 1.
+func reportScriptResult(w io.Writer, r scriptResult) error {
+	if r.Err == nil {
+		if r.ClosedByUs {
+			fmt.Fprintln(w, "shellshot: child did not exit; closed by shellshot")
+			return nil
+		}
+		return reportExit(w, r.Status, r.IgnoreExit)
+	}
+	var se *run.ScriptError
+	switch {
+	case errors.As(r.Err, &se):
+		printFinalScreen(w, r.Screen)
+		fmt.Fprintf(w, "shellshot: script failed: %v; partial recording kept at %s\n", se, r.Path)
+		return ExitError{Code: se.ExitCode}
+	case errors.Is(r.Err, context.Canceled), errors.Is(r.Err, context.DeadlineExceeded):
+		fmt.Fprintf(w, "shellshot: cancelled; partial recording kept at %s\n", r.Path)
+		return ExitError{Code: exitCancelled}
+	}
+	return fmt.Errorf("script failed: %w; partial recording kept at %s", r.Err, r.Path)
+}
+
+// printFinalScreen writes the screen text, each row after "| ", under a title.
+func printFinalScreen(w io.Writer, screen string) {
+	if screen == "" {
+		return
+	}
+	fmt.Fprintln(w, "shellshot: final screen:")
+	for _, row := range strings.Split(screen, "\n") {
+		fmt.Fprintf(w, "| %s\n", row)
+	}
 }
