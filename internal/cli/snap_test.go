@@ -26,14 +26,34 @@ func TestLastFrameSinkKeepsLastFrame(t *testing.T) {
 	}
 }
 
-func TestWriteScreenAppendsNewline(t *testing.T) {
-	var buf bytes.Buffer
-	s := snapshot.Snapshot{Lines: []string{"hello", "world"}}
-	if err := writeScreen(&buf, s); err != nil {
-		t.Fatalf("writeScreen: %v", err)
+func TestWriteScreen(t *testing.T) {
+	red := snapshot.Style{Fg: snapshot.Color{Kind: snapshot.ColorPalette, Index: 1}}
+	styled := snapshot.Snapshot{
+		Lines: []string{"red ok", "", ""},
+		Spans: [][]snapshot.Span{{{Start: 0, End: 3, Style: red}}, nil, nil},
 	}
-	if got, want := buf.String(), "hello\nworld\n"; got != want {
-		t.Errorf("output = %q, want %q", got, want)
+	tests := []struct {
+		name  string
+		s     snapshot.Snapshot
+		color bool
+		want  string
+	}{
+		{"appends newline", snapshot.Snapshot{Lines: []string{"hello", "world"}}, false, "hello\nworld\n"},
+		{"trims trailing blank rows", snapshot.Snapshot{Lines: []string{"a", "", "b", "", ""}}, false, "a\n\nb\n"},
+		{"empty screen prints nothing", snapshot.Snapshot{Lines: []string{"", ""}}, false, ""},
+		{"plain ignores spans", styled, false, "red ok\n"},
+		{"colour writes SGR", styled, true, "\x1b[31mred\x1b[0m ok\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := writeScreen(&buf, tt.s, tt.color); err != nil {
+				t.Fatalf("writeScreen: %v", err)
+			}
+			if got := buf.String(); got != tt.want {
+				t.Errorf("output = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -65,6 +85,7 @@ func TestSnapFlagDefaults(t *testing.T) {
 		"cols":     "80",
 		"rows":     "24",
 		"interval": session.DefaultInterval.String(),
+		"color":    "auto",
 	} {
 		if got := cmd.Flags().Lookup(name).DefValue; got != want {
 			t.Errorf("--%s default = %q, want %q", name, got, want)
@@ -86,11 +107,45 @@ func TestSnapPrintsFinalScreen(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr %q)", code, stderr.String())
 	}
-	lines := strings.Split(stdout.String(), "\n")
-	if len(lines) < 2 || lines[0] != "hello" || lines[1] != "world" {
-		t.Errorf("stdout = %q, want first lines hello and world", stdout.String())
+	if want := "hello\nworld\n"; stdout.String() != want {
+		t.Errorf("stdout = %q, want %q", stdout.String(), want)
 	}
-	if !strings.HasSuffix(stdout.String(), "\n") {
-		t.Errorf("stdout = %q, want trailing newline", stdout.String())
+}
+
+func TestSnapColorFlag(t *testing.T) {
+	const script = `printf '\033[31mred\033[0m'`
+	tests := []struct {
+		name      string
+		color     string
+		wantSGR   bool
+		wantError string
+	}{
+		{"always emits SGR", "always", true, ""},
+		{"never is plain", "never", false, ""},
+		{"auto is plain when piped", "auto", false, ""},
+		{"invalid", "sometimes", false, "invalid --color"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			args := []string{"snap", "--color", tt.color, "--cols", "40", "--rows", "4", "--", "sh", "-c", script}
+			code := Run(context.Background(), args, &stdout, &stderr)
+			if tt.wantError != "" {
+				if code != 1 || !strings.Contains(stderr.String(), tt.wantError) {
+					t.Fatalf("exit code = %d, stderr = %q, want 1 and %q", code, stderr.String(), tt.wantError)
+				}
+				return
+			}
+			if code != 0 {
+				t.Fatalf("exit code = %d, stderr = %q", code, stderr.String())
+			}
+			if tt.wantSGR {
+				if want := "\x1b[31mred\x1b[0m\n"; stdout.String() != want {
+					t.Errorf("stdout = %q, want %q", stdout.String(), want)
+				}
+			} else if want := "red\n"; stdout.String() != want {
+				t.Errorf("stdout = %q, want %q", stdout.String(), want)
+			}
+		})
 	}
 }

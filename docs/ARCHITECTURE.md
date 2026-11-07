@@ -8,8 +8,8 @@ that can be replayed.
 | Command | Purpose |
 |---|---|
 | `shellshot record [-o file] [-c "cmd"] [--cols N --rows N] [--interval d] [-- cmd args...]` | Interactive recorder (asciicast-style): runs $SHELL (or the given command) on a live passthrough terminal and records snapshot frames |
-| `shellshot snap [--cols --rows] -- cmd args...` | Run cmd, print the final screen as plain text |
-| `shellshot replay file [--speed f]` | Play recording frames to stdout with original timing |
+| `shellshot snap [--cols --rows] [--color auto\|always\|never] -- cmd args...` | Run cmd, print the final screen (trailing blank rows trimmed); `--color always` emits SGR, `auto` (default) only on a terminal with `NO_COLOR` unset |
+| `shellshot replay file [--speed f] [--clear] [--color auto\|always\|never]` | Play recording frames to stdout with original timing; `--clear` defaults to on for a terminal; `--color auto` (default) emits SGR only on a terminal with `NO_COLOR` unset |
 | `shellshot version` | Print version |
 
 ## Package layout (module `github.com/michaellorant/shellshot`)

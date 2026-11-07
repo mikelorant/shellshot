@@ -37,6 +37,57 @@ func writeFixtureRecording(t *testing.T) string {
 	return path
 }
 
+// writeStyledRecording writes a one-frame recording whose first three
+// characters are red and returns its path.
+func writeStyledRecording(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "styled.jsonl")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	w, err := recording.NewWriter(f, recording.Header{Cols: 10, Rows: 1, Command: []string{"demo"}, Started: time.Unix(0, 0).UTC()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	red := snapshot.Style{Fg: snapshot.Color{Kind: snapshot.ColorPalette, Index: 1}}
+	frame := snapshot.Frame{Snapshot: snapshot.Snapshot{
+		Cols: 10, Rows: 1,
+		Lines: []string{"red ok"},
+		Spans: [][]snapshot.Span{{{Start: 0, End: 3, Style: red}}},
+	}}
+	if err := w.WriteFrame(frame); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestReplayColorFlag(t *testing.T) {
+	path := writeStyledRecording(t)
+	t.Setenv("NO_COLOR", "")
+	tests := []struct {
+		color string
+		want  string
+	}{
+		{"always", "\x1b[31mred\x1b[0m ok\n"},
+		{"never", "red ok\n"},
+		{"auto", "red ok\n"}, // stdout is a buffer, not a terminal
+	}
+	for _, tt := range tests {
+		t.Run(tt.color, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := Run(context.Background(), []string{"replay", path, "--color", tt.color}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("exit code = %d, stderr = %q", code, stderr.String())
+			}
+			if stdout.String() != tt.want {
+				t.Errorf("stdout = %q, want %q", stdout.String(), tt.want)
+			}
+		})
+	}
+}
+
 func TestReplayPlaysFramesInOrder(t *testing.T) {
 	path := writeFixtureRecording(t)
 	var stdout, stderr bytes.Buffer
@@ -80,6 +131,7 @@ func TestReplayErrors(t *testing.T) {
 		{"malformed file", []string{"replay", bad}, "malformed"},
 		{"zero speed", []string{"replay", good, "--speed", "0"}, "speed must be greater than zero"},
 		{"negative speed", []string{"replay", good, "--speed", "-2"}, "speed must be greater than zero"},
+		{"invalid color", []string{"replay", good, "--color", "sometimes"}, "invalid --color"},
 		{"no file argument", []string{"replay"}, "accepts 1 arg"},
 	}
 	for _, tt := range tests {
