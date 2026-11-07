@@ -1,25 +1,58 @@
 # Export reference
 
-`shellshot export FILE [-o OUT.png] [flags]` renders a recording as an animated PNG
-(APNG). The result is a standard PNG that carries animation data. Browsers, GitHub, Slack
-and Discord animate it; at the time of writing, macOS Preview and Quick Look show only the
-first frame. Run `shellshot export --help` for the flag list.
+`shellshot export FILE [-o OUT] [flags]` renders a recording as an animated PNG (APNG, the
+default) or an animated GIF. An APNG is a standard PNG that carries animation data. Browsers,
+GitHub, Slack and Discord animate it; at the time of writing, macOS Preview and Quick Look show
+only the first frame. Run `shellshot export --help` for the flag list.
 
 ## Output format
 
 `--format NAME` chooses the output format. Without it, the format comes from the extension of
 `-o` (case-insensitive), and is `apng` when there is no `-o` or `-o` has no extension. An
 extension that no format owns, or an unknown `--format` name, fails with the list of supported
-formats (`supported: apng`); `--format` then lets you write any file name.
+formats (`supported: apng, gif`); `--format` then lets you write any file name.
 
 | Format | `--format` | Extensions | Notes |
 | --- | --- | --- | --- |
-| Animated PNG | `apng` | `.png`, `.apng` | The default. Plays in browsers, GitHub, Slack and Discord. |
+| Animated PNG | `apng` | `.png`, `.apng` | The default. Full colour. Plays in browsers, GitHub, Slack and Discord. |
+| Animated GIF | `gif` | `.gif` | At most 255 colours plus transparency. Plays everywhere. See [GIF](#gif). |
+
+## GIF
+
+`--format gif` (or an `-o` ending in `.gif`) writes an animated GIF that plays in every browser,
+chat tool and image viewer.
+
+- **256 colours.** A GIF has one palette of 256 entries, one of them transparent, so a frame has
+  at most 255 colours. Export counts the colours of the whole animation. If they fit, the GIF is
+  exact. If not, which is usual because anti-aliased text has hundreds of blends (a 7-colour text
+  session had about 1,000 colours), export builds one palette for all frames by a
+  popularity-weighted median cut. Plain text stays visually unchanged (the measured error was
+  about 0.01 of 255 levels on average), because the rare colours it merges are few pixels.
+- **Emoji banding.** Colour emoji have smooth gradients, so a GIF with emoji bands slightly
+  (stepped colours in the gradients of a face). `--gif-dither` hides the steps with a
+  Floyd-Steinberg dither, at the price of visible grain, a 6 to 25 % larger file and
+  several times the encode time (still under a second for the recordings measured). Plain text shows no benefit, so it is off by default. `--gif-colors N` (2 to 255, default
+  255) lowers the palette size for smaller files and coarser colour.
+- **Size.** Only the rectangle that changed is stored for each frame, and identical frames
+  merge. On the recordings measured, the GIF was about 2 to 2.5 times smaller than the APNG of the same
+  recording because it has 8 bits per pixel. Smooth gradients are where a GIF loses the most
+  quality.
+- **Timing.** A GIF delay is a whole number of centiseconds, so every frame lasts at least 2 cs
+  (20 ms), because browsers show shorter frames as 100 ms. Rounding errors carry to the next
+  frame, so the total length stays within 1 cs. Holds longer than 655.35 s are split.
+- **Looping.** `--loops 0` (default) loops forever, `--loops N` plays the animation N times.
+- `--gif-colors` and `--gif-dither` are ignored for other formats, and `--gif-dither` does
+  nothing when the palette is exact.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--gif-colors N` | 255 | Largest number of picture colours, 2 to 255 |
+| `--gif-dither` | off | Dither when the animation has more colours than the palette |
 
 ## Output file
 
 - Without `-o`, the output is `FILE` with its extension replaced by the first extension of the
-  format (`.png` for `apng`).
+  format (`.png` for `apng`, `.gif` for `gif`).
 - `-o` is used as typed, whatever its extension, and the extension picks the format unless
   `--format` is given. `-o -` writes a file named `-`; export does not write to stdout.
 - Export refuses to overwrite the input recording and replaces any other existing file.
