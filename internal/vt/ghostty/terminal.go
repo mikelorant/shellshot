@@ -49,7 +49,12 @@ func New(cols, rows int) (vt.Terminal, error) {
 	t := &terminal{cols: cols, height: rows}
 
 	var err error
-	t.term, err = libghostty.NewTerminal(libghostty.WithSize(uint16(cols), uint16(rows)))
+	t.term, err = libghostty.NewTerminal(
+		libghostty.WithSize(uint16(cols), uint16(rows)),
+		// Grapheme clustering (mode 2027) is on by default in modern terminals;
+		// as the reset default it also survives RIS.
+		libghostty.WithModeDefault(libghostty.ModeGraphemeCluster, true),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("ghostty: create terminal: %w", err)
 	}

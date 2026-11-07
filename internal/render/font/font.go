@@ -1,14 +1,19 @@
 // Package font provides monospace font sets and faces for rasterising
-// terminal cells. It is pure Go (no cgo) and ships JetBrains Mono embedded.
+// terminal cells. It is pure Go (no cgo) and ships JetBrains Mono embedded,
+// with a fallback chain (Symbols Nerd Font, a CJK subset, user fonts) for
+// runes it lacks and a colour emoji font for emoji.
 package font
 
 import (
 	"fmt"
+	"image"
 	"sync"
 
 	xfont "golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/font/sfnt"
+
+	"github.com/michaellorant/shellshot/internal/render/emoji"
 )
 
 // dpi is 72 so that a face size in points equals its size in pixels.
@@ -40,7 +45,8 @@ func styleOf(bold, italic bool) style {
 type FallbackFont struct {
 	// Name identifies the font in error messages.
 	Name string
-	// Data is the TTF/OTF file contents.
+	// Data is the TTF/OTF file contents. For a collection (TTC/OTC) the
+	// first font is used.
 	Data []byte
 }
 
@@ -52,7 +58,9 @@ type faceKey struct {
 }
 
 // Set is a regular/bold/italic/bold-italic family of parsed fonts plus an
-// ordered list of fallback fonts for runes the family lacks. Faces and
+// ordered chain of fallback fonts for runes the family lacks (the first font
+// in the chain that has a rune draws it), and optionally a colour emoji font
+// that is consulted last for text and first for emoji sequences. Faces and
 // metrics are cached per (font, size). A Set is safe for concurrent use, but
 // the returned faces are shared and, like all opentype faces, must not be
 // used from multiple goroutines at once.
@@ -60,22 +68,39 @@ type Set struct {
 	fonts         [styleCount]*opentype.Font
 	fallbacks     []*opentype.Font
 	fallbackNames []string
+	emoji         *emoji.Font // nil without colour emoji
 
 	mu    sync.Mutex
 	faces map[faceKey]xfont.Face
 }
 
-// Default returns a new Set backed by the embedded JetBrains Mono fonts with
-// the embedded Symbols Nerd Font Mono as a fallback for icon glyphs. Each
+// Default returns a new Set backed by the embedded JetBrains Mono fonts. Its
+// fallback chain is the embedded Symbols Nerd Font Mono (icons), the embedded
+// Noto Sans Mono CJK SC subset (hanzi, Hangul, kana), then extra, in order;
+// embedded fonts come first so that user fonts never change the glyphs they
+// cover. The embedded Twemoji Mozilla colour emoji font backs Emoji. Each
 // call parses the fonts again and returns an independent Set (with its own
 // caches); callers that render repeatedly should keep the Set.
-func Default() (*Set, error) {
-	return Load(jetBrainsMonoRegular, jetBrainsMonoBold, jetBrainsMonoItalic, jetBrainsMonoBoldItalic,
-		FallbackFont{Name: "Symbols Nerd Font Mono", Data: symbolsNerdFontMono})
+func Default(extra ...FallbackFont) (*Set, error) {
+	emojiFont, err := emoji.Parse(twemojiMozilla)
+	if err != nil {
+		return nil, fmt.Errorf("font: embedded colour emoji: %w", err)
+	}
+	chain := append([]FallbackFont{
+		{Name: "Symbols Nerd Font Mono", Data: symbolsNerdFontMono},
+		{Name: "Noto Sans Mono CJK SC", Data: notoSansMonoCJK},
+	}, extra...)
+	s, err := Load(jetBrainsMonoRegular, jetBrainsMonoBold, jetBrainsMonoItalic, jetBrainsMonoBoldItalic, chain...)
+	if err != nil {
+		return nil, err
+	}
+	s.emoji = emojiFont
+	return s, nil
 }
 
 // Load parses TTF/OTF data for the four styles into a Set. Each fallback is
-// parsed too; FaceFor tries them in the order given.
+// parsed too; FaceFor tries them in the order given. The Set has no colour
+// emoji font.
 func Load(regular, bold, italic, boldItalic []byte, fallbacks ...FallbackFont) (*Set, error) {
 	s := &Set{faces: make(map[faceKey]xfont.Face)}
 	for i, d := range [styleCount][]byte{regular, bold, italic, boldItalic} {
@@ -86,14 +111,57 @@ func Load(regular, bold, italic, boldItalic []byte, fallbacks ...FallbackFont) (
 		s.fonts[i] = f
 	}
 	for _, fb := range fallbacks {
-		f, err := opentype.Parse(fb.Data)
+		f, err := fb.parse()
 		if err != nil {
-			return nil, fmt.Errorf("font: parse fallback %q: %w", fb.Name, err)
+			return nil, err
 		}
 		s.fallbacks = append(s.fallbacks, f)
 		s.fallbackNames = append(s.fallbackNames, fb.Name)
 	}
 	return s, nil
+}
+
+// parse parses the font, or the first font of a collection.
+func (fb FallbackFont) parse() (*opentype.Font, error) {
+	coll, err := opentype.ParseCollection(fb.Data)
+	if err != nil {
+		return nil, &FallbackError{fb.Name, err}
+	}
+	f, err := coll.Font(0)
+	if err != nil {
+		return nil, &FallbackError{fb.Name, err}
+	}
+	return f, nil
+}
+
+// Validate reports whether fb parses as a font, with a *FallbackError if not.
+func (fb FallbackFont) Validate() error {
+	_, err := fb.parse()
+	return err
+}
+
+// FallbackError reports a fallback font that could not be parsed.
+type FallbackError struct {
+	Name string // the FallbackFont's Name
+	Err  error
+}
+
+func (e *FallbackError) Error() string {
+	return fmt.Sprintf("font: parse fallback %q: %v", e.Name, e.Err)
+}
+
+func (e *FallbackError) Unwrap() error { return e.Err }
+
+// Emoji renders cluster, a grapheme cluster (a base rune with its zero-width
+// followers), as a side x side colour image from the colour emoji font. It
+// uses the glyph of the whole sequence when the font has one and otherwise
+// that of the first rune. ok is false when the Set has no colour emoji font
+// or the font has no glyph. The image is shared: callers must not modify it.
+func (s *Set) Emoji(cluster string, side int) (img *image.RGBA, ok bool) {
+	if s.emoji == nil {
+		return nil, false
+	}
+	return s.emoji.Image(cluster, side)
 }
 
 var styleNames = [styleCount]string{"regular", "bold", "italic", "bold italic"}

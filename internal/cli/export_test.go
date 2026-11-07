@@ -474,3 +474,113 @@ func TestExportFPSChangesFrameCount(t *testing.T) {
 		}
 	}
 }
+
+// A recording of emoji sequences exports as colour: with grapheme clustering
+// on, a ZWJ family is one two-cell cluster, so the text after it lands in the
+// column after its second cell and nothing is drawn past it.
+func TestExportDrawsColourEmojiSequences(t *testing.T) {
+	const family = "\U0001F468\u200d\U0001F469\u200d\U0001F467"
+	data := buildRecording(t, head.Head{Cols: 12, Rows: 1}, bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
+		must(t, w.Output(100*time.Millisecond, []byte("\U0001F600x"+family+"y")))
+		must(t, w.Exit(200*time.Millisecond, 0))
+	})
+	in := writeFile(t, "emoji.shot", data)
+	out := filepath.Join(t.TempDir(), "emoji.apng")
+	if code, stderr := runExportCmd(t, in, "-o", out, "--hold", "1s", "--cursor", "none"); code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	a := decodeAPNG(t, out)
+	final := compose(t, a, len(a.Frames)-1)
+
+	fonts, err := font.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := raster.New(fonts, raster.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, h := r.Size(12, 1)
+	cellW, cellH := (w-2*raster.DefaultPadding)/12, h-2*raster.DefaultPadding
+	bg := final.At(0, 0)
+	colourful := func(col, cells int) int { // pixels that are neither background nor grey text
+		n := 0
+		for y := raster.DefaultPadding; y < raster.DefaultPadding+cellH; y++ {
+			for x := raster.DefaultPadding + col*cellW; x < raster.DefaultPadding+(col+cells)*cellW; x++ {
+				c := final.RGBAAt(x, y)
+				if final.At(x, y) != bg && (max(c.R, c.G, c.B)-min(c.R, c.G, c.B)) > 60 {
+					n++
+				}
+			}
+		}
+		return n
+	}
+	if n := colourful(0, 2); n < 30 {
+		t.Errorf("grin: %d colourful pixels in its two cells", n)
+	}
+	if n := colourful(3, 2); n < 30 {
+		t.Errorf("family: %d colourful pixels in its two cells", n)
+	}
+	if n := colourful(2, 1) + colourful(5, 1) + colourful(6, 6); n != 0 {
+		t.Errorf("%d colourful pixels outside the emoji cells", n)
+	}
+	ink := func(col int) int {
+		n := 0
+		for y := raster.DefaultPadding; y < raster.DefaultPadding+cellH; y++ {
+			for x := raster.DefaultPadding + col*cellW; x < raster.DefaultPadding+(col+1)*cellW; x++ {
+				if final.At(x, y) != bg {
+					n++
+				}
+			}
+		}
+		return n
+	}
+	if ink(2) == 0 || ink(5) == 0 {
+		t.Error("the text around the emoji is missing from columns 2 and 5")
+	}
+	for col := 6; col < 12; col++ {
+		if ink(col) != 0 {
+			t.Errorf("column %d has ink; the family must occupy exactly columns 3-4", col)
+		}
+	}
+}
+
+func TestExportFallbackFontErrors(t *testing.T) {
+	in := writeExportFixture(t)
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "bad.ttf")
+	if err := os.WriteFile(bad, []byte("not a font"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(dir, "missing.ttf")
+	for _, tc := range []struct{ name, font, want string }{
+		{"missing", missing, missing},
+		{"invalid", bad, bad + " is not a valid font"},
+	} {
+		out := filepath.Join(dir, tc.name+".apng")
+		code, stderr := runExportCmd(t, in, "-o", out, "--fallback-font", tc.font)
+		if code == 0 || !strings.Contains(stderr, tc.want) || !strings.Contains(stderr, "--fallback-font") {
+			t.Errorf("%s: exit %d, stderr %q; want a failure naming --fallback-font and %q", tc.name, code, stderr, tc.want)
+		}
+		if _, err := os.Stat(out); err == nil {
+			t.Errorf("%s: output was written despite the error", tc.name)
+		}
+	}
+}
+
+func TestExportFallbackFontAndSystemFontsAreAccepted(t *testing.T) {
+	in := writeExportFixture(t)
+	dir := t.TempDir()
+	font := "../render/font/assets/NotoSansMonoCJKsc-Subset.otf"
+	for _, args := range [][]string{
+		{"--fallback-font", font},
+		{"--fallback-font", font, "--fallback-font", font},
+		{"--system-fonts"},
+	} {
+		out := filepath.Join(dir, "out.apng")
+		code, stderr := runExportCmd(t, append([]string{in, "-o", out}, args...)...)
+		if code != 0 {
+			t.Errorf("%v: exit %d, stderr %q", args, code, stderr)
+		}
+	}
+}

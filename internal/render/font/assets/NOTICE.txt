@@ -22,3 +22,33 @@ The font bundles icon sets under their own licences, as listed in the zip's READ
   Pomicons 1.001 (OFL 1.1 with Reserved Font Name), Powerline Extra (MIT),
   Powerline Symbols 1.000 (MIT), Power Symbols IEC (MIT),
   Weather Icons 2.0.10 (OFL 1.1).
+
+Twemoji Mozilla v0.7.0 (COLRv0 colour emoji font built from Twemoji 14.0.1)
+Source: https://github.com/mozilla/twemoji-colr/releases/download/v0.7.0/Twemoji.Mozilla.ttf
+Unmodified file (saved as TwemojiMozilla.ttf); sha256:
+  6d90152ee0d29e82fe2a87793af5aa4b7ad13e6538360889e141e81ed299ee8e  TwemojiMozilla.ttf
+  64419edc28e9163204c3be73f835a8dfc34cd6c9b8f7d067bb685f119f839a99  Twemoji-Mozilla-LICENSE.md
+    (LICENSE.md from https://github.com/mozilla/twemoji-colr, master)
+  9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411  Twemoji-CC-BY-4.0.txt
+    (https://creativecommons.org/licenses/by/4.0/legalcode.txt)
+Licences: the emoji artwork is Twemoji, Copyright Twitter, Inc. and other
+contributors, licensed under CC BY 4.0 (attribution required: this notice and
+the README credit it; the artwork was converted by Mozilla into the layered
+glyphs of this font, and shellshot draws those glyphs unchanged). The font
+build code is Copyright 2016-2018 Mozilla Foundation, Apache License 2.0.
+Used for colour emoji in exports; see internal/render/emoji.
+
+Noto Sans Mono CJK SC Regular (SIL OFL 1.1, see NotoCJK-OFL.txt), subset
+Source: https://github.com/notofonts/noto-cjk/raw/main/Sans/Mono/NotoSansMonoCJKsc-Regular.otf
+  (Version 2.004; 16,393,784 bytes; sha256
+  ec04cc376b34887cedbdf84074e2e226ed2761eeabdcb9173fc1dd7bfd153ef7)
+Modified: subset to 6,625 characters (GB2312 level-1 hanzi, KS X 1001 Hangul,
+U+3000-30FF, U+FF00-FFEF, U+2010-2027) with layout features and hinting
+removed, by scripts/subset-cjk-font.sh using fonttools 4.68.0 (pyftsubset).
+The font name table is unchanged (no Reserved Font Name is declared).
+Subset sha256:
+  e969f2583a376232cc9f784d44edcc00e2ef53c0f3f64eae311ddb38aa355091  NotoSansMonoCJKsc-Subset.otf
+  6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2  NotoCJK-OFL.txt
+    (https://github.com/notofonts/noto-cjk/raw/main/Sans/LICENSE)
+Used as a fallback for hanzi, Hangul, kana and CJK punctuation. It has
+simplified Chinese glyph forms.

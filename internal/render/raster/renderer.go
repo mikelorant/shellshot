@@ -32,6 +32,10 @@ type Fonts interface {
 	// cells (cells wide, cellW x cellH pixels each) r occupies. ok is false
 	// if no font has r.
 	FitFace(r rune, bold, italic bool, sizePx float64, cellW, cellH, cells int) (face xfont.Face, ok bool, err error)
+	// Emoji renders a grapheme cluster as a side x side colour image, or
+	// reports false if no colour emoji font has a glyph for it. The image is
+	// shared and must not be modified.
+	Emoji(cluster string, side int) (img *image.RGBA, ok bool)
 	// Metrics returns the whole-pixel cell geometry at sizePx.
 	Metrics(sizePx float64) (font.Metrics, error)
 }

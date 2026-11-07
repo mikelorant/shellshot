@@ -24,3 +24,17 @@ var (
 	//go:embed assets/SymbolsNerdFontMono-Regular.ttf
 	symbolsNerdFontMono []byte
 )
+
+// Embedded Noto Sans Mono CJK SC Regular subset (SIL OFL 1.1): the common
+// hanzi, Hangul syllables, kana and CJK punctuation. See assets/NOTICE.txt.
+var (
+	//go:embed assets/NotoSansMonoCJKsc-Subset.otf
+	notoSansMonoCJK []byte
+)
+
+// Embedded Twemoji Mozilla v0.7.0 (COLRv0 colour emoji; artwork CC BY 4.0).
+// See assets/NOTICE.txt.
+var (
+	//go:embed assets/TwemojiMozilla.ttf
+	twemojiMozilla []byte
+)

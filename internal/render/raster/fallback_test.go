@@ -82,7 +82,7 @@ func TestFallbackBoldItalicUseRegularSymbols(t *testing.T) {
 // A rune no font has stays blank and does not panic.
 func TestFallbackMissingEverywhereIsBlank(t *testing.T) {
 	r, _ := newTestRenderer(t, Options{})
-	img := mustRender(t, r, plainSnapshot(4, "\U0010FFFE世 "))
+	img := mustRender(t, r, plainSnapshot(4, "\U0010FFFE\U0010FFFD "))
 	if got := inkOutsideCells(r, img); got != 0 {
 		t.Errorf("%d inked pixels for runes no font has", got)
 	}
