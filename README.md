@@ -106,14 +106,20 @@ terminal and `NO_COLOR` is unset. With `--color always` the second line is
 ### `export`: animated PNG
 
 ```console
-$ shellshot export demo.shot -o demo.apng --theme light
-wrote 3 frames (3.2 KB) to demo.apng
-$ shellshot export demo.shot        # writes demo.apng next to the input
+$ shellshot export demo.shot -o demo.png --theme light
+wrote 3 frames (3.2 KB) to demo.png
+$ shellshot export demo.shot        # writes demo.png next to the input
 ```
+
+The output is a standard PNG that carries APNG animation data. Viewers that
+support APNG animate it (browsers, GitHub, Slack, Discord and many image
+viewers); others show only the first frame. At the time of writing, macOS
+Preview and Quick Look show only the first frame, so open the file in a browser
+to check the animation. `-o` is written as typed, so `-o demo.apng` also works.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `-o` | input with `.apng` | output file (never overwrites the input) |
+| `-o` | input with `.png` | output file (never overwrites the input) |
 | `--theme` | `dark` | built-in (`dark`, `light`) or a theme JSON file |
 | `--font-size`, `--scale`, `--padding` | 15, 1, 8 | em size in pixels, integer scale of font size and padding (2 = native 2x glyphs, for sharp retina embeds), border (≥1) |
 | `--adjust-cell-width`, `--adjust-cell-height` | 0, 0 | change the cell size after `--scale`, in pixels (`-1`, `2`) or percent (`-7%`), like Ghostty's options of the same name |
