@@ -216,7 +216,7 @@ type Segment struct {
 
 - **Model:** a non-blocking state machine on the session goroutine (v1 brief). Scenes add a scope stack and two events.
 - **Order:** apply settings, `SPAN begin`, steps, `SPAN end`, revert.
-- **`run`:** type text, press Enter, then `wait idle settle` (no OUT event for `settle`, capped by `timeout`; hitting the cap is not an error). `settle off` skips it. Then `linger`.
+- **`run`:** type text, press Enter, then `wait idle settle` (no OUT event for `settle`, capped by `timeout`; hitting the cap **fails the script**, `script-format.md` §7.3). `settle off` skips it. Then `linger`.
 - **Prompt detection:** libghostty exposes OSC 133 semantic-prompt effects (**direct**, `binary-format.md` §2.3), but they require shell integration, so they cannot be the default. Possible later refinement: if a prompt mark was seen during recording, `run` waits for it; otherwise quiet screen.
 - **Failure: stop at the first failure.** A `wait` timeout, failed `wait … 0s` assertion, or unexpected child exit: print `file:line: scene "install": wait "done" timed out after 15s` plus the last screen to stderr; write span ends; kill the child; finish the recording; exit with a script-failure code. Codes (proposal, align with v2): 0 ok; 2 usage/parse; 3 script step failed; else child's code (`128+sig`).
 - **Assertions:** `wait "text" 0s` (was `expect "text"`) is a `wait` with timeout 0: match once against the visible screen text of the headless libghostty terminal (rows joined by `\n`). `expect not` ("absent now") is dropped: RE2 has no lookahead; revisit if asked.
@@ -283,7 +283,7 @@ The user's tape (`committed`, a TUI that prompts for type, scope and message) is
 | 7 | Blank-line idiom `Sleep 0.5s Enter Sleep 0.25s` / `Sleep 0.25s Enter Sleep 0.25s` | Inside `paragraphs`, a blank line is typed as two Enters, so the idiom is one block; pauses between become `linger` | The tape's 250/500 ms pauses around the Enters are lost |
 | 8 | `Require committed` / `Require git` | `require` is **deferred**; a hidden `run command -v committed > /dev/null && command -v git > /dev/null && echo TOOLS-OK` plus `wait /^TOOLS-OK$/ 5s` fails the run (exit 3) when a tool is missing | Checks the guest `PATH`, after the shell starts; `--list` does not show it |
 | 9 | `Output demo.gif`, `Width/Height/Padding/FontSize/Theme/LetterSpacing` at the top: these are **export** settings | Out of the script (see 8.3) | A single file is no longer the whole recipe; the `export` command line or a future `export { }` section carries it |
-| 10 | Trailing `Hide` + `Ctrl+D` just to exit | Automatic: at the end of the script the executor sends EOT inside an implicit hidden span | A script that must keep the shell alive needs `settle`-free opt-out (not defined; open question) |
+| 10 | Trailing `Hide` + `Ctrl+D` just to exit | Automatic: at the end of the script the executor sends EOT inside an implicit hidden span | Always on: there is no opt-out (decided, `script-format.md` §7.4) |
 | 11 | Magic numbers meaning "give the viewer time to read" | `linger` names the intent; end-of-scene `hold` is **export-time** (the final `Sleep 5s` becomes `hold 5s`, so recording and CI run faster) | Numbers are still magic; `linger` is record-time so it still costs wall time |
 | 12 | `Set Width 794 / Height 760` are pixels | Recording size is `size COLSxROWS`; pixels come from font size and padding at export | Cannot copy the pixel size over directly (see 8.2) |
 | 13 | `cd /tmp` and `git init` run in a shared `/tmp` | Same problem. Better: `hidden { run cd $(mktemp -d) ... }` | Both the tape and the translation share state in a user-visible directory |
@@ -609,7 +609,7 @@ Tasks 1–3 do not depend on the parser. `linger` (task 7) can slip. **[supersed
 5. ~~`require` in v1~~ (answered: deferred, reserved).
 6. No `export` block in v1; theme/font/padding/pixels via `export` flags.
 7. GIF dropped; APNG only.
-8. Auto-exit at end of script: always, or opt out (open: how, e.g. a `keep-open` setting)?
+8. ~~Auto-exit at end of script: always, or opt out~~ (answered: always, no opt-out).
 9. ~~`type@dur` suffix~~ (answered: dropped; use a `typing` line).
 10. Exit-code numbers; `FILE.failed.shot` naming for failed runs; `expect` in v1 or v1.1.
 11. Record-time `--only/--skip` dropped in favour of export-time `--scene`.
@@ -617,7 +617,7 @@ Tasks 1–3 do not depend on the parser. `linger` (task 7) can slip. **[supersed
 **Risks**
 - `timeline` changes touch shared policy; the split-at-boundary rule can double an idle cap at a crossing.
 - Forced `frames` samples change the frame stream when spans exist.
-- Quiet-screen `run` is a heuristic (slow silent commands, spinners that keep emitting output never settle until `timeout`).
+- Quiet-screen `run` is a heuristic (slow silent commands, spinners that keep emitting output never settle and now **fail the `run` at `timeout`**; such commands need `settle off` plus `wait PATTERN TIMEOUT`, `script-format.md` §7.3).
 - Hidden spans can mask state: the export may show a screen the visible commands cannot reach.
 - Scenes look independent but share shell state.
 - A failing run leaves a partial recording that could be published by mistake.

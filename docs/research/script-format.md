@@ -1,6 +1,6 @@
 # Research: automation script format for shellshot (`record --script`), v2 consolidated
 
-Status: design brief, **v2 consolidated**. One design: the v2 grouped-block language, the scenes refinement ([`script-scenes.md`](script-scenes.md)) and the user's latest decisions (named text blocks, `linger`, the command/setting budget, SPAN events). `script-scenes.md` stays as supporting detail (recording, export, the VHS-tape reference case); **where the two differ, this file wins**. No code exists yet.
+Status: design brief, **v2 consolidated**. One design: the v2 grouped-block language, the scenes refinement ([`script-scenes.md`](script-scenes.md)) and the user's latest decisions (named text blocks, `linger`, the command/setting budget, SPAN events, and the three newest: the shell always exits at the end of a script, a `run` that cannot settle fails the script, and `shell` takes arguments). `script-scenes.md` stays as supporting detail (recording, export, the VHS-tape reference case); **where the two differ, this file wins**. No code exists yet.
 
 **Evidence limits (read first).**
 - This is a design. **No code was run.** Examples were checked by a throwaway Python checker written to this file's EBNF (§4.3), not by the real parser. The checker is not committed. It approximates RE2 with Python `re`.
@@ -18,8 +18,10 @@ Status: design brief, **v2 consolidated**. One design: the v2 grouped-block lang
 - **Blocks (2):** `scene NAME { … }` is a named, exportable chapter. `hidden { … }` runs and is recorded but export may drop it. A `hidden` may sit in a `scene`; no other nesting.
 - **Settings (14) in three classes:** process (`size shell env cwd seed output`, before the first step only), behaviour (`typing jitter timeout settle linger`, anywhere, scoped in blocks) and export hints (`speed idle hold`, preamble or in a `scene`). A setting line inside a block applies to the closing `}`, then reverts.
 - **Text:** `run npm install` takes the rest of the line literally; a leading `"` switches to an escaped string. Multi-line text uses **named text blocks** `type|run lines { … }` and `type|run paragraphs { … }` (§3.5). There is no line continuation.
-- **Waiting:** `run` waits for a quiet screen (`settle`, 200 ms). `wait idle` waits for quiet explicitly. `wait PATTERN` matches libghostty's rendered screen. `linger 2s` pauses after each step so a viewer can read (§3.2).
+- **Waiting:** `run` waits for a quiet screen (`settle`, 200 ms) and **fails the script if the screen is not quiet within `timeout`** (§7.3). `wait idle` waits for quiet explicitly and fails the same way. `wait PATTERN` matches libghostty's rendered screen. `linger 2s` pauses after each step so a viewer can read (§3.2).
 - **Recording:** scenes and hidden spans are **SPAN events** (kind 64, ancillary, binary); user `mark` stays MARK (§7.2).
+- **End of script:** the shell is **always** exited automatically, inside an implicit hidden span the author never writes; there is no opt-out (§7.4).
+- **Shell:** `shell PATH ARGS…` runs a program with arguments (e.g. `shell /bin/bash --noprofile --norc`); the arguments are split by a fixed rule with no environment expansion (§3.2).
 - **Static:** the whole file is parsed and validated before anything spawns (exit 2). `record --script FILE --list` prints the plan.
 - **Kept from v1:** a non-blocking executor polled by the session goroutine; key chords through libghostty's `KeyEncoder`; real time only; reproducible inputs and screens at marks, not byte-identical recordings; own exit codes.
 - **Deferred or excluded:** §3.4.
@@ -53,22 +55,22 @@ Status: design brief, **v2 consolidated**. One design: the v2 grouped-block lang
 
 | Command | Meaning |
 |---|---|
-| `run TEXT` | Type TEXT, press Enter, wait for a quiet screen (`settle`). The common case. |
+| `run TEXT` | Type TEXT, press Enter, wait for a quiet screen (`settle`). The common case. **Fails the script if the screen is not quiet within `timeout`** (§7.3). |
 | `type TEXT` | Type TEXT without Enter. |
 | `press KEY…` | Key chords, e.g. `press ctrl+c`, `press up up enter`. A key may be followed by a repeat `xN`: `press down x3`. |
 | `wait PATTERN [TIMEOUT]` | Block until the visible screen matches PATTERN: a quoted string (substring) or `/regex/`. TIMEOUT overrides `timeout`. **`wait "passed" 0s` checks the current screen once and fails at once if it does not match: this is the assertion** (there is no `expect`, §11). |
-| `wait idle [DURATION]` | Block until the screen has had no output for DURATION (default: `settle`, or 200 ms if `settle off`). Fails at `timeout`. |
+| `wait idle [DURATION]` | Block until the screen has had no output for DURATION (default: `settle`, or 200 ms if `settle off`). Fails at `timeout`, like `run`'s settle. |
 | `sleep DURATION` | Pause. |
 | `mark LABEL` | Emit a MARK event (a user label, §7.2). |
 
-`run` and `type` take **one text form** (§3.5): rest-of-line, a quoted string, or a text block. `run` does not wait for the command to *finish*, only for a quiet screen; use `wait PATTERN` for slow commands.
+`run` and `type` take **one text form** (§3.5): rest-of-line, a quoted string, or a text block. `run` does not wait for the command to *finish*, only for a quiet screen; use `wait PATTERN` for slow commands. **Rule for long-running commands:** the implicit settle is a failure if the screen never stays quiet for `settle` before `timeout` (a build that prints continuously, a spinner, `tail -f`, `top`). Such a `run` must be written with `settle off` (in the step's block, so it reverts) followed by an explicit `wait PATTERN TIMEOUT`, or with a `timeout` larger than the output lasts. A command that is silent (or redirects its output) settles at once and needs no special care.
 
 ### 3.2 Settings (14)
 
 | Setting | Argument | Default | Class |
 |---|---|---|---|
 | `size` | `COLSxROWS`, each 1–1000 | current terminal, else 80x24 | process |
-| `shell` | PATH of the program to run | `$SHELL`, else `/bin/sh` | process |
+| `shell` | PATH of the program to run, then optional ARGS (rest of line, split into argv; see below) | `$SHELL`, else `/bin/sh`, no args | process |
 | `env` | `KEY=VALUE`, repeatable; later wins | inherited | process |
 | `cwd` | PATH | cwd of `shellshot` | process |
 | `seed` | unsigned int, jitter PRNG seed | `1` | process |
@@ -76,13 +78,21 @@ Status: design brief, **v2 consolidated**. One design: the v2 grouped-block lang
 | `typing` | DURATION between typed units | `50ms` | behaviour |
 | `jitter` | PERCENT `0%`–`100%` | `0%` | behaviour |
 | `timeout` | DURATION > 0, default for `wait` | `15s` | behaviour |
-| `settle` | DURATION, or `off`: quiet time `run` waits for after Enter | `200ms` | behaviour |
+| `settle` | DURATION, or `off`: quiet time `run` waits for after Enter; not reaching it within `timeout` **fails the script** | `200ms` | behaviour |
 | `linger` | DURATION: **pause this long after every step in the block so the viewer can read the screen** | `0s` | behaviour |
 | `speed` | NUMBERx, > 0 (`8x`): export playback speed of the span | export default | hint |
 | `idle` | DURATION: export cap per gap in the span | none | hint |
 | `hold` | DURATION: extra export time on the span's last screen | none | hint |
 
 **`linger`, precisely.** After every `run`, `type`, `press` and `wait` (including `wait idle`) completes, the executor pauses `linger` before the next step; for `run` that is after the settle. `sleep` and `mark` get no linger (a `sleep` already is a pause). A text block is **one** step, so it gets one linger after the whole block, never one per line. The last step in a block lingers too (inside the span). Unlike `hold`, `linger` costs real recording time; `hold` is export-time only.
+
+**`shell` arguments, precisely.** `shell PATH ARGS…` spawns PATH with argv `[PATH, ARGS…]`, e.g. `shell /bin/bash --noprofile --norc`. The rest of the line after `shell` (up to an optional trailing comment) is split into arguments by this rule, and no other:
+- Arguments are separated by runs of spaces or tabs.
+- A double quote starts a quoted run that ends at the next unescaped double quote; spaces and tabs inside it do not split. A quoted run may sit inside a word, so `--rcfile="/my dir/rc"` is the one argument `--rcfile=/my dir/rc`. `""` is an empty argument.
+- Inside a quoted run a backslash starts an escape, the same set as strings (`\n \t \" \\ \e \xHH`; any other `\` is an error). Outside quotes a backslash is literal.
+- Single quotes have no meaning (`'` is an ordinary character). `#` starts a comment only at the start of an argument (put `"#"` in quotes to pass one).
+- **No environment expansion** and no globbing, tilde or command substitution: `shell /bin/sh -c "echo $HOME"` passes the text `echo $HOME` to `sh`, which then expands it. (Reason: the script must mean the same on every machine; `env` plus the child cover real needs.)
+- An unterminated quote, a bad escape, or no PATH is a parse error at that column. PATH is not looked up on disk during validation (the validator stays static); a program that cannot be started is a runtime error (exit 1).
 
 **Where each class is legal:**
 
@@ -107,7 +117,7 @@ hidden {
 - Nesting is at most one level: `hidden` inside `scene` is allowed. `scene` in `scene`, `hidden` in `hidden`, `scene` in `hidden` are errors (the last two are pointless or confusing).
 - A block must contain at least one step.
 - `hidden` steps run exactly like others (failures fail the run); `hidden` only marks a span that export may drop. A trailing `hidden` runs on success only; `cleanup { }` is deferred.
-- At the end of the script the executor shuts the shell down inside an **implicit trailing hidden span** (§7.4). A script author writes nothing.
+- At the end of the script the executor **always** shuts the shell down inside an **implicit trailing hidden span** (§7.4). A script author writes nothing, and nothing can turn this off. The span is hidden: export drops it, so the exit does not appear in an export. It exists in the plan and the recording even in a script with no `hidden` block, and it is not subject to the "a block must contain a step" rule (it is not source text).
 
 ### 3.4 Deliberately excluded or deferred
 
@@ -183,7 +193,10 @@ Body rules (all deterministic, applied in this order):
   demo.script:9:5: "scene" cannot be nested inside scene "intro"
   demo.script:7:3: unterminated text block opened here: expected a line with only "}" at column 3 (found "}" at line 12 with different indentation; that line is literal text)
   demo.script:7:3: empty text block: no non-blank line (to press Enter alone use "press enter")
+  demo.script:3:22: unterminated quote in shell arguments
+  demo.script:14:3: scene "build": run did not settle: the screen was still changing after 15s (timeout); for continuous output use "settle off" and "wait PATTERN TIMEOUT", or raise "timeout"
   ```
+  The first five are parse or validation errors (exit 2, nothing spawned). The settle error is a **run-time script failure** (exit 3, §7.3); it names the scene (or `hidden`, or nothing at top level), the position of the `run`, and the `timeout` in effect.
 
 ### 4.2 Files and header
 
@@ -211,9 +224,12 @@ close           = { SP } , "}" , tail , NL ;
 process-setting   = ( size | shell | env | cwd | seed | output ) , tail , NL ;
 behaviour-setting = ( typing | jitter | timeout | settle | linger ) , tail , NL ;
 hint-setting      = ( speed | idle | hold ) , tail , NL ;
-size    = "size" , SP , { SP } , int , "x" , int ;      shell  = "shell" , SP , { SP } , arg ;
+size    = "size" , SP , { SP } , int , "x" , int ;
 env     = "env" , SP , { SP } , key , "=" , [ arg ] ;   cwd    = "cwd" , SP , { SP } , arg ;
 seed    = "seed" , SP , { SP } , int ;                  output = "output" , SP , { SP } , arg ;
+shell   = "shell" , SP , { SP } , shell-arg , { SP , { SP } , shell-arg } ;     (* PATH, then ARGS; see 3.2 *)
+shell-arg = ( string | ( ANY - SP - NL - '"' - "#" ) ) , { string | ( ANY - SP - NL - '"' ) } ;
+                  (* a quoted run may sit inside a word; the lexer unescapes it; the argument list ends at tail *)
 typing  = "typing" , SP , { SP } , duration ;           timeout = "timeout" , SP , { SP } , duration ;
 jitter  = "jitter" , SP , { SP } , number , "%" ;       linger  = "linger" , SP , { SP } , duration ;
 settle  = "settle" , SP , { SP } , ( duration | "off" ) ;
@@ -257,12 +273,13 @@ regexchar = ( ANY - "/" - "\" - NL ) | ( "\" , ANY - NL ) ;
 
 Notes:
 - `press`, `wait`, `sleep`, `mark` may end in a comment. `run`/`type` carry their own line end: unquoted text cannot take one.
-- **Validator-only rules** (the grammar is a superset so errors are precise): names against the known sets; legality table (3.2); no duplicate process settings except `env`; unique scene names; non-empty blocks; nesting (3.3); `timeout` and `idle` > 0, `wait idle` duration > 0, `speed` > 0; size ≤ 1000; repeat 1–999; modifiers not repeated; `\xHH` results valid UTF-8; raw text, text blocks and marks contain no control characters other than tab (use a quoted string with `\e`).
+- **Validator-only rules** (the grammar is a superset so errors are precise): names against the known sets; legality table (3.2); no duplicate process settings except `env`; `shell` PATH non-empty and every argument free of NUL and other control characters except tab (no file-system check); unique scene names; non-empty blocks; nesting (3.3); `timeout` and `idle` > 0, `wait idle` duration > 0, `speed` > 0; size ≤ 1000; repeat 1–999; modifiers not repeated; `\xHH` results valid UTF-8; raw text, text blocks and marks contain no control characters other than tab (use a quoted string with `\e`).
 
 ### 4.4 Tokenizer note
 
 Hand-written scanner, one line at a time; the first word is the keyword (or `}`). The keyword selects how the rest of the line is scanned:
 - `run`, `type`: one **TEXT** (rest of line, trimmed) or **STRING** plus optional COMMENT, **or a mode switch**: if the remainder is exactly a text-block header (`lines`|`paragraphs`, `{`, optional comment), the scanner emits `TEXTBLOCK{keyword, shape, opener Pos, body lines with Pos}` as **one token**: it reads raw lines until the first line equal to the keyword line's indentation + `}` + optional spaces, and tokenises nothing inside. End of file first: `unterminated text block` at the opener. All body-rule processing (strip, trim, join) happens in the parser, so the lexer stays a pure line splitter.
+- `shell`: **keyword-directed value shape.** The rest of the line is not one WORD but PATH followed by ARGS: a list of `ARG` tokens, each with its own line:col, split by the rule of §3.2 (whitespace separates; a double quote starts a quoted run inside a word; backslash escapes only inside quotes; `#` at the start of an argument begins the COMMENT; nothing is expanded). The split is a pure function `splitShellArgs(rest string, col int) ([]Arg, error)` so it can be table-tested and fuzzed on its own. Unterminated quote and bad escape are reported at the offending column.
 - `wait`: first argument is **STRING**, **REGEX** (decided by `"` or `/`) or the bare word `idle`. Other keywords never scan a REGEX, so `cwd /tmp` is not a regex.
 - Everything else: **WORD**, **STRING**, `{`, `}`; `#` starts a COMMENT only at a token start (`cwd /tmp/a#b` is one WORD).
 - Each token has line:col. Typed literals (duration, percent, size, speed, key, repeat) are WORDs classified in the parser, so "needs a unit" and did-you-mean errors live in one place.
@@ -276,7 +293,8 @@ type Item interface{ ItemPos() Pos }                    // implemented only by S
 type Setting struct {
     Pos   Pos
     Name  string // "size", "typing", "linger", …; unknown names kept for the validator
-    Value string // raw argument text; typed by the validator
+    Value string   // raw argument text; typed by the validator
+    Argv  []string // shell only: [PATH, ARGS…] after splitting, quotes and escapes resolved; nil for other settings
     At    int    // effective before Items[At] of the enclosing list
 }
 type Step struct {
@@ -293,19 +311,19 @@ type Step struct {
 type Block struct { Pos Pos; Kind string /* scene | hidden */; Name string
                     Settings []Setting; Items []Item }
 ```
-`At` keeps source order between settings and items without making settings items. A canonical printer (AST → text) serves golden tests and the round-trip fuzz property; it prints blocks with the resolved text re-indented one level deeper, which the strip rule reverses.
+For `shell` the setting's value **is** the argv (`Argv`); `Value` keeps the raw source text for error messages, and the canonical printer prints `Argv`, re-quoting arguments that contain whitespace, `"`, `\` or a leading `#`. `At` keeps source order between settings and items without making settings items. A canonical printer (AST → text) serves golden tests and the round-trip fuzz property; it prints blocks with the resolved text re-indented one level deeper, which the strip rule reverses.
 
 ---
 
 ## 5. Examples
 
-Each was checked against §4.3 by the throwaway checker (every example passes; invalid variants (nesting, a process setting in a block, an unterminated or empty text block, a mis-indented closing line) are rejected). `/bin/sh` plus `env PS1=…` for a reproducible prompt is **unverified** (memory).
+Each was checked against §4.3 by the throwaway checker (every example passes; invalid variants (nesting, a process setting in a block, an unterminated or empty text block, a mis-indented closing line) are rejected). `/bin/sh` or `bash --noprofile --norc` plus `env PS1=…` for a reproducible prompt is **unverified** (memory). Re-checked after the decisions of §11 (shell arguments, settle failure): all five still parse, and no example has a `run` that would fail to settle.
 
 **1. Hello world**
 ```
 #!/usr/bin/env -S shellshot record --script
 # hello.script: the smallest useful demo
-shell /bin/sh
+shell /bin/bash --noprofile --norc    # arguments follow the path; no startup files, so the prompt is ours
 env PS1="$ "
 size 60x10
 linger 1s              # the viewer gets a second on the final screen
@@ -385,7 +403,7 @@ scene save {
 }
 ```
 
-**4. Long build, hidden setup, export hints**
+**4. Long build, hidden setup, export hints** (a `run` whose output never goes quiet needs `settle off` plus an explicit `wait`; without the `settle off` line, the 120 s `timeout` would fail the script at the `run`, §7.3)
 ```
 size 110x30
 shell /bin/sh
@@ -406,8 +424,9 @@ hidden {
 scene build {
   speed 8x                      # export: play the wait at 8x
   idle 2s
-  run make build > build.log 2>&1; echo BUILD-STATUS=$?
-  wait /^BUILD-STATUS=0$/ 5m    # anchored: the echoed command starts with the prompt
+  settle off                    # make prints for minutes and would never go quiet: no implicit settle
+  run make build; echo BUILD-STATUS=$?
+  wait /^BUILD-STATUS=0$/ 5m    # the explicit wait carries the long timeout; anchored: the echo starts with the prompt
   mark built
 }
 
@@ -489,7 +508,7 @@ Only `press` uses the encoder. `run`/`type` text is sent as raw UTF-8, one rune 
   hint tags: 1 speed (uvarint milli-x) | 2 idle (uvarint µs) | 3 hold (uvarint µs) | 4 caption (reserved) | 5+ reserved
   ```
 - Hint values are **resolved** (inheritance applied by the executor), so readers need no scope logic. Script-wide preamble hints are also written to `meta` keys `hint.speed`, `hint.idle`, `hint.hold` at start (crash-safe).
-- **Placement:** begin before the span's first step, end after its last step and its `linger`. The executor drains pending PTY output before stamping a boundary (the writer clamps backward timestamps). The implicit end-of-script span (§7.4) is a hidden span with the next id.
+- **Placement:** begin before the span's first step, end after its last step and its `linger`. The executor drains pending PTY output before stamping a boundary (the writer clamps backward timestamps). The implicit end-of-script span (§7.4) is a hidden span with the next id; it is **always** written, so every recording from a script ends with a hidden span after the last author-written step.
 - **Failure:** the executor writes the span ends before EXIT. After a kill or crash an unclosed span ends at the last event (readers must tolerate it). Unknown id, duplicate id, unknown type or `version > 1` makes that event ignorable, never a file error.
 - **User `mark LABEL`** is a MARK (kind 3, UTF-8 label); labels carry no structure. `info` lists scenes and hidden spans from SPAN events.
 - `hidden` output is still replayed (terminal state stays correct); export drops only its frames and time. `binary-format.md` does not yet list kind 64 (docs task T18).
@@ -497,14 +516,15 @@ Only `press` uses the encoder. `run`/`type` text is sent as raw UTF-8, one rune 
 ### 7.3 Wait and settle semantics
 - The executor is polled on the **session's single goroutine**. After each output chunk and on a timer tick it is handed a `Screen` and calls `Text()`: the visible rows (alt screen when active), each right-trimmed, joined by `\n`. No extra goroutine touches the terminal.
 - A quoted pattern is `strings.Contains`; a regex is compiled with `(?m)` and used with `MatchString`; a quoted literal may contain `\n` to match across rows. Scrollback is not searched (binding access unverified): text that scrolled off times out. This is more robust than raw-byte matching because the *rendered grid* already resolved cursor movement, clear-line, alt-screen and redraws.
-- **Timeout:** explicit `wait PATTERN TIMEOUT`, else the `timeout` in effect, else 15 s. **`TIMEOUT` of `0s`** tests the current screen once. On failure: error `file:line:col: scene "build": wait timed out after 15s waiting for /re/`, the final screen to stderr, child closed (SIGHUP, kill after grace), recording **finalised and kept**, exit 3. A wait that already matches returns at once. If the child exited, the final screen is tested once, then "child exited (status N) before match".
-- **Settle** (`run`, after the last Enter): wait until the screen has had no output for `settle` (default 200 ms), capped by `timeout`. **Reaching the cap is not an error** (the implicit settle is best effort: a spinner or very chatty command never settles); `settle off` skips it. `wait idle [D]` is the explicit form and **does** fail at `timeout`. Quiet is a heuristic: a command silent for more than `settle` returns early; use `wait PATTERN` for slow commands. OSC 133 prompt detection needs shell integration, so it is not the default.
+- **Timeout:** explicit `wait PATTERN TIMEOUT`, else the `timeout` in effect, else 15 s. **`TIMEOUT` of `0s`** tests the current screen once. On failure: error `file:line:col: scene "build": wait timed out after 15s waiting for /re/`, the final screen to stderr, child closed (SIGHUP, kill after grace), recording **finalised and kept**, exit 3. Every script failure in this file (wait timeout, failed assertion, settle timeout, child gone when input is needed) is handled the same way. A wait that already matches returns at once. If the child exited, the final screen is tested once, then "child exited (status N) before match".
+- **Settle** (`run`, after the last Enter): wait until the screen has had no output for `settle` (default 200 ms). The wait is capped by the `timeout` in effect, counted from the Enter. **Reaching the cap FAILS the script**: a screen that never stays quiet for `settle` within `timeout` is a script failure, exit 3, handled like a `wait` timeout (final screen on stderr, child closed, recording finalised and kept). The error names the scene (or `hidden`; nothing at top level), the line and column of the `run` (the opener of a text block), and the timeout: `demo.script:14:3: scene "build": run did not settle: the screen was still changing after 15s (timeout); for continuous output use "settle off" and "wait PATTERN TIMEOUT", or raise "timeout"`. `settle off` skips the settle entirely (nothing can fail there). `wait idle [D]` is the explicit form and fails at `timeout` in the same way.
+- **Rule for long-running commands:** `run` never waits for a command to *finish*; it waits for a quiet screen. A command that prints continuously for longer than `timeout` therefore fails the `run`. Write it as `settle off` (scoped: in a block it reverts at `}`) followed by `run CMD` and an explicit `wait PATTERN TIMEOUT` with a timeout that fits the command, or raise `timeout` above the duration of the output. A command that is silent, or whose output is redirected, settles after `settle` and is unaffected however long it runs. Quiet is a heuristic: a command silent for more than `settle` returns early (so `run sleep 30` does not wait 30 s); use `wait PATTERN` for slow commands. OSC 133 prompt detection needs shell integration, so it is not the default.
 - The echo trap (§2): anchor on line start, or print the sentinel through a split literal (`echo DO"NE"`).
 
 ### 7.4 Exit rules and codes
-- **End of script:** inside the implicit hidden span: (1) final settle (`settle`, max 2 s); (2) if the child still runs: shell → EOF (Ctrl-D, 0x04), other program → close the PTY master (SIGHUP); (3) grace 2 s, then kill. The final frame and footer are written as `session` does today. Opting out (a `keep-open` setting) is open (§11).
+- **End of script: always exits.** After the last step, and its `linger`, the executor **always** runs the exit sequence inside the implicit hidden span. There is no `keep-open` setting or flag: a script that must show a live shell at the end has no way to leave it running (an author who wants the last screen to stay on screen in an export uses `hold`). Sequence: (1) final drain (`settle`, max 2 s). This is part of the shutdown, not a `run`: failing to go quiet is **not** an error and the sequence carries on; (2) if the child still runs: shell → EOF (Ctrl-D, 0x04), other program → close the PTY master (SIGHUP); (3) grace 2 s, then kill. The final frame and footer are written as `session` does today. A child that had to be closed by SIGHUP or kill is noted on stderr (`child did not exit; closed by shellshot`) and is not counted as a child failure.
 - **Child exits mid-script:** later `run`/`type`/`press` fail "child exited"; `sleep`/`mark`/`wait` still work. Ending with `run exit` or `press q` is normal.
-- **Exit codes** (these override the scenes brief's "else child's code"): `0` completed (regardless of child status); `1` runtime error; `2` parse or validation error (nothing spawned, no file written); `3` script failure (`wait`/assertion failed, child exited when input was required); `130` cancelled. `--propagate-exit` makes the child's status the exit code.
+- **Exit codes** (the same convention as `record`, which exits with the child's status after writing the recording, `128+sig` for a signal death, unless `--ignore-exit-status`): `0` completed and the child's own exit status was 0; **the child's status** when the script completed and the child exited non-zero by itself (for example the last command's status, which a shell passes on when it receives Ctrl-D; a note goes to stderr; `--ignore-exit-status` makes it `0`); `1` runtime error (including a program that cannot be started); `2` parse or validation error (nothing spawned, no file written); `3` script failure (`wait`/assertion failed, `run` did not settle, child exited when input was required); `130` cancelled. The script's own codes (1, 2, 3, 130) win over a child status; a child that happens to exit with one of those numbers is told apart only by the stderr note (`record` has the same property).
 
 ### 7.5 What is recorded, and cancellation
 OUT: raw PTY output including echo of scripted typing. IN: off by default (`--record-input` records scripted keystrokes through the live write path). MARK: `mark`. SPAN: blocks. RESIZE: the initial size only. Scripted mode forwards no stdin and does not mirror output by default. `cmd.Context()` cancellation flows into the session; the recording is finalised and the exit code is 130. The executor never blocks without a context-aware wait.
@@ -527,7 +547,7 @@ internal/session           // + optional Driver hook
 internal/cli               // record.go: --script, --list; export.go: spans → segments
 testdata/script/*.script   // golden inputs; *.ast.golden, *.timeline.golden
 ```
-`script`, `keys` and `run` import no cgo, no pty, no cobra. `run` declares `Screen{Text() string}`, `Keys{Encode(Chord) ([]byte, error)}` and `Clock`. **Lowering** resolves scopes once: every op already carries its effective `typing`, `jitter`, `timeout`, `settle`, `linger` and resolved hints, and `SpanBegin`/`SpanEnd` and the implicit end span are explicit ops, so the state machine has no scope logic.
+`script`, `keys` and `run` import no cgo, no pty, no cobra. `run` declares `Screen{Text() string}`, `Keys{Encode(Chord) ([]byte, error)}` and `Clock`. **Lowering** resolves scopes once: every op already carries its effective `typing`, `jitter`, `timeout`, `settle`, `linger` and resolved hints, and `SpanBegin`/`SpanEnd` are explicit ops, so the state machine has no scope logic. Lowering **always appends** the implicit end span (hidden `SpanBegin`, drain, EOF or SIGHUP, grace, kill, `SpanEnd`) after the last item; it is unconditional, there is no setting to read. A `run` lowers to type, Enter, `SettleOrFail{quiet, timeout}` (omitted when `settle off`), where the failure carries the scene name, the source position and the timeout for the §7.3 message. The plan's spawn command is the argv of the `shell` setting (`[PATH, ARGS…]`, no expansion; default `[$SHELL]`).
 
 ### 8.2 Hook into the session
 The executor is a non-blocking state machine polled by the session loop:
@@ -540,7 +560,7 @@ type Step struct { Write []byte; Mark string; Span *SpanOp; Deadline time.Durati
 `wait` is "keep polling and match `scr.Text()`". The session select loop was not read; adjust. `Keys` is implemented by the ghostty adapter holding the `*Terminal` and calling `SetFromTerminal` before each `Encode`.
 
 ### 8.3 CLI and export
-- `shellshot record --script demo.script [-o out.shot] [--cols/--rows] [--record-input] [--list]`. `--list` parses, validates, and prints the plan with scene names and estimated duration (typing × chars + sleeps + lingers; waits as "up to timeout"); it is the lint. Explicit flags (`Changed`) > script > defaults; `-o` overrides `output`; `--cols/--rows` override `size`. `-c`/`--` with `--script` overrides `shell` (open, §11). Rename the `script` variable in `record.go`.
+- `shellshot record --script demo.script [-o out.shot] [--cols/--rows] [--record-input] [--list]`. `--list` parses, validates, and prints the plan with scene names, the resolved `shell` argv and estimated duration (typing × chars + sleeps + lingers; waits as "up to timeout"); it is the lint. Explicit flags (`Changed`) > script > defaults; `-o` overrides `output`; `--cols/--rows` override `size`. `-c`/`--` with `--script` overrides `shell` (open, §11; `--` already carries an argv, so `record --script f -- /bin/bash --norc` would equal `shell /bin/bash --norc`, while `-c CMD` is a command string). Rename the `script` variable in `record.go`.
 - Export (detail: `script-scenes.md` §5): SPAN → `timeline.Segment{From,To,Speed,IdleLimit,Hold,Skip}`; a gap is split at boundaries; hidden spans are replayed but add no frames or time; `frames` gets a forced sample at span boundaries; flag > scene hint > preamble hint > default; `--no-hints` ignores hints. `export --scene` and `replay --from` are deferred.
 
 ---
@@ -549,23 +569,23 @@ type Step struct { Write []byte; Mark string; Span *SpanOp; Deadline time.Durati
 
 | # | Task | Output | Tests | Depends on |
 |---|---|---|---|---|
-| T1 | Lexer core | tokens with line:col; keyword-directed modes (§4.4); CRLF; comments | Table tests per mode: TEXT, STRING escapes, REGEX with `\/`, `#` rules, `{`/`}`; positions | none |
+| T1 | Lexer core | tokens with line:col; keyword-directed modes (§4.4), including the `shell` value shape (PATH then `ARG` tokens by the §3.2 split rule, `splitShellArgs`); CRLF; comments | Table tests per mode: TEXT, STRING escapes, REGEX with `\/`, `#` rules, `{`/`}`, shell argv (quotes inside words, escapes, empty `""`, unterminated quote, `$HOME` kept literal, `#` rule); positions; **fuzz** `splitShellArgs` | none |
 | T2 | **Text-block lexing and resolution** | `TEXTBLOCK` token (opener, raw body lines); `Resolve(shape, keyword, lines) (text, error)`: closing-indent rule, strip, trim, blank handling, `lines`/`paragraphs`, `run` Enter | Table tests for every rule of §3.5 incl. `}` at other indent, `#`, quotes, tabs vs spaces, blank lines, empty block, EOF; error positions; **fuzz**: never panics, terminates, the closing line is found iff present, re-indenting the body leaves the result unchanged | T1 token types |
 | T3 | Parser + canonical printer | AST (§4.5); syntax errors; permissive superset | Golden `testdata/*.script` → `*.ast.golden`; **fuzz**: no panics, stable error text, accepted input prints and re-parses to the same AST; §5 examples as goldens | T1, T2 |
-| T4 | Validator + diagnostics | legality table, nesting, unique names, ranges, key names, UTF-8/control chars, reserved words, did-you-mean | One table test per error with exact message and line:col; max 10 errors; negative text-block cases | AST types only (hand-built ASTs; parallel with T3) |
+| T4 | Validator + diagnostics | legality table, nesting, unique names, ranges, key names, UTF-8/control chars, reserved words, did-you-mean, **`shell` checks (PATH present and non-empty; PATH and every argv element free of NUL and control characters; no disk lookup)** | One table test per error with exact message and line:col; max 10 errors; negative text-block cases | AST types only (hand-built ASTs; parallel with T3) |
 | T5 | `keys` package | chord text → `(Key, Mods)` | every documented name parses; order of modifiers irrelevant | none |
 | T6 | **Verify libghostty key encoder** (experiment) | bytes for the §6 key set, before/after `ESC[?1h`, on the pinned module | cgo test asserts bytes; findings written to §6 | none (needs build tree) |
 | T7 | KeyEncoder adapter | `keys.Chord` → bytes via `SetFromTerminal` | cgo tests as T6 | T5, **T6 passing** |
-| T8 | Lowering | `Lower(AST) → Plan`; scopes resolved; SPAN ops; implicit end span | Plan goldens: scoped `typing`/`linger` revert at `}`; hint inheritance | T3 (AST) |
+| T8 | Lowering | `Lower(AST) → Plan`; scopes resolved; SPAN ops; **unconditional** implicit end span; `shell` argv into the spawn command; `run` → settle-or-fail op | Plan goldens: scoped `typing`/`linger`/`settle` revert at `}`; hint inheritance; every plan (even an empty-ish one) ends with the implicit hidden span; `shell` with arguments | T3 (AST) |
 | T9 | Executor: input and pacing | `run/type/press/sleep`, text-block units, `typing`, `jitter`, `linger` | fake clock → expected `[]Step` timeline golden; block = one step, one linger | T8, T5 |
-| T10 | Wait and settle semantics | string/regex, `0s` assertion, `wait idle`, implicit settle (best effort), timeouts, child exited | fake screen sequences; timeout text with scene name; echo-trap cases | T9 interfaces (parallel with T9 against fakes) |
+| T10 | Wait and settle semantics | string/regex, `0s` assertion, `wait idle`, implicit settle that **fails at `timeout`** (exit 3, scene and line in the message), `settle off`, timeouts, child exited | fake screen sequences; a screen that never goes quiet fails with the exact §7.3 text; a silent long command passes; timeout text with scene name; echo-trap cases | T9 interfaces (parallel with T9 against fakes) |
 | T11 | **SPAN encoding in `bin`** | `KindSpan` 64, `AppendSpan`/`ParseSpan` per §7.2; check Writer flush on kind 64 | round trip, the hand-computed bytes of `script-scenes.md` §4.3, **fuzz**, torn tails | none |
 | T12 | Span scan + `info` | `spans.Scan`, `info` lists scenes/hidden | open spans end at last event | T11 |
-| T13 | Session `Driver` hook | Poll after chunks and at deadlines; writes, span events; end-of-script and grace | session tests with fake Process/Terminal | T9 interface; after binary-format session changes land |
+| T13 | Session `Driver` hook | Poll after chunks and at deadlines; writes, span events; unconditional end-of-script exit and grace (final drain never fails) | session tests with fake Process/Terminal | T9 interface; after binary-format session changes land |
 | T14 | `timeline` segments | split gaps at boundaries; skip; hold | dedup/min-delay invariant; double-idle-cap case | none |
 | T15 | `frames` forced samples at boundaries | `Options.Boundaries` | screen after a hidden span is emitted | none (reads frames code first) |
 | T16 | `export` wiring | spans → segments + boundaries; flag precedence; `--no-hints` | golden timelines | T11, T12, T14, T15 |
-| T17 | CLI `record --script` and `--list` | precedence merge; exit codes 0/1/2/3/130 | fake runner; end-to-end `hello.script` on `/bin/sh`, gated on libghostty | `--list`: T3, T4, T8; run: T13 |
+| T17 | CLI `record --script` and `--list` | precedence merge; exit codes 0/child status/1/2/3/130, `--ignore-exit-status` as in `record` | fake runner; end-to-end `hello.script` on `/bin/sh`, gated on libghostty | `--list`: T3, T4, T8; run: T13 |
 | T18 | Docs | `docs/SCRIPT.md`, ARCHITECTURE, add SPAN to `binary-format.md`, `examples/*.script` | CI runs examples, checks screens at marks | all |
 
 **Parallel start (no dependencies):** T1, T5, T6, T11, T14, T15. Then T2 (needs T1's token types), T4 (AST types), T7 (after T5+T6), T12 (after T11). T3 follows T1+T2. T9 and T10 can proceed against fakes once T8's Plan exists. T13 is the only change to a shared package (`session`).
@@ -590,34 +610,35 @@ type Step struct { Write []byte; Mark string; Span *SpanOp; Deadline time.Durati
 
 **Decisions needing confirmation** (my defaults; recommendation first)
 1. **Command budget:** six commands (`run type press wait sleep mark`). `expect` is not a command: `wait "x" 0s` asserts. No `wait now` alias (it would add a second pattern-position keyword for little gain), no `expect not`.
-2. **`require` deferred** (reserved); **kept:** `run`'s implicit settle (default 200 ms, setting `settle`, best effort at the cap), `wait idle [DURATION]`, export hints `speed`/`idle`/`hold`, and `linger`.
+2. **`require` deferred** (reserved); **kept:** `run`'s implicit settle (default 200 ms, setting `settle`; failing at the cap, see Decided below), `wait idle [DURATION]`, export hints `speed`/`idle`/`hold`, and `linger`.
 3. **Settings:** 14 in three classes; process settings preamble-only; export hints preamble (script-wide) or in a `scene`, not in `hidden`; behaviour settings anywhere in a block (not first-only as the scenes brief said).
 4. **`linger`** follows `run`, `type`, `press`, `wait` (not `sleep`/`mark`), including the last step in a block, once per text block.
 5. **Text blocks:** `lines` Enter *between* lines, `run` adds the final Enter; `paragraphs` soft-wrap with one space and blank line = two Enters; trailing whitespace trimmed; closing `}` has no comment; header disambiguated by an exact-match rule (§3.5).
 6. **`type@DURATION` dropped** (use `typing` before the line); **`\` continuation dropped**.
 7. **Nesting:** only `hidden` in `scene`; empty blocks are errors; scene names unique and bare.
-8. **Implicit end-of-script shutdown** as a hidden span: always on, or a `keep-open` opt-out?
-9. **Implicit settle hitting `timeout`** is silent (best effort) vs failing. `wait idle` fails.
-10. **`shell PATH` takes no arguments** today; allow `shell PATH ARGS…` (e.g. `/bin/bash --noprofile --norc`)? Recommendation: yes.
-11. **Exit code on child failure:** `0` with `--propagate-exit` opt-in, or the reverse? Name of the kept recording on failure (`FILE.failed.shot`)?
-12. **CLI `-c`/`--` with `--script`:** override `shell`, or forbid? **Mirror output to stdout while scripting:** off, `--watch` to show. **`output` with non-`.shot` extension:** no in v1.
-13. **AST:** `Block.Items` and `Setting.At` rather than `Block{Steps}`.
+8. **Exit code on child failure:** follow `record`: the script runner exits with the child's status (`128+sig` for signal deaths) after the recording is written, and `--ignore-exit-status` makes it `0`; the script's own codes (1, 2, 3, 130) take precedence (§7.4). **Open question left:** the name of the recording kept after a script failure (exit 3): the `output` name as is, or `FILE.failed.shot`? Also confirm that a child the executor had to close (SIGHUP or kill at the end) is a stderr note and not a failure.
+9. **CLI `-c`/`--` with `--script`:** override `shell` (`--` carries an argv like `shell PATH ARGS…`; `-c` a command string), or forbid? **Mirror output to stdout while scripting:** off, `--watch` to show. **`output` with non-`.shot` extension:** no in v1.
+10. **AST:** `Block.Items` and `Setting.At` rather than `Block{Steps}`.
+
+**Decided** (the user, no longer open; the text above is already updated): (a) the end of a script **always** exits the shell, with no `keep-open` opt-out (§3.3, §7.4); (b) `run`'s implicit settle reaching `timeout` **fails the script** (exit 3, error naming scene, line and timeout), so long builds use `settle off` plus `wait PATTERN TIMEOUT` or a larger `timeout` (§3.1, §7.3, Example 4); (c) `shell PATH ARGS…` takes arguments, split by the §3.2 rule with no environment expansion.
 
 **Risks**
 - Echo trap on `wait` (docs, anchoring only). Rest-of-line text surprises (`run "hi" | wc`, trailing `#` is text, `run lines {` header rule).
-- Quiet-screen `run` is a heuristic; `run lines` with an interactive middle command can mis-feed it.
+- Quiet-screen `run` is a heuristic; `run lines` with an interactive middle command can mis-feed it. Because a settle that reaches `timeout` now fails the script, any `run` of a command that prints continuously (long build, spinner, `tail -f`) is a script error until the author adds `settle off` and a `wait`; `--list` cannot see this (it needs the run). Raising `timeout` to avoid it also raises every `wait` default.
+- Always-exit has no escape hatch: a script cannot leave a live shell, and a script that ends mid-program (vim open) is closed by SIGHUP. The shell's own exit status (last command, on Ctrl-D) becomes the script's exit code (§7.4), so an ending such as `run false` gives a non-zero exit unless `--ignore-exit-status` is used.
+- `shell` arguments: the split rule is custom (no single quotes, no expansion), so users who expect POSIX shell quoting will be surprised; the error messages and `--list` (which prints the resolved argv) are the guard.
 - Text blocks: whitespace-only differences in the closing line's indentation (tabs vs spaces) fail with the "different indentation" hint; fuzz covers it.
 - SPAN touches shared policy: `timeline` segments double an idle cap at a boundary; forced `frames` samples change the frame stream; writer flush on kind 64 unverified.
 - cgo key-encoder API may differ at the pinned commit. Scrollback is not matchable. Session hook T13 collides with binary-format session work. Only screens at marks are reproducible, not bytes.
 - A failing run leaves a partial recording that could be published by mistake.
 
-**Contradictions found between the two briefs and how they were resolved:** (a) `read` → `linger`; (b) quoted `run "cmd"` / string scene names / `env ident string` / `command` / `wait … timeout 120s` / `press enter 2` in the scenes grammar → v2 rest-of-line text, bare names, `env K=V`, `shell`, `wait PAT 120s`, `press enter x2`; (c) scenes: "settings first in the block" vs v2 "anywhere" → anywhere; (d) `expect` as a 7th step → `wait … 0s`; (e) `require` kept vs v2 excluded → deferred; (f) `wait idle` and `idle` were reserved/excluded in v2 → `wait idle` kept, `idle` is now a hint setting (removed from the reserved list); (g) MARK pairs (v2) vs SPAN (scenes) → SPAN; (h) auto-exit as hidden span vs v2 §7.4 exit sequence → one sequence, recorded as an implicit hidden span; (i) exit codes "else child's code" vs v2 codes → v2; (j) `type@` and `\` continuation → dropped; (k) span ends on failure written (scenes) vs unclosed start (v2) → ends written, unclosed tolerated after kill.
+**Contradictions found between the two briefs and how they were resolved:** (a) `read` → `linger`; (b) quoted `run "cmd"` / string scene names / `env ident string` / `command` / `wait … timeout 120s` / `press enter 2` in the scenes grammar → v2 rest-of-line text, bare names, `env K=V`, `shell`, `wait PAT 120s`, `press enter x2`; (c) scenes: "settings first in the block" vs v2 "anywhere" → anywhere; (d) `expect` as a 7th step → `wait … 0s`; (e) `require` kept vs v2 excluded → deferred; (f) `wait idle` and `idle` were reserved/excluded in v2 → `wait idle` kept, `idle` is now a hint setting (removed from the reserved list); (g) MARK pairs (v2) vs SPAN (scenes) → SPAN; (h) auto-exit as hidden span vs v2 §7.4 exit sequence → one sequence, recorded as an implicit hidden span, always on; (i) exit codes "else child's code" vs v2 codes → script codes 1/2/3/130 first, then the child's status as `record` does, `--ignore-exit-status` to disable; (j) `type@` and `\` continuation → dropped; (k) span ends on failure written (scenes) vs unclosed start (v2) → ends written, unclosed tolerated after kill.
 
 **Unverified claims:** encoder output bytes; pinned-version API; DECCKM sequences; `/bin/sh` honouring imported `PS1`; vim `--clean` and `~`; `env -S`; scrollback access; `git log --oneline` decorations (the regex tolerates them); embedded-language library facts; asciinema-automation, demo-magic, doitlive, Terminalizer details; Writer/frames behaviour on kind 64; MARK/SPAN availability in the final binary format.
 
 ## Final recommendation
 
-Ship `record --script` in this order: start T1, T5, T6, T11, T14, T15 in parallel; T2→T3 and T4; T8–T10 against fakes; T7 after T6 passes; then T12, T13, T16, T17, T18. Confirm decisions 1–5 before T4, since they fix the validator rules, and decision 8 before T13. Keep the surface at six commands, fourteen settings, two block kinds and four text-block forms; the reserved-word list is the growth path.
+Ship `record --script` in this order: start T1, T5, T6, T11, T14, T15 in parallel; T2→T3 and T4; T8–T10 against fakes; T7 after T6 passes; then T12, T13, T16, T17, T18. Confirm decisions 1–5 before T4, since they fix the validator rules, and decision 8 (kept-recording name) before T17. Keep the surface at six commands, fourteen settings, two block kinds and four text-block forms; the reserved-word list is the growth path.
 
 ## Sources
 - Kept: VHS README (https://github.com/charmbracelet/vhs/blob/main/README.md; fetched in the v1 run); go-libghostty `key_encoder.go` on GitHub main (https://github.com/mitchellh/go-libghostty; not the pinned version).
