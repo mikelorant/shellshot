@@ -17,6 +17,13 @@ import (
 // beyond this ceiling fails with ErrTooLarge.
 const maxZstdDecodeMemory = 256 << 20
 
+// zstdMaxExpansionShift is log2 of the largest expansion a zstd frame can
+// achieve: every block is at least 4 compressed bytes (3 header bytes plus one
+// RLE byte) and decodes to at most 128 KiB, so output <= input<<15. Decompress
+// uses it to size its output buffer from the input instead of trusting maxLen
+// or a declared frame content size.
+const zstdMaxExpansionShift = 15
+
 // maxZstdDictCacheEntries bounds the per-dictionary encoder/decoder cache.
 // When full the cache is dropped and rebuilt on demand.
 const maxZstdDictCacheEntries = 16
@@ -188,7 +195,10 @@ func (c *ZstdCodec) Compress(dst, src, dict []byte) (out []byte, err error) {
 // maxLen is rejected before any allocation; otherwise the output buffer is
 // sized to the declared size (or maxLen+1 when the frame does not declare
 // one) and the decoder is limited to that capacity
-// (zstd.WithDecodeAllCapLimit), with a hard ceiling of 256 MiB per call
+// (zstd.WithDecodeAllCapLimit). That size is further capped at len(src)<<15,
+// the most a zstd frame can expand, so a tiny hostile frame with a huge
+// maxLen or lying content size cannot force a large allocation. There is a
+// hard ceiling of 256 MiB per call
 // (zstd.WithDecoderMaxMemory); finally the result length is checked against
 // maxLen explicitly. Any overflow returns ErrTooLarge.
 //
@@ -224,6 +234,11 @@ func (c *ZstdCodec) Decompress(dst, src, dict []byte, maxLen int) (out []byte, e
 			return dst, fmt.Errorf("%w: frame declares %d bytes, maxLen %d", ErrTooLarge, h.FrameContentSize, maxLen)
 		}
 		want = min(want, int(h.FrameContentSize))
+	}
+	// Neither maxLen nor the declared size is trusted for allocation: a few
+	// input bytes cannot expand past the format's maximum ratio.
+	if len(src) <= want>>zstdMaxExpansionShift {
+		want = len(src) << zstdMaxExpansionShift
 	}
 	start := len(dst)
 	buf := dst

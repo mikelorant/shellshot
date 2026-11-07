@@ -285,6 +285,63 @@ func TestZstdDecompressionBomb(t *testing.T) {
 	}
 }
 
+// TestZstdLyingMaxLenDoesNotAllocate checks that the output buffer follows
+// the input size, not the caller's maxLen: Compress writes no content size,
+// so a 16 byte frame used to cost maxLen+1 bytes of zeroed memory.
+func TestZstdLyingMaxLenDoesNotAllocate(t *testing.T) {
+	c := newZstd(t, 0)
+	small, err := c.Compress(nil, []byte{1, 2, 3}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, maxLen := range []int{1 << 20, 64 << 20, 1 << 62} {
+		var before, after runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&before)
+		got, err := c.Decompress(nil, small, nil, maxLen)
+		runtime.ReadMemStats(&after)
+		if err != nil || !bytes.Equal(got, []byte{1, 2, 3}) {
+			t.Fatalf("maxLen %d: got %v, err %v", maxLen, got, err)
+		}
+		if alloc := after.TotalAlloc - before.TotalAlloc; alloc > 1<<20 {
+			t.Errorf("maxLen %d: allocated %d bytes for a %d byte frame", maxLen, alloc, len(small))
+		}
+	}
+
+	// A frame whose declared content size lies (64 MiB, a few bytes of body)
+	// fails without allocating the declared size.
+	lying := []byte{0x28, 0xb5, 0x2f, 0xfd, 0x80, 0x00, 0x00, 0x00, 0x00, 0x04, 0x01, 0x00, 0x00}
+	var lh zstd.Header
+	if err := lh.Decode(lying); err != nil || lh.FrameContentSize != 64<<20 {
+		t.Fatalf("test frame premise broken: %+v, %v", lh, err)
+	}
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	_, err = c.Decompress(nil, lying, nil, 64<<20)
+	runtime.ReadMemStats(&after)
+	if err == nil {
+		t.Fatal("lying content size decoded without error")
+	}
+	if alloc := after.TotalAlloc - before.TotalAlloc; alloc > 1<<20 {
+		t.Errorf("lying content size: allocated %d bytes (err %v)", alloc, err)
+	}
+}
+
+func BenchmarkZstdDecompressLyingMaxLen(b *testing.B) {
+	c := newZstd(b, 0)
+	small, err := c.Compress(nil, []byte{1, 2, 3}, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := c.Decompress(nil, small, nil, 64<<20); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestZstdCorruptInput(t *testing.T) {
 	c := newZstd(t, 0)
 	src := terminalBlocks(4, 1, 4096)[0]

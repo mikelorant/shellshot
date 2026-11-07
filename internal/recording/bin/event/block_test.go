@@ -197,7 +197,7 @@ func TestRoundTripRandom(t *testing.T) {
 
 func TestEmptyBlock(t *testing.T) {
 	b := Block{StartTick: 42, EndTick: 42}
-	for _, id := range []codec.ID{codec.None, codec.Flate} {
+	for _, id := range []codec.ID{codec.None, codec.Flate, codec.Zstd} {
 		got, err := decode(encode(t, b, id, nil, 0))
 		if err != nil {
 			t.Fatal(err)
@@ -490,7 +490,7 @@ func TestCorruptionAtEveryOffsetNeverPanics(t *testing.T) {
 	reg := codec.DefaultRegistry()
 	for i := 0; i < 4; i++ {
 		b := randomBlock(rng)
-		for _, id := range []codec.ID{codec.None, codec.Flate} {
+		for _, id := range []codec.ID{codec.None, codec.Flate, codec.Zstd} {
 			p := encode(t, b, id, nil, 0)
 			for off := range p {
 				for _, flip := range []byte{0x01, 0xff} {
@@ -526,6 +526,13 @@ func TestLyingCountsDoNotAllocate(t *testing.T) {
 	// A flate body with lying plen values.
 	hugePlen := varint.AppendUvarint([]byte{0, 0, 0, 0}, 1<<40)
 	hugePlen = varint.AppendUvarint(hugePlen, 1<<40)
+	zstdBody := func(raw []byte) []byte {
+		out, err := mustCodec(t, codec.Zstd).Compress(nil, raw, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
 	flateBomb := bytes.Repeat([]byte{0}, 8<<20)
 
 	cases := []struct {
@@ -537,6 +544,7 @@ func TestLyingCountsDoNotAllocate(t *testing.T) {
 		{"huge raw_len", rawPayload(0, 0, 0, 0, 1, big, []byte{0, 0, 0}), Limits{}},
 		{"max n_events and raw_len, tiny body", lieN, Limits{}},
 		{"max n_events and raw_len, tiny flate body", append(rawPayload(1, 0, 0, 0, DefaultMaxEvents, DefaultMaxRawLen, nil), flateBody([]byte{0, 0, 0})...), Limits{}},
+		{"max raw_len, tiny zstd body", append(rawPayload(uint64(codec.Zstd), 0, 0, 0, 1, DefaultMaxRawLen, nil), zstdBody([]byte{0, 0, 0})...), Limits{}},
 		{"huge plen (none)", rawPayload(0, 0, 0, 0, 2, uint64(len(hugePlen)), hugePlen), Limits{}},
 		{"huge plen (flate)", append(rawPayload(1, 0, 0, 0, 2, uint64(len(hugePlen)), nil), flateBody(hugePlen)...), Limits{}},
 		{"flate bomb under small raw_len", append(rawPayload(1, 0, 0, 0, 1, 10, nil), flateBody(flateBomb)...), Limits{}},
@@ -556,12 +564,32 @@ func TestLyingCountsDoNotAllocate(t *testing.T) {
 	}
 }
 
+func BenchmarkDecodeLyingRawLen(b *testing.B) {
+	reg := codec.DefaultRegistry()
+	for _, id := range []codec.ID{codec.None, codec.Flate, codec.Zstd} {
+		c, _ := reg.Get(id)
+		body, err := c.Compress(nil, []byte{0, 0, 0}, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
+		p := rawPayload(uint64(id), 0, 0, 0, 1, DefaultMaxRawLen, body)
+		b.Run(id.String(), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				if _, err := Decode(p, reg, nil, Limits{}); err == nil {
+					b.Fatal("lying raw_len decoded")
+				}
+			}
+		})
+	}
+}
+
 func FuzzDecode(f *testing.F) {
 	rng := rand.New(rand.NewSource(3))
 	for i := 0; i < 8; i++ {
 		b := randomBlock(rng)
 		var enc Encoder
-		for _, id := range []codec.ID{codec.None, codec.Flate} {
+		for _, id := range []codec.ID{codec.None, codec.Flate, codec.Zstd} {
 			c, _ := codec.DefaultRegistry().Get(id)
 			p, err := enc.Encode(b, c, nil, 0)
 			if err != nil {
