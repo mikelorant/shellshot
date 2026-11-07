@@ -62,7 +62,7 @@ printf ' ... plain text between ... '
 linkid demo 'https://example.com/long-link' 'second half'
 printf '\n'
 nap 400
-printf '  \033[2m(links are only printed; nothing is opened. Hover or ctrl-click in a terminal.)\033[0m\n'
+printf '  \033[2m(links are only printed, never opened. Hover or ctrl-click in a terminal.)\033[0m\n'
 nap 1200
 
 printf '\n\033[1mBoth together\033[0m\n'

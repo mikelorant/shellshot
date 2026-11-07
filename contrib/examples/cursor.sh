@@ -24,9 +24,9 @@ scene_begin() {
 # ---------------------------------------------------------------- 1: CUP
 scene_begin 'CUP: absolute addressing   ESC [ row ; col H'
 ex_cup 3 1; printf '(3,1)'
-ex_cup 3 $((C - 6)); printf '(3,%d)' "$C"
+ex_cup 3 $((C - 5)); printf '(3,%d)' "$C"
 ex_cup "$R" 1; printf '(%d,1)' "$R"
-ex_cup "$R" $((C - 7)); printf '(%d,%d)' "$R" "$C"
+ex_cup "$R" $((C - 6)); printf '(%d,%d)' "$R" "$C"
 i=0
 while [ "$i" -le 24 ]; do
     ex_hue $((i * 60))
@@ -53,7 +53,7 @@ while [ "$i" -lt "$w" ]; do printf '\033[2D\033[35m#'; i=$((i + 1)); done
 i=2
 while [ "$i" -lt "$h" ]; do printf '\033[A\033[D\033[32m#'; i=$((i + 1)); nap 30; done
 printf '\033[0m'
-printf '\033[6d\033[10GVPA 6, CHA 10: text inside the frame'
+printf '\033[6d\033[10GVPA 6, CHA 10: inside'
 printf '\033[2B\033[10G\033[1mCUD 2 then CHA 10\033[0m'
 printf '\033[2B\033[10G\033[3mCUF/CUB: \033[5Cfive right\033[5D<-'
 printf '\033[0m'
@@ -75,6 +75,7 @@ for word in the cursor jumps away and returns to this exact spot every time and 
     ex_cup 2 $((C - 10))
     printf '\033[1;7m tick %-2d \033[0m' "$n"
     ex_restore
+    if [ "$n" -eq 6 ]; then ex_cup 5 3; fi   # the sentence is wider than the screen: continue on the next row
     printf '%s ' "$word"
     n=$((n + 1))
     nap 130
@@ -144,9 +145,9 @@ nap 700
 ex_alt_on
 bw=44
 ex_box $((R / 2 - 3)) $((C / 2 - bw / 2)) 7 "$bw" 'alternate screen'
-ex_cup $((R / 2 - 1)) $((C / 2 - 17)); printf 'A separate buffer: no scrollback here.'
-ex_cup $((R / 2)) $((C / 2 - 17)); printf 'Leaving restores the screen you saw.'
-ex_cup $((R / 2 + 1)) $((C / 2 - 17)); printf '\033[2mReturning in a moment\033[0m'
+ex_cup $((R / 2 - 1)) $((C / 2 - 19)); printf 'A separate buffer: no scrollback here.'
+ex_cup $((R / 2)) $((C / 2 - 19)); printf 'Leaving restores the screen you saw.'
+ex_cup $((R / 2 + 1)) $((C / 2 - 19)); printf '\033[2mReturning in a moment\033[0m'
 nap 800
 ex_alt_off
 ex_cup "$R" 1

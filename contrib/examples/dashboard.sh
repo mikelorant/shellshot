@@ -19,10 +19,15 @@ RW=$((W - LW))
 BOT=$((H - 11))              # height of the bottom box (rows 11..H-1)
 CPUBAR=$((LW - 15))
 if [ "$CPUBAR" -gt 40 ]; then CPUBAR=40; fi
-PAD=$((W - 2 - 46))          # blanks that fill a table row up to the box border
-if [ "$PAD" -lt 0 ]; then PAD=0; fi
-ex_rep ' ' "$PAD"
-ROWPAD=$EX_REP
+
+# row_pad WIDTH: sets ROWPAD to the blanks that fill a table row of WIDTH columns, drawn from
+# column 3, up to the last column inside the box border (so the row never reaches the border).
+row_pad() {
+    ex_pad=$((W - 3 - $1))
+    if [ "$ex_pad" -lt 0 ]; then ex_pad=0; fi
+    ex_rep ' ' "$ex_pad"
+    ROWPAD=$EX_REP
+}
 
 # clock T: HH:MM:SS of the simulated clock into CLOCK.
 clock() {
@@ -125,6 +130,7 @@ overview() {
 
     ex_cup 12 3
     printf '\033[1;4m%-6s %-9s %5s  %5s  %-22s\033[0m' PID USER CPU MEM COMMAND
+    row_pad 53
     r=0
     while [ "$r" -lt $((BOT - 3)) ]; do
         proc "$r"
@@ -154,6 +160,7 @@ network() {
 
     ex_cup 12 3
     printf '\033[1;4m%-22s %-22s %-12s\033[0m' LOCAL REMOTE STATE
+    row_pad 58
     r=0
     while [ "$r" -lt $((BOT - 3)) ]; do
         case $((r % 5)) in
@@ -185,6 +192,7 @@ logs() {
     ex_cup 4 $((LW + 3)); printf '\033[1;31m!\033[0m disk /var at 91%%'
     ex_cup 5 $((LW + 3)); printf '\033[1;33m!\033[0m queue depth rising'
     ex_cup 6 $((LW + 3)); printf '\033[2m  no other alerts\033[0m'
+    row_pad 57
     r=0
     while [ "$r" -lt $((BOT - 2)) ]; do
         k=$(($1 + r))
