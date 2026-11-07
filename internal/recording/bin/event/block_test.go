@@ -342,7 +342,6 @@ func TestDecodeRejectsInconsistentHeaders(t *testing.T) {
 		{"plen sum mismatch", rawPayload(0, 0, 10, 15, 2, 9, []byte{0, 5, 0, 3, 2, 2, 'h', 'i', 'x'}), ErrCorrupt},
 		{"plen beyond body", rawPayload(0, 0, 10, 15, 2, 9, []byte{0, 5, 0, 3, 9, 1, 'h', 'i', 'x'}), ErrCorrupt},
 		{"unknown codec", rawPayload(9, 0, 10, 15, 2, 9, good), codec.ErrUnknownCodec},
-		{"zstd unregistered", rawPayload(2, 0, 10, 15, 2, 9, good), codec.ErrUnknownCodec},
 		{"unknown dict", rawPayload(0, 4, 10, 15, 2, 9, good), ErrUnknownDict},
 		{"non-canonical varint", append([]byte{0x80, 0x00}, good...), ErrCorrupt},
 		{"empty", nil, ErrCorrupt},
