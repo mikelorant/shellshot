@@ -11,8 +11,8 @@ import (
 
 func TestDefaultRegistersAPNG(t *testing.T) {
 	r := Default()
-	if got := r.Names(); !slices.Equal(got, []string{"apng", "gif"}) {
-		t.Errorf("Names = %v, want [apng gif]", got)
+	if got := r.Names(); !slices.Equal(got, []string{"apng", "gif", "webp"}) {
+		t.Errorf("Names = %v, want [apng gif webp]", got)
 	}
 	f, ok := r.Lookup("apng")
 	if !ok || f.Name != "apng" {
