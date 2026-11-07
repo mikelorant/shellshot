@@ -48,20 +48,27 @@ Cell width was `ceil(advance('M'))`, height `ceil(ascent)+ceil(descent)`.
 | default size with integer advance (15, 20, 25) | perfect, but `--font-size 14` stays loose |
 | **snap the em**: cell = round(advance), em = cell / (advance/em) | exact tracking, integer crisp cells, em differs from the request by at most half a pixel of advance (-4.8% at 14, +4% at 16) |
 
-**Chosen**: snap the em (`font.Set.Metrics` returns `EmPx`). Cell height is the
-font's line height rounded, baseline = ascent + half the rounding. Metrics are
-computed at scale 1 and multiplied, so `--scale n` is exactly n times
-the layout. Default font size 15 keeps the old 9x20 default cell (glyphs 7%
-larger; tracking 0.600 em instead of 0.643). Underline: the font's
-`post.underlinePosition` below the baseline (2 rows at 15 px).
-Other terminals, from memory (the ghostty submodule is not checked out here, so
-unverified): Ghostty, kitty and WezTerm take cell width = ceil/round of the
-face's advance at the configured size and keep the em as set (loose at 14 px,
-like we were); Ghostty derives height from ascent + descent + line gap and
-centres the baseline in it, which is what we now do.
+**Chosen (final)**: follow Ghostty (`third_party/ghostty/src/font/Metrics.zig`,
+`face/coretext.zig`, read in this worktree, so verified) and do **not** snap
+the em. Snapping was tried first (cell = round(advance), em = cell / advance
+per em) and then dropped, because it makes `--font-size` inexact and cannot
+match a terminal that draws at the nominal size. The cell is now
 
-After (audit table, scale 1): 12 -> 7x15, em 11.67; 14 -> 8x18, em 13.33;
-15 -> 9x20; 16 -> 10x22, em 16.67; 20 -> 12x26. Pitch error 0.00% everywhere.
+* width = `round(advance('M') * em)`, height = `round(line height)` (Ghostty
+  `@round`), baseline = `round(face baseline - (cellH - height) / 2)`, the line
+  gap split above and below;
+* `Metrics` is computed at the final pixel size (`FontSize * Scale`), exactly
+  as a terminal on a 2x display does, so scale 2 is not always exactly twice
+  scale 1 (e.g. 14 px: 8x18 cells; 28 px: 17x37);
+* `--adjust-cell-width/height` (section 4) changes the cell after that.
+
+The em is exactly the requested `--font-size` (times scale), so the pitch
+error of section 1 returns whenever the advance is not a whole number of
+pixels (a cell is at most half a pixel from the advance, instead of up to a
+whole pixel with `ceil`): 14 px -> 8 px cell for 8.4 (-4.8%), 12 px -> 7 for
+7.2 (-2.8%), 16 -> 10 for 9.6 (+4.2%), 15 and 20 are exact. Underline: the font's
+`post.underlinePosition` below the baseline (2 rows at 15 px). Default font
+size stays 15 (9.0 px advance, 9x20 cell, zero error).
 
 ## 2. Sharpness audit
 
@@ -69,7 +76,7 @@ What we send and where (all values are the shipped ones after this change):
 
 | setting | where | value | effect |
 |---|---|---|---|
-| face Size, DPI | `font/font.go` `face()` | `FontSize*Scale` px (snapped em), DPI 72 | 1 pt = 1 px |
+| face Size, DPI | `font/font.go` `face()` | `FontSize*Scale` px, DPI 72 | 1 pt = 1 px |
 | Hinting | `font/font.go` `face()` | `HintingNone` | see below: x/image ignores the others |
 | glyph origin | `raster/draw.go`, `layout.go` | whole-pixel cell origin + integer baseline | no sub-pixel placement, no fractional blur |
 | fractional 26.6 dot | `fallback()` | rounded to whole pixels | icons not blurred by placement |
@@ -93,7 +100,8 @@ coordinates piecewise-linearly (baseline 0, x-height and cap height rounded,
 "p" descender depth rounded, overshoot within 1.5% em flattened), vertical only
 like FreeType's light auto-hinter; x and advances untouched.
 
-Numeric sharpness (text line, dark theme; full% = share of ink in near-opaque
+Numeric sharpness (text line, dark theme, measured while the em was still snapped to 13.33 at
+14; the shipped em is now the requested one; full% = share of ink in near-opaque
 pixels, mid% = share of ink pixels between 20% and 80%; higher full / lower mid
 is crisper):
 
@@ -122,7 +130,8 @@ slightly brighter than strict sRGB blending.
 ## 3. HiDPI and supersampling
 
 **Scale as the deliverable.** `--scale 2` rasterises glyphs at twice the em
-(native, verified in `renderer.go`), exactly twice the layout. Real recording,
+(native, verified in `renderer.go`); the cell is rounded at the doubled size, so
+it is twice scale 1 only when the advance is whole at 1x (15: 9 -> 18). Real recording,
 80x24, 32 frames, `export` on this machine:
 
 | scale | image | APNG | encode |
@@ -132,8 +141,8 @@ slightly brighter than strict sRGB blending.
 | 3 | 2208x1488 | 3.22 MB (3.8x) | 3.05 s |
 
 Delta frames keep growth well below the 4x/9x pixel growth (scale 1 took
-0.52 s before grid fit and the contrast curve: about 10% slower). Pitch error is zero at
-every scale (layout is n x scale 1), sharpness rises with size
+0.52 s before grid fit and the contrast curve: about 10% slower). Pitch error shrinks with
+scale (rounding half a pixel of a bigger cell), sharpness rises with size
 (full% 34 at 14 px to 68 at 28 px) because stems cover whole pixels.
 Displayed at half size on a retina screen it renders at the device's resolution.
 
@@ -163,32 +172,77 @@ embeds export with `--scale 2` and set the display size in HTML/Markdown
 (`<img src="demo.apng" width="736">`, the 1x width), so retina screens show
 native 2x glyphs; use `--scale 3` only for 3x displays.
 
-## 4. Letter spacing and line height
+## 4. Cell size adjustment (`--adjust-cell-width/height`)
 
-Effective letter spacing before = cell width - true advance at the requested
-size: +0.80 px (12), +0.59 (14), +0.41 (16), 0 (15, 20), +0.20 (14 at scale 2),
-varying with size from ceil(); line height 1.36 to 1.43 em. Now the cell equals
-the advance of the drawn em: spacing 0, line height 1.30 to 1.35 em (design 1.32,
-rounded to a pixel). VHS (xterm.js: fontSize 22, letterSpacing 1, lineHeight 1.0)
-has pitch 13.2+1 = 14.2 px = 0.645 em and rows of 1.32 em: the old default
-(9/14 = 0.643 em) matched it by accident; the new one is 0.600 em, 7% denser
-horizontally, same row density. To mimic a VHS look use `--font-size 24`
-(cell 14, pitch 0.600 of 23.3 em, about VHS's 14.2) or `--font-size 22` (cell
-13, 8% tighter, same glyph size); VHS pads 60 px by default (`--padding 60`).
+Instead of `--letter-spacing`/`--line-height`, `export` has Ghostty's
+`adjust-cell-width` and `adjust-cell-height`: VALUE is an integer pixel delta
+(`-1`, `2`) or a percentage (`-7%`) of the font-derived cell (after rounding and
+after `--scale`), default 0. Verified in Ghostty's source:
 
-**Not implemented**: `--letter-spacing PX` and `--line-height N`. With whole-
-pixel cells a fractional spacing is not well defined (the spacing would have
-to be rounded into the cell width, or glyphs placed at `round(col*pitch)`
-with uneven gaps, see section 1). Recommended if wanted: integer
-`--letter-spacing` added to the rounded cell width (glyphs centred in the cell)
-and `--line-height` as a multiplier of the font line height before rounding;
-both are small now that `font.Metrics` owns the policy.
+* `Metrics.apply`: `new = max(modifier.apply(original), 1)`; a percentage is
+  `round(original * (1 + p/100))`. We reject results under 1 px or over 10x
+  (Ghostty clamps to 1 and has no upper bound); `-100%` is an error.
+* The cell changes, not the glyph: a wider cell centres the glyph
+  (`dx = (cell - face_width)/2`; FreeType rounds it, CoreText keeps the
+  fraction, we follow CoreText). A narrower cell keeps only the fractional part
+  of the (negative) offset, so the glyph stays anchored at the cell's left edge
+  and overflows to the right; nothing is clipped or re-centred.
+* A height change moves the baseline by half the difference, the odd pixel going
+  to the side where the face sits away from centre (`face_y`); underline and
+  strikethrough follow. Ours is relative to the baseline, so they move with it.
+* Not implemented: the sub-pixel `x` of non-ASCII "stretch" constraints (icons
+  are fitted to integer cells already).
 
-## 5. Open points for the user
+`internal/render/font` tests compare `Metrics.Adjust` with a transcription of
+the Ghostty arithmetic over 9 sizes x 6 adjustments per axis.
 
-* Default font size 15 (was 14): the only way to keep the 9x20 cell with exact
-  tracking. Keep 15 or return to 14 (8x18 cell, 11% narrower images)?
-* `--font-size` is now a nominal size: the drawn em moves by at most half a
-  pixel of advance (14 -> 13.33).
-* The contrast curve (exponents 0.8 / 1.25) is a taste call; set both to 1 in
-  `raster/contrast.go` to get plain sRGB blending.
+**VHS** (xterm.js: fontSize 22, letterSpacing 1, lineHeight 1.0) has pitch
+13.2 + 1 = 14.2 px (0.645 em) and rows of 1.32 em; `--font-size 22
+--adjust-cell-width 1` gives cell 14 (13.2 -> 13, +1) with the glyphs at 22 px.
+VHS pads 60 px by default (`--padding 60`).
+
+### Comparison with the user's terminal
+
+Ghostty config: `font-size = 12`, `adjust-cell-width = -7%`, default family
+(JetBrains Mono), on a 2x display, so 12 pt = 24 px. Advance 0.6 em,
+line height 1.32 em:
+
+| step | Ghostty (source) | `export --font-size 12 --scale 2 --adjust-cell-width -7%` |
+|---|---|---|
+| em | 24 px | 24 px (`12 * 2`) |
+| advance / line height | 14.4 / 31.68 | same |
+| rounded cell | 14 x 32 | 14 x 32 |
+| width -7% | `round(14 * 0.93)` = 13 | 13 |
+| cell | **13 x 32** | **13 x 32** (asserted in `TestAdjustCellSize`) |
+| glyph x | `(13 - 14.4)/2 = -0.7`, integer part dropped: -0.7 px, left-anchored | -0.7 px (`GlyphOffsetX`) |
+| pitch / em | 0.542 (7.2% tighter than 0.6 design) | same |
+
+Measured on a real export (80x12): 1072x416 px = 80 * 13 + 2 * 16 by 12 * 32 +
+2 * 16; the default export (15, 9x20) is 736x256. Without the adjustment the
+same font would be 14x32. Differences left: Ghostty on macOS rasterises with
+CoreText (its own smoothing/thickening, `font-thicken` off by default) and
+uses the system's DPI scale; our glyphs are FreeType-style greyscale masks with
+vertical grid fit and a contrast curve. Metrics and positions should match to
+the pixel; stroke weight may not.
+
+**Recipe**: `shellshot export demo.shot --font-size 12 --scale 2
+--adjust-cell-width -7%`. For a 1x export of the same look use `--font-size 12
+--adjust-cell-width -7%` (7.2 -> 7, -7% -> 7: no change at that size, so 2x
+is the faithful variant). Set the HTML display size to half the image width.
+
+## 5. Decisions for the user
+
+* **Default font size**: 15 (zero pitch error, 9x20 cell, as before the
+  research) or back to 14 (8.4 px advance rounds to an 8 px cell, -4.8% pitch,
+  11% narrower images; with the em no longer snapped, 14 is now a
+  visibly tighter pitch than the font design)? Kept 15.
+* **Em snapping**: dropped, because `--font-size` now means the exact em (as in
+  a terminal) and a faithful match to Ghostty needs the unsnapped em. The
+  trade-off is the up-to-5% pitch error at sizes where the advance is not
+  whole; `--adjust-cell-width` is the tool to correct it deliberately.
+* **Supersampling**: not implemented. Measured in section 3: box-filter
+  supersampling is 1 to 11 points less crisp than native rendering with vertical
+  grid fit, and native tracking error is already bounded by cell rounding.
+  `--scale 2` with a display size of half the image is the sharp option.
+* **Contrast curve** (exponents 0.8 / 1.25, `raster/contrast.go`): a taste
+  call; set both to 1 for plain sRGB blending.
