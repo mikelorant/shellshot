@@ -84,6 +84,10 @@ func (r *Reader) Next() (snapshot.Frame, error) {
 			return snapshot.Frame{}, fmt.Errorf("%w: line %d: %d span rows, want %d", ErrMalformed, r.line, len(fl.Spans), r.header.Rows)
 		}
 		snap.Spans = decodeSpans(fl.Spans)
+		if fl.Widths != nil && len(fl.Widths) != r.header.Rows {
+			return snapshot.Frame{}, fmt.Errorf("%w: line %d: %d width rows, want %d", ErrMalformed, r.line, len(fl.Widths), r.header.Rows)
+		}
+		snap.Widths = decodeWidths(fl.Widths)
 	}
 	if err := snap.Validate(); err != nil {
 		return snapshot.Frame{}, fmt.Errorf("%w: line %d: %w", ErrMalformed, r.line, err)

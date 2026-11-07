@@ -7,12 +7,17 @@
 //
 // Frame lines:
 //
-//	{"t":<ms int>,"lines":[...],"cx":0,"cy":0,"cv":true,"title":"","spans":[...]}
+//	{"t":<ms int>,"lines":[...],"cx":0,"cy":0,"cv":true,"title":"","spans":[...],"widths":[...]}
 //
 // "spans" is optional (version 2 only) and present only when the frame has
 // styled text. It has one entry per row, each an array of [start,end,"<SGR>"]
 // triples whose start and end are rune indexes into that row's line, e.g.
 // "spans":[[[0,3,"31"]],[],[]]. Version 1 recordings have no spans.
+//
+// "widths" is optional (version 2 only) and present only when some rune of
+// the frame is not one cell wide. It has one entry per row, each an array of
+// [runeIndex,cells] pairs where cells is 2 (wide) or 0 (zero-width), e.g.
+// "widths":[[[0,2],[1,2]],[],[]]. Version 1 recordings have no widths.
 package recording
 
 import (
@@ -66,6 +71,8 @@ type frameLine struct {
 	Title string   `json:"title"`
 	// Spans is omitted when the frame has no styled text.
 	Spans [][]spanJSON `json:"spans,omitempty"`
+	// Widths is omitted when every rune of the frame occupies one cell.
+	Widths [][]wideJSON `json:"widths,omitempty"`
 }
 
 // validate checks the header is one this package can read.
