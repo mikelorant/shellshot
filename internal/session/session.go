@@ -1,0 +1,235 @@
+// Package session runs a program in a pseudo-terminal, feeds its output to a
+// headless virtual terminal and emits snapshot frames to a Sink. It depends
+// only on small interfaces (Process, vt.Terminal), never on pty or cgo.
+package session
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"time"
+
+	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/michaellorant/shellshot/internal/vt"
+)
+
+// readBufferSize is the size of the buffer used for each read from the process.
+const readBufferSize = 32 * 1024
+
+// chunkQueueLen is how many output chunks may be queued between the reader
+// goroutine and the main loop.
+const chunkQueueLen = 16
+
+// Run drives proc until it exits and returns its exit code.
+//
+// A single goroutine reads proc and forwards copies of the output over a
+// channel. The calling goroutine is the sole owner of the terminal (vt
+// terminals are not safe for concurrent use): it writes the chunks to the
+// terminal and, on every tick, snapshots it.
+//
+// Frames sent to sink:
+//   - An initial frame at t=0, before any output has been processed.
+//   - A frame, stamped with the time since Run started, on each tick at which
+//     the screen differs from the previously emitted frame.
+//   - A final frame once the output ends (EOF), after all remaining output has
+//     been written to the terminal. The final frame is ALWAYS emitted exactly
+//     once, even if it equals the previous frame, so a recording always ends
+//     with the terminal's final state.
+//
+// After the final frame Run waits for the process and returns its exit code;
+// a non-zero exit code is not an error.
+//
+// If ctx is cancelled Run closes proc and returns an error wrapping ctx.Err().
+// A sink error, terminal error or non-EOF read error also aborts the run with
+// a wrapped error. On every path Run closes the terminal and proc and does not
+// return until its goroutines have finished. The exit code is -1 when err is
+// non-nil. Errors from closing proc are ignored.
+func Run(ctx context.Context, proc Process, newTerm vt.Factory, cfg Config, sink Sink) (exitCode int, err error) {
+	cfg = cfg.withDefaults()
+	defer func() { _ = proc.Close() }()
+
+	if err := ctx.Err(); err != nil {
+		return -1, cancelError(err)
+	}
+	term, err := newTerm(cfg.Cols, cfg.Rows)
+	if err != nil {
+		return -1, fmt.Errorf("session: create terminal: %w", err)
+	}
+	defer func() {
+		if cerr := term.Close(); cerr != nil && err == nil {
+			exitCode, err = -1, fmt.Errorf("session: close terminal: %w", cerr)
+		}
+	}()
+	if err := proc.Resize(cfg.Cols, cfg.Rows); err != nil {
+		return -1, fmt.Errorf("session: resize process: %w", err)
+	}
+
+	s := &session{proc: proc, term: term, sink: sink, cfg: cfg}
+	exitCode, err = s.run(ctx)
+	if err != nil {
+		return -1, err
+	}
+	return exitCode, nil
+}
+
+// session holds the state of one Run call. All fields are owned by the
+// goroutine running Run.
+type session struct {
+	proc Process
+	term vt.Terminal
+	sink Sink
+	cfg  Config
+
+	start time.Time
+	last  snapshot.Snapshot
+	dirty bool // terminal written since the last snapshot
+}
+
+// waitResult is the outcome of Process.Wait.
+type waitResult struct {
+	code int
+	err  error
+}
+
+// run is the main loop. It returns once the process has exited or the run
+// has been aborted, and joins every goroutine it started.
+func (s *session) run(ctx context.Context) (int, error) {
+	chunks := make(chan []byte, chunkQueueLen)
+	stop := make(chan struct{})
+	var readErr error // written by the reader before it closes chunks
+	go func() {
+		defer close(chunks)
+		readErr = pump(s.proc, chunks, stop)
+	}()
+
+	var waited <-chan waitResult
+	defer func() {
+		close(stop)
+		_ = s.proc.Close() // unblocks a pending Read and Wait
+		for range chunks { // returns once the reader has exited
+		}
+		if waited != nil {
+			<-waited
+		}
+	}()
+
+	s.start = s.cfg.Clock()
+	ticks, stopTicker := s.cfg.Ticker(s.cfg.Interval)
+	defer stopTicker()
+
+	snap, err := s.term.Snapshot()
+	if err != nil {
+		return 0, fmt.Errorf("session: snapshot: %w", err)
+	}
+	if err := s.emit(0, snap); err != nil {
+		return 0, err
+	}
+
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			return 0, cancelError(ctx.Err())
+		case chunk, ok := <-chunks:
+			if !ok {
+				break loop
+			}
+			if _, err := s.term.Write(chunk); err != nil {
+				return 0, fmt.Errorf("session: write terminal: %w", err)
+			}
+			s.dirty = true
+		case <-ticks:
+			if err := s.sample(); err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	// The reader has finished and every chunk has been written to the terminal.
+	if ctx.Err() != nil {
+		return 0, cancelError(ctx.Err())
+	}
+	if readErr != nil {
+		return 0, fmt.Errorf("session: read process output: %w", readErr)
+	}
+	snap, err = s.term.Snapshot()
+	if err != nil {
+		return 0, fmt.Errorf("session: snapshot: %w", err)
+	}
+	if err := s.emit(s.elapsed(), snap); err != nil {
+		return 0, err
+	}
+
+	ch := make(chan waitResult, 1)
+	waited = ch
+	go func() {
+		code, err := s.proc.Wait()
+		ch <- waitResult{code, err}
+	}()
+	select {
+	case <-ctx.Done():
+		return 0, cancelError(ctx.Err())
+	case r := <-ch:
+		waited = nil
+		if r.err != nil {
+			return 0, fmt.Errorf("session: wait for process: %w", r.err)
+		}
+		return r.code, nil
+	}
+}
+
+// sample takes a snapshot and emits it if the screen changed since the last
+// emitted frame.
+func (s *session) sample() error {
+	if !s.dirty {
+		return nil
+	}
+	s.dirty = false
+	snap, err := s.term.Snapshot()
+	if err != nil {
+		return fmt.Errorf("session: snapshot: %w", err)
+	}
+	if snap.Equal(s.last) {
+		return nil
+	}
+	return s.emit(s.elapsed(), snap)
+}
+
+// emit sends a frame to the sink and records it as the last emitted one.
+func (s *session) emit(at time.Duration, snap snapshot.Snapshot) error {
+	if err := s.sink.Frame(snapshot.Frame{At: at, Snapshot: snap}); err != nil {
+		return fmt.Errorf("session: sink: %w", err)
+	}
+	s.last = snap
+	s.dirty = false
+	return nil
+}
+
+// elapsed returns the time since the session started.
+func (s *session) elapsed() time.Duration { return s.cfg.Clock().Sub(s.start) }
+
+// cancelError wraps a context error so errors.Is(err, ctx.Err()) holds.
+func cancelError(err error) error { return fmt.Errorf("session: %w", err) }
+
+// pump copies r to out until EOF, a read error, or stop is closed. Each chunk
+// is a fresh copy, so the receiver may keep it. io.EOF is not an error.
+func pump(r io.Reader, out chan<- []byte, stop <-chan struct{}) error {
+	buf := make([]byte, readBufferSize)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			select {
+			case out <- append([]byte(nil), buf[:n]...):
+			case <-stop:
+				return nil
+			}
+		}
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+	}
+}
