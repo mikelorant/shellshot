@@ -1,0 +1,31 @@
+# Not runnable until `record --script` ships.
+# A deterministic smoke test: runs two demos and asserts what is on screen.
+# Planned use, from the repository root:
+#   shellshot record --script examples/scripts/ci-smoke.script
+size 80x24
+shell /bin/sh
+env PS1="$ "
+env EXAMPLES_SPEED=fast
+env NO_COLOR=
+seed 42
+typing 10ms
+timeout 30s
+output ci-smoke.shot
+
+scene build {
+  run sh examples/buildlog.sh
+  wait "BUILD OK" 0s              # run has settled, so the text must be on screen now
+  wait /BUILD OK in [0-9.]+s/ 0s
+  mark build-ok
+}
+
+scene colours {
+  run sh examples/colors.sh
+  wait "truecolour" 0s
+  wait "16 colours" 0s
+}
+
+scene refuse {
+  run sh examples/colors.sh | cat
+  wait "stdout is not a terminal" 0s
+}

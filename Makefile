@@ -1,7 +1,7 @@
 export PKG_CONFIG_PATH := $(CURDIR)/build/libghostty/lib/pkgconfig
 export CGO_ENABLED := 1
 
-.PHONY: deps build test vet fmt noto-asset emoji-asset clean distclean
+.PHONY: deps build test vet fmt noto-asset emoji-asset examples test-examples clean distclean
 
 deps:
 	./scripts/build-libghostty.sh
@@ -17,6 +17,22 @@ vet:
 
 fmt:
 	gofmt -w .
+
+# Records and exports every examples/*.sh into build/examples/ (fast speed, 80x24).
+examples: build
+	@set -e; mkdir -p build/examples; \
+	for f in examples/*.sh; do \
+		n=$${f##*/}; n=$${n%.sh}; \
+		[ "$$n" = lib ] && continue; \
+		echo "== $$n"; \
+		EXAMPLES_SPEED=fast ./bin/shellshot record -o build/examples/$$n.shot --cols 80 --rows 24 -c "sh ./$$f" >/dev/null; \
+		./bin/shellshot export build/examples/$$n.shot -o build/examples/$$n.png; \
+	done; \
+	ls -l build/examples | awk 'NR > 1 { printf "%10d  %s\n", $$5, $$9 }'
+
+# Runs every example under dash, bash, sh and zsh on a pty (takes a few minutes).
+test-examples:
+	./scripts/test-examples.sh
 
 # Re-fetches the pinned Noto Color Emoji font and checks its sha256 (no-op when
 # the committed assets already match).

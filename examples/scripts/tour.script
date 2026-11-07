@@ -1,0 +1,31 @@
+# Not runnable until `record --script` ships.
+# Plays examples/showcase.sh as three scenes and leaves it with Enter (--pause).
+# Planned use, from the repository root:
+#   shellshot record --script examples/scripts/tour.script
+size 80x24
+shell /bin/sh
+env PS1="$ "
+env EXAMPLES_SPEED=normal
+timeout 60s
+settle off
+linger 500ms
+output tour.shot
+
+scene start {
+  run ./examples/showcase.sh --pause
+  wait "shellshot" 10s
+}
+
+scene watch {
+  speed 1x
+  sleep 20s
+  wait "That was shellshot" 30s
+}
+
+scene quit {
+  hold 2s
+  press enter
+  wait idle 500ms
+  press q
+  mark tour-done
+}
