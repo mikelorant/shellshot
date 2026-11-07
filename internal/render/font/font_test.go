@@ -8,6 +8,7 @@ import (
 	"math"
 	"testing"
 
+	xfont "golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -421,4 +422,89 @@ func TestStylesShareAdvance(t *testing.T) {
 			}
 		}
 	}
+}
+
+// gridFit tests: the fitted outline has its x-height, cap height, baseline
+// and descender edges on whole pixel rows, round overshoot flattened.
+
+func TestGridFitSnapsHeights(t *testing.T) {
+	s := mustDefault(t)
+	for _, size := range []float64{11, 13.333, 15, 16.667, 20, 26.667} {
+		f, err := s.Face(false, false, size)
+		if err != nil {
+			t.Fatal(err)
+		}
+		whole := func(name string, v fixed.Int26_6) {
+			if v&63 != 0 {
+				t.Errorf("size %v: %s = %v px, want a whole pixel", size, name, float64(v)/64)
+			}
+		}
+		top := func(r rune) fixed.Int26_6 { b, _, _ := f.GlyphBounds(r); return b.Min.Y }
+		bottom := func(r rune) fixed.Int26_6 { b, _, _ := f.GlyphBounds(r); return b.Max.Y }
+		whole("top of x", top('x'))
+		whole("top of o", top('o'))
+		whole("top of H", top('H'))
+		whole("bottom of x", bottom('x'))
+		whole("bottom of o", bottom('o'))
+		whole("bottom of p", bottom('p'))
+		if top('o') != top('x') {
+			t.Errorf("size %v: o overshoots x-height: %v vs %v", size, top('o'), top('x'))
+		}
+	}
+}
+
+// Grid fitting moves outlines vertically only: advances, and the x extent of
+// a glyph, match the unfitted face.
+func TestGridFitKeepsHorizontalMetrics(t *testing.T) {
+	fitted := mustDefault(t)
+	plain := mustDefault(t)
+	plain.SetGridFit(false)
+	a, _ := fitted.Face(false, false, 15)
+	b, _ := plain.Face(false, false, 15)
+	for r := rune('!'); r <= '~'; r++ {
+		ba, adva, _ := a.GlyphBounds(r)
+		bb, advb, _ := b.GlyphBounds(r)
+		if adva != advb || ba.Min.X != bb.Min.X || ba.Max.X != bb.Max.X {
+			t.Errorf("%q: fitted x extent/advance %v %v, plain %v %v", r, ba, adva, bb, advb)
+		}
+	}
+}
+
+// The fitted mask must not leak between glyphs: drawing the same glyph twice
+// (with another between) yields identical coverage, and the top row of an
+// 'x' is fully covered where the unfitted face leaves a partial row.
+func TestGridFitMask(t *testing.T) {
+	s := mustDefault(t)
+	f, _ := s.Face(false, false, 15)
+	coverage := func(r rune) []uint8 {
+		_, mask, _, _, ok := f.Glyph(fixed.P(0, 20), r)
+		if !ok {
+			t.Fatalf("no glyph for %q", r)
+		}
+		a := mask.(*image.Alpha)
+		return append([]uint8(nil), a.Pix...)
+	}
+	first := coverage('x')
+	coverage('W')
+	second := coverage('x')
+	if !bytes.Equal(first, second) {
+		t.Error("mask of x changed between calls")
+	}
+	dr, mask, _, _, _ := f.Glyph(fixed.P(0, 20), 'x')
+	a := mask.(*image.Alpha)
+	maxTop := uint8(0)
+	for x := 0; x < dr.Dx(); x++ {
+		maxTop = max(maxTop, a.Pix[x])
+	}
+	if maxTop < 200 {
+		t.Errorf("top row of fitted x has max coverage %d, want a crisp edge", maxTop)
+	}
+	if _, ok := mustGlyphOK(f, 0x10FFFF); ok {
+		t.Error("glyph reported for an unmapped rune")
+	}
+}
+
+func mustGlyphOK(f xfont.Face, r rune) (image.Rectangle, bool) {
+	dr, _, _, _, ok := f.Glyph(fixed.P(0, 20), r)
+	return dr, ok
 }
