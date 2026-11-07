@@ -133,12 +133,12 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 The GoReleaser archives are a separate path: they ship the binary per platform, built outside the
 container. The image build does not use them or `scripts/build-libghostty.sh`; it runs the same
-`zig build` itself. Publishing images to a registry is not configured.
+`zig build` itself. Release images are built from the release archives instead (see "Continuous integration and releases").
 
 ## Releases
 
 [GoReleaser](https://goreleaser.com) (`.goreleaser.yaml`, version 2) builds one archive per target
-into `dist/`: macOS and Linux, each for amd64 and arm64. Publishing is not configured yet.
+into `dist/`: macOS and Linux, each for amd64 and arm64. The workflows below run it on GitHub; this section is the local build.
 
 Prerequisites: `goreleaser` (`brew install goreleaser`), zig 0.17.x, `git` with the submodule
 (`make release-libs` initialises it), `pkg-config`, and a Mac with Xcode or the Command Line Tools
@@ -172,10 +172,47 @@ How the builds work:
   `xcrun --show-sdk-path` unless you set it. Building the macOS archives therefore needs a Mac.
 - `shellshot` is about 36 MB per binary (the fonts are embedded) and about 29 MB per archive.
 
-Publishing: `release.disable: true` and `changelog.disable: true` in the config keep everything
-local. To release from GitHub Actions later, run `make release-libs` on a macOS runner with zig 0.17
-and goreleaser installed, then `goreleaser release --clean` on a tag push with `GITHUB_TOKEN` set,
-after removing `release.disable` (and setting `release.github` if the repository differs).
+If the link fails with a `libghostty-vt.a: file not found` path from another worktree, Go has reused
+a cached cgo result from that checkout: run `make snapshot` with `GOCACHE=$(mktemp -d)` once.
+
+## Continuous integration and releases
+
+Two workflows live in `.github/workflows/`. Neither needs a secret beyond the built-in
+`GITHUB_TOKEN`. Actions are pinned by major version, zig by exact version (`ZIG_VERSION` in both
+workflows and the Dockerfile: change all three together), and Go comes from `go.mod`.
+
+**`ci.yml`** runs on pushes to `main` and on pull requests; a newer push cancels the older run.
+`test` runs on `macos-latest` (arm64) and `ubuntu-latest`: it fetches only the ghostty submodule,
+builds libghostty with `make deps` (cached on the submodule commit, zig version and OS), then runs
+`go vet ./...`, `go build ./...`, `go test -count=1 -race ./...`, `go mod tidy -diff` and
+`make check-showcase`. `release-check` runs `goreleaser check`. Read-only permissions.
+
+**`release.yml`** runs on a `v*` tag push (a real release) and on manual `workflow_dispatch` (a dry
+run):
+
+- `archives` (macOS runner, `contents: write`) builds libghostty for the four targets
+  (`make release-libs`, cached) and runs GoReleaser. On a tag it creates a **draft** GitHub Release
+  with the four archives, `checksum.txt` and a changelog of the `feat` and `fix` commits. In a dry run
+  it runs `release --snapshot`, which publishes nothing. Both modes upload the archives and
+  `checksum.txt` as the `archives` workflow artifact (kept 14 days).
+- `image` (Linux runner, `packages: write`) takes the Linux binaries out of those archives, so the
+  image holds exactly the release bits, and assembles `Dockerfile.release` for linux/amd64 and
+  linux/arm64 (QEMU only runs `useradd` in the arm64 base image; nothing is compiled). It smoke-tests
+  the amd64 image (`version`, `record`, `export`, `file` on the PNG) and pushes
+  `ghcr.io/mikelorant/shellshot` on tags only: `X.Y.Z`, `X.Y` and `latest` for a stable tag, just
+  `X.Y.Z-rc.1` for a prerelease. A dry run builds the image and pushes nothing.
+
+To cut a release: make sure `main` is green, then `git tag vX.Y.Z && git push origin vX.Y.Z`. When the
+workflow finishes, review the draft under the repository's Releases page, edit the notes, and publish
+it by hand; releases are never published automatically. To rehearse, run the `release` workflow from
+the Actions tab (Run workflow) and download the `archives` artifact.
+
+Repository settings: nothing beyond the defaults, because the jobs ask for their own permissions
+(`contents: write`, `packages: write`). If the repository's Actions setting for workflow permissions
+is "read-only" that is still enough, since job-level `permissions` override it. The first push
+creates the GHCR package as private and linked to the repository; set its visibility under the
+package settings once the release is public. The repository has no `LICENSE` and the embedded emoji
+font is Apple artwork: see `NOTICE` before making a release or the image public.
 
 ## Worktrees
 
