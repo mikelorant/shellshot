@@ -117,15 +117,15 @@ nap 1100
 
 # ---- 5 cursor and screen control
 caption 5 'Cursor control, save/restore, scroll region'
-ex_box 4 3 7 34 'CUP + box'
+ex_box 4 3 7 36 'CUP + box'
 ex_cup 6 6; printf 'boxes drawn with absolute moves'
 ex_cup 7 6; printf '\033[1;35mDECSC\033[0m / \033[1;35mDECRC\033[0m keep a position'
-ex_cup 5 $((W - 24)); printf 'typing with a ticking counter:'
-ex_cup 6 $((W - 24))
+ex_cup 5 $((W - 30)); printf 'typing with a ticking counter:'
+ex_cup 6 $((W - 30))
 n=1
 for word in ESC 7 saves and ESC 8 restores; do
     ex_save
-    ex_cup 8 $((W - 24)); printf '\033[1;7m tick %d \033[0m' "$n"
+    ex_cup 8 $((W - 30)); printf '\033[1;7m tick %d \033[0m' "$n"
     ex_restore
     printf '%s ' "$word"
     n=$((n + 1))

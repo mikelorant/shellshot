@@ -9,8 +9,10 @@ The Go binary links libghostty-vt through cgo. libghostty is built from the pinn
 |---|---|
 | `make deps` | Runs `scripts/build-libghostty.sh`: initialises the submodule (`git submodule update --init --depth 1 third_party/ghostty`) and runs `zig build -Demit-lib-vt -Doptimize=ReleaseFast --prefix build/libghostty`. Safe to repeat; it reuses the zig cache |
 | `make build` | `go build -o bin/shellshot ./cmd/shellshot` |
-| `make test` | `go test ./...` |
+| `make test` | `make check-showcase`, then `go test ./...` |
 | `make vet` | `go vet ./...` |
+| `make showcase` | Records the showcase demo and exports the README image `docs/assets/showcase.png` (on demand; see below) |
+| `make check-showcase` | Fails if `docs/assets/showcase.png` is stale (see "Regenerating the README image") |
 | `make test-examples` | Runs every `contrib/examples/*.sh` under dash, bash, sh and zsh (takes a few minutes); it checks exit status, terminal restore and Ctrl-C handling |
 | `make fmt` | `gofmt -w .` |
 | `make clean` | Removes `bin/` |
@@ -50,6 +52,24 @@ go test ./internal/recording/...
   ```sh
   go test ./internal/render/raster ./internal/render/sprite -update
   ```
+
+## Regenerating the README image
+
+`make showcase` builds the binary, records `contrib/examples/showcase.sh` at 80x24 and speed
+`normal` into `build/showcase.shot`, and exports it to `docs/assets/showcase.png` with every
+look and timing flag pinned (`scripts/build-showcase.sh` has the list): `--scale 2 --emoji-set noto`
+(licence-clean artwork), 60 fps, 1.25x speed, pauses capped at 1 s, 2 s final hold. That gives about
+29 s and 1.7 MB. The README shows it at half its pixel width (736 of 1472), so retina screens get
+sharp text. If you change `--scale` or `--font-size`, update the `width` in `README.md`.
+
+It runs only on demand, never as part of `make build`, because the image is committed and a new
+1.7 MB binary on every build would bloat the history. Regenerate it when the demo or the export
+flags change, and commit it deliberately. The demo runs in real time, so two runs can differ byte for byte
+(frame boundaries move by a few milliseconds) while looking the same.
+
+`docs/assets/showcase.png.src` holds a sha256 of `showcase.sh`, `lib.sh` and the record and export
+settings. `make check-showcase` recomputes it and fails with `showcase.png is stale: run make showcase`
+when they differ; `make test` runs it too. It is a hash comparison, so it is fast and needs no libghostty.
 
 ## Worktrees
 

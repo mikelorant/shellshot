@@ -16,6 +16,7 @@ a terminal), `--pause` (wait for Enter at the end), `--help`.
     shellshot export colors.shot          # writes colors.png (animated PNG)
 
 `make examples` does this for every demo into `build/examples/` (fast speed).
+`make showcase` records `showcase.sh` at normal speed into the README image `docs/assets/showcase.png` (on demand; see `docs/development.md`).
 `make test-examples` runs each demo under dash, bash, sh and zsh on a pty.
 
 ## Demos

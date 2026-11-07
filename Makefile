@@ -1,7 +1,7 @@
 export PKG_CONFIG_PATH := $(CURDIR)/build/libghostty/lib/pkgconfig
 export CGO_ENABLED := 1
 
-.PHONY: deps build test vet fmt noto-asset emoji-asset examples test-examples test-scripts clean distclean
+.PHONY: deps build test vet fmt noto-asset emoji-asset examples showcase check-showcase test-examples test-scripts clean distclean
 
 deps:
 	./scripts/build-libghostty.sh
@@ -9,7 +9,7 @@ deps:
 build:
 	go build -o bin/shellshot ./cmd/shellshot
 
-test:
+test: check-showcase
 	go test ./...
 
 vet:
@@ -29,6 +29,16 @@ examples: build
 		./bin/shellshot export build/examples/$$n.shot -o build/examples/$$n.png; \
 	done; \
 	ls -l build/examples | awk 'NR > 1 { printf "%10d  %s\n", $$5, $$9 }'
+
+# Records contrib/examples/showcase.sh and exports the README image docs/assets/showcase.png.
+# On demand only: the result is committed deliberately (see docs/development.md).
+showcase: build
+	./scripts/build-showcase.sh
+
+# Fails when docs/assets/showcase.png no longer matches the demo and export flags it was made from
+# (a sha256 comparison, instant).
+check-showcase:
+	./scripts/build-showcase.sh --check
 
 # Runs every example under dash, bash, sh and zsh on a pty (takes a few minutes).
 test-examples:
