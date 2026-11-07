@@ -22,6 +22,7 @@ EX_ACTIVE=0     # 1 once ex_init has touched the terminal; cleanup does nothing 
 EX_ALT=0        # 1 while the alternate screen is on
 EX_REGION=0     # 1 while a scroll region is set
 EX_TITLE=0      # 1 while a window title was pushed
+EX_ESC=$(printf '\033')   # for building escape strings without a printf per piece
 EX_OWED=0       # milliseconds not yet slept when fractional sleep is missing
 
 # ---------------------------------------------------------------- start/stop
