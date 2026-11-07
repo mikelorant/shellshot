@@ -1,0 +1,10 @@
+t=+0s span-begin scene:w id=1 parent=0
+t=+0s write "e"
+t=+50ms write "c"
+t=+100ms write "h"
+t=+150ms write "o"
+t=+200ms write " "
+t=+250ms write "h"
+t=+300ms write "i"
+t=+350ms write "\r"
+t=+2.57s error wait_timeout.script:3:3: scene "w": wait timed out after 2s waiting for "never"

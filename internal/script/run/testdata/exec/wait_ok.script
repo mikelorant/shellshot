@@ -1,0 +1,5 @@
+run echo hi
+wait idle 500ms
+wait /^hi$/
+wait "hi" 0s
+wait idle

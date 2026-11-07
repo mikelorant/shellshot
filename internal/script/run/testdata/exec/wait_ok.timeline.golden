@@ -1,0 +1,13 @@
+t=+0s write "e"
+t=+50ms write "c"
+t=+100ms write "h"
+t=+150ms write "o"
+t=+200ms write " "
+t=+250ms write "h"
+t=+300ms write "i"
+t=+350ms write "\r"
+t=+1.27s span-begin hidden id=1 parent=0
+t=+1.47s shutdown
+t=+1.48s child-exit 0
+t=+1.48s span-end id=1
+t=+1.48s done

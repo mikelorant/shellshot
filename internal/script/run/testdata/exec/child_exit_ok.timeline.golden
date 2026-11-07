@@ -1,0 +1,12 @@
+t=+0s span-begin scene:gone id=1 parent=0
+t=+0s write "e"
+t=+50ms write "x"
+t=+100ms write "i"
+t=+150ms write "t"
+t=+200ms write "\r"
+t=+220ms child-exit 0
+t=+1.4s mark after-exit
+t=+1.4s span-end id=1
+t=+1.4s span-begin hidden id=2 parent=0
+t=+1.6s span-end id=2
+t=+1.6s done

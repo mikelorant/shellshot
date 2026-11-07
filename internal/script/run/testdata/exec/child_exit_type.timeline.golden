@@ -1,0 +1,7 @@
+t=+0s write "e"
+t=+50ms write "x"
+t=+100ms write "i"
+t=+150ms write "t"
+t=+200ms write "\r"
+t=+220ms child-exit 0
+t=+400ms error child_exit_type.script:2:1: child exited (status 0) before the script could type "x"

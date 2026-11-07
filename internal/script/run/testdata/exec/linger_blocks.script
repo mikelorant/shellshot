@@ -1,0 +1,12 @@
+linger 1s
+typing 10ms
+
+type lines {
+  ab
+  cd
+}
+press up up
+wait "$"
+sleep 500ms
+mark after-sleep
+run echo bye
