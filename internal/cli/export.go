@@ -11,7 +11,7 @@ import (
 
 	"github.com/michaellorant/shellshot/internal/export/pipeline"
 	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/render/font"
+	"github.com/michaellorant/shellshot/internal/render/fontchain"
 	"github.com/michaellorant/shellshot/internal/render/raster"
 	"github.com/michaellorant/shellshot/internal/render/theme"
 	"github.com/michaellorant/shellshot/internal/snapshot"
@@ -31,6 +31,9 @@ type exportFlags struct {
 	minDelay  time.Duration
 	cursor    string
 	fps       int
+	// fallbackFonts are --fallback-font files, in the order given.
+	fallbackFonts []string
+	systemFonts   bool
 }
 
 // newExportCmd builds "shellshot export", which renders a recording as an
@@ -58,6 +61,8 @@ func newExportCmd() *cobra.Command {
 	fl.DurationVar(&f.minDelay, "min-delay", 20*time.Millisecond, "shortest frame delay; shorter frames are merged into the previous one (0 to keep all)")
 	addFPSFlag(cmd, &f.fps)
 	fl.StringVar(&f.cursor, "cursor", "block", "cursor shape: block, bar, underline or none")
+	fl.StringArrayVar(&f.fallbackFonts, "fallback-font", nil, "TTF/OTF/TTC `file` for glyphs the built-in fonts lack (repeatable; tried in order, after the built-in fonts)")
+	fl.BoolVar(&f.systemFonts, "system-fonts", false, "also use installed CJK and symbol fonts (macOS and Linux font folders); the output then depends on this machine's fonts")
 	return cmd
 }
 
@@ -143,9 +148,9 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	if sameFile(input, output) {
 		return fmt.Errorf("export: output %s would overwrite the input recording", output)
 	}
-	fonts, err := font.Default()
+	fonts, err := fontchain.New(fontchain.Options{Files: flags.fallbackFonts, System: flags.systemFonts})
 	if err != nil {
-		return fmt.Errorf("export: %w", err)
+		return fmt.Errorf("export: --fallback-font: %w", err)
 	}
 	renderer, err := raster.New(fonts, raster.Options{
 		Theme:    th,
