@@ -194,7 +194,7 @@ type Segment struct {
 }
 // Options.Segments []Segment  (sorted, non-overlapping; nil = today's behaviour)
 ```
-1. A gap is **split at segment boundaries**; each piece is capped by its segment's idle and divided by its speed; pieces summed. Otherwise a pause at the start of scene 2 would be scaled by scene 1's speed. Side effect: a gap crossing a boundary can get two idle caps (documented).
+1. A gap is **split at segment boundaries**; each piece is capped by its segment's idle and divided by its speed; pieces summed. Otherwise a pause at the start of scene 2 would be scaled by scene 1's speed. The idle cap applies once to the whole stretch, not once per piece: the budget is the smallest non-zero limit among the non-skipped pieces, spent in time order (T14 decision; this replaces the earlier "two caps" side effect). A segment's `Speed`/`IdleLimit` replace the global value (0 inherits); `Hold` is added on top of `Options.Hold`; `Hold` also applies on a `Skip` segment, landing on the last visible step.
 2. `Skip` pieces add zero; frames inside are dropped before dedup.
 3. `Hold` is added to the last step at or before the segment end; not capped, not divided (same rule as the existing final hold). The recording's last frame still uses `Options.Hold`.
 4. Dedup and min-delay folding run after, unchanged; they only move time. A hold-lengthened step is not folded (inference; add a test).
