@@ -3,7 +3,7 @@
 `shellshot export FILE [-o OUT] [flags]` renders a recording as an animated PNG (APNG, the
 default), an animated GIF, an animated WebP or an SVG. An APNG is a standard PNG that carries animation data. Browsers,
 GitHub, Slack and Discord animate it; at the time of writing, macOS Preview and Quick Look show
-only the first frame. Run `shellshot export --help` for the flag list.
+only one image, which export makes the end of the recording (see [Poster](#poster-apng)). Run `shellshot export --help` for the flag list.
 
 ## Output format
 
@@ -150,6 +150,37 @@ supported):
 **PNG is the safe choice for READMEs and chat.** Use SVG where you control the viewer (your own
 site, documentation, a browser tab) or want a small, sharp still (`--frame last`).
 
+## Poster (APNG)
+
+A viewer that cannot animate shows one image of a PNG: the *default image*. Preview, Quick Look and
+many chat previews are such viewers. An APNG normally has no separate default image, so they show
+its first frame. `--poster` (APNG only) chooses what they show instead.
+
+| `--poster` | Default image |
+|---|---|
+| `last` (default) | The final screen of the recording, the end result |
+| `first` | The first frame, which is what `none` writes |
+| `none` | None: the first frame is both the default image and the first animation frame |
+| a time such as `12s` | The frame on screen at that time on the output clock, after `--speed`, `--idle-limit` and `--hold` and the [leading blank trim](#leading-blank-frame), like `--frame` of SVG; a time past the end picks the last frame |
+
+- The poster is drawn by the same renderer, with the same theme, font and cursor, and stored as
+  the PNG's `IDAT` image *without* an `fcTL` chunk before it, as the APNG specification defines
+  a default image that is not part of the animation. Every animation frame is then an `fdAT`
+  chunk, `acTL` counts only them, and animating viewers play exactly the same animation as
+  without a poster. A viewer that decodes the file as a plain PNG shows the poster.
+- **Size.** A poster other than the first frame costs one full-canvas image. Measured on the
+  README showcase recording (80x24, scale 2, 1472x992 px, 204 frames): 1,742,152 B with
+  `--poster none`, 1,761,500 B with `last`, +19,348 B (+1.1 %). On the short 80x24 example
+  recordings (`contrib/examples`, scale 1) the cost is 7 to 107 KB: +0.5 % (dashboard) to +13 %
+  (animations, cursor, buildlog) for sessions of hundreds of frames, but nearly double (+94 to
+  +101 %) for a recording of a few screens (attributes, colours, emoji, osc, unicode).
+  Use `--poster none` where file size matters more than the preview.
+- `first` and a time that falls in the first frame write the same file as `none`: the default
+  image is already the first frame, so no copy is added.
+- `--poster` with another format (`--format gif`, `.webp`, `.svg`) is an error. Those formats have
+  no default image; a GIF viewer shows the first frame, as before, which the
+  [leading blank trim](#leading-blank-frame) makes the first output instead of an empty screen.
+
 ## Output file
 
 - Without `-o`, the output is `FILE` with its extension replaced by the first extension of the
@@ -158,6 +189,9 @@ site, documentation, a browser tab) or want a small, sharp still (`--frame last`
   `--format` is given. `-o -` writes a file named `-`; export does not write to stdout.
 - Export refuses to overwrite the input recording and replaces any other existing file.
 - The file is written atomically: a failed run leaves no partial output.
+- The `wrote N frames` line on stderr counts the frames in the file, not the steps of the
+  timeline: the encoders merge frames that render the same picture (for example a cursor move
+  with `--cursor none`) into one longer frame. An APNG's poster is not a frame.
 - A recording cut short by a crash exports up to the damage, with the same note on stderr as
   `replay`.
 - The canvas size is fixed. A recording whose terminal changed size part-way fails with
@@ -266,6 +300,26 @@ nothing (no background, or only a foreground colour, bold, italic, faint or blin
 | `--hold` | 2s | How long the final frame stays |
 | `--min-delay` | 20ms | Shortest frame delay; shorter frames merge into the previous one (0 keeps all) |
 | `--loops` | 0 | Times the animation plays (0 for forever) |
+| `--keep-leading-blank` | off | Keep a blank first frame; see below |
+
+### Leading blank frame
+
+A recording starts with the empty terminal that existed before the program printed anything.
+Viewers that show only the first frame (macOS Preview, Quick Look, chat previews) would show an
+empty terminal. So, in every format, export drops the first frame when it shows
+nothing (no text and no styled cell; the cursor does not count) and is on screen for 250 ms or
+less, measured on the output clock. The recording then starts at the first output. Decisions:
+
+- The dropped frame is removed from playback: its time is not added to the next frame, so the
+  animation is that much shorter. The idle before the first output is not interesting.
+- A blank first frame longer than 250 ms stays (that wait is part of what happened), and so does
+  a recording that has only one frame.
+- Only the first frame is considered, once. If a hidden span covers the start, the first frame is
+  the screen at the end of that span, and the same rule applies to it.
+- `--keep-leading-blank` turns the trim off.
+
+The trim is the timeline option `TrimLeadingBlank` (0 disables it); the command line sets it to
+250 ms.
 
 ## Scenes and hidden spans
 

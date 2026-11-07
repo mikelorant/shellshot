@@ -184,3 +184,26 @@ func TestSnapshotTextTrimsStyledTrailingSpaces(t *testing.T) {
 		t.Errorf("Text = %q, want %q", got, want)
 	}
 }
+
+func TestSnapshotIsBlank(t *testing.T) {
+	styled := [][]Span{{{Start: 0, End: 1, Style: Style{Attrs: Inverse}}}}
+	tests := []struct {
+		name string
+		s    Snapshot
+		want bool
+	}{
+		{"empty lines", Snapshot{Cols: 4, Rows: 2, Lines: []string{"", ""}}, true},
+		{"spaces only", Snapshot{Cols: 4, Rows: 1, Lines: []string{"  "}}, true},
+		{"cursor and title only", Snapshot{Cols: 4, Rows: 1, Lines: []string{""}, Cursor: Cursor{X: 1, Visible: true}, Title: "t"}, true},
+		{"text", Snapshot{Cols: 4, Rows: 2, Lines: []string{"", "$"}}, false},
+		{"styled blank cell", Snapshot{Cols: 4, Rows: 1, Lines: []string{" "}, Spans: styled}, false},
+		{"empty span lists", Snapshot{Cols: 4, Rows: 1, Lines: []string{""}, Spans: [][]Span{nil}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.s.IsBlank(); got != tt.want {
+				t.Errorf("IsBlank() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -75,6 +75,23 @@ func (s Snapshot) Text() string {
 	return string(b)
 }
 
+// IsBlank reports whether the screen shows nothing: no text other than
+// spaces and no styled cells. The cursor and the title are not content, so a
+// fresh screen with only a cursor is blank.
+func (s Snapshot) IsBlank() bool {
+	for _, l := range s.Lines {
+		if strings.TrimSpace(l) != "" {
+			return false
+		}
+	}
+	for _, spans := range s.Spans {
+		if len(spans) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // Equal reports whether two snapshots show the same screen content.
 func (s Snapshot) Equal(o Snapshot) bool {
 	if s.Cols != o.Cols || s.Rows != o.Rows || s.Cursor != o.Cursor || s.Title != o.Title || len(s.Lines) != len(o.Lines) {

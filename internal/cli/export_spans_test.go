@@ -80,12 +80,13 @@ func hiddenRecording(t *testing.T) string {
 	})
 }
 
-// exportSpans runs export on in with --fps 10 and extra flags and returns the
-// decoded animation.
+// exportSpans runs export on in with --fps 10, --keep-leading-blank (these
+// recordings open on a short blank screen that the delays below include) and
+// extra flags and returns the decoded animation.
 func exportSpans(t *testing.T, in string, flags ...string) (kettek.APNG, string) {
 	t.Helper()
 	outPath := filepath.Join(t.TempDir(), "out.png")
-	args := append([]string{in, "-o", outPath, "--fps", spanFPS}, flags...)
+	args := append([]string{in, "-o", outPath, "--fps", spanFPS, "--keep-leading-blank"}, flags...)
 	code, stderr := runExportCmd(t, args...)
 	if code != 0 {
 		t.Fatalf("export %v: exit %d, stderr %q", flags, code, stderr)
@@ -312,7 +313,7 @@ func TestExportWithoutSpansIsUnchanged(t *testing.T) {
 func exportTo(t *testing.T, in string, flags ...string) string {
 	t.Helper()
 	outPath := filepath.Join(t.TempDir(), "out.png")
-	args := append([]string{in, "-o", outPath, "--fps", spanFPS}, flags...)
+	args := append([]string{in, "-o", outPath, "--fps", spanFPS, "--keep-leading-blank"}, flags...)
 	if code, stderr := runExportCmd(t, args...); code != 0 {
 		t.Fatalf("export %v: exit %d, stderr %q", flags, code, stderr)
 	}

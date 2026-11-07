@@ -72,6 +72,8 @@ type Sink struct {
 	// that changed the canvas.
 	shown, cur *image.NRGBA
 
+	// written is the number of frames Close wrote.
+	written  int
 	closed   bool
 	closeErr error
 }
@@ -79,6 +81,7 @@ type Sink struct {
 var (
 	_ pipeline.Sink         = (*Sink)(nil)
 	_ pipeline.DelayLimiter = (*Sink)(nil)
+	_ pipeline.FrameCounter = (*Sink)(nil)
 )
 
 // NewSink returns a Sink for a width×height canvas that writes to w. The
@@ -195,6 +198,11 @@ func changedRect(a, b *image.NRGBA) image.Rectangle {
 	return rect
 }
 
+// Frames returns the number of frames Close wrote, after identical images
+// were merged into one frame. It is 0 before Close and after a Close that
+// failed.
+func (s *Sink) Frames() int { return s.written }
+
 // Close writes the WebP to the underlying writer. It returns ErrNoFrames if
 // no frame was added. Close is idempotent: later calls return the first
 // call's result without writing again.
@@ -204,6 +212,9 @@ func (s *Sink) Close() error {
 	}
 	s.closed = true
 	s.closeErr = s.write()
+	if s.closeErr == nil {
+		s.written = len(s.frames)
+	}
 	s.frames, s.shown, s.cur = nil, nil, nil
 	return s.closeErr
 }

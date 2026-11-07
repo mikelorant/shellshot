@@ -43,7 +43,8 @@ type Renderer interface {
 // nothing behind; Export also silences the writer it gives the sink when the
 // export fails, so a Close after a failure writes nothing.
 //
-// A Sink may additionally implement DelayLimiter and AutoFrame.
+// A Sink may additionally implement DelayLimiter, AutoFrame, PosterSetter and
+// FrameCounter.
 type Sink interface {
 	// AddFrame appends img, shown for delay. Export never modifies img, and
 	// passes the same image again for the next step if the screen did not
@@ -74,10 +75,30 @@ type AutoFrame interface {
 	AddFrameAuto(img image.Image, delay time.Duration) error
 }
 
+// PosterSetter is implemented by a Sink whose format has a still image apart
+// from the animation, for viewers that cannot animate (the APNG sink's
+// default image). Export calls SetPoster once, before the first AddFrame,
+// when Options.Poster asks for a poster.
+type PosterSetter interface {
+	SetPoster(img image.Image) error
+}
+
+// FrameCounter is implemented by a Sink that can say how many frames its
+// output holds. Frames is the number of frames Close wrote, counting a run of
+// identical images the sink merged into one frame once, which can be fewer
+// than the timeline steps. It is 0 before Close and after a failed Close.
+type FrameCounter interface {
+	Frames() int
+}
+
 // Options configures Export.
 type Options struct {
 	// Timeline sets the idle cap, speed, final hold and minimum delay.
 	Timeline timeline.Options
+	// Poster picks the step rendered as the sink's still image; the zero
+	// value, PosterNone, writes none. Export fails if it asks for a poster
+	// and the sink is not a PosterSetter.
+	Poster Poster
 	// Loops is the APNG play count; 0 means forever. It only applies when
 	// NewSink is nil.
 	Loops int
@@ -113,6 +134,11 @@ func Export(ctx context.Context, src Source, cols, rows int, r Renderer, w io.Wr
 	sink, err := newSink(out, width, height)
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
+	}
+	if err := setPoster(steps, r, sink, o.Poster); err != nil {
+		out.silence()
+		sink.Close()
+		return err
 	}
 	if err := encodeSteps(ctx, steps, r, sink, o.Progress); err != nil {
 		out.silence()
@@ -153,6 +179,33 @@ func ReadSteps(ctx context.Context, src Source, o timeline.Options) ([]timeline.
 		return nil, errors.New("export: recording has no frames")
 	}
 	return steps, nil
+}
+
+// setPoster renders the step p picks and hands it to sink as its poster. It
+// does nothing for PosterNone, and nothing when p picks the first step: a
+// viewer without animation already shows the first frame, so a poster of it
+// would only add a copy.
+func setPoster(steps []timeline.Step, r Renderer, sink Sink, p Poster) error {
+	if p.Kind == PosterNone {
+		return nil
+	}
+	ps, ok := sink.(PosterSetter)
+	if !ok {
+		return errors.New("export: this output format has no poster")
+	}
+	i := p.Step(steps)
+	if i == 0 {
+		// The first animation frame is already the default image.
+		return nil
+	}
+	img, err := r.Render(steps[i].Snapshot)
+	if err != nil {
+		return fmt.Errorf("export: render poster (step %d of %d): %w", i, len(steps), err)
+	}
+	if err := ps.SetPoster(img); err != nil {
+		return fmt.Errorf("export: poster: %w", err)
+	}
+	return nil
 }
 
 // gatedWriter passes writes through to w until silence is called, then

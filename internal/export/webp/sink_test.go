@@ -570,3 +570,24 @@ func TestSinkFactory(t *testing.T) {
 		t.Error("negative loops accepted")
 	}
 }
+
+func TestFramesCountsTheFramesWritten(t *testing.T) {
+	s, buf := newSink(t, 8, 8, Options{})
+	a, b := image.NewRGBA(image.Rect(0, 0, 8, 8)), image.NewRGBA(image.Rect(0, 0, 8, 8))
+	b.Pix[0], b.Pix[3] = 0xff, 0xff
+	for _, img := range []*image.RGBA{a, a, b, b, a} {
+		if err := s.AddFrame(img, time.Second); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := s.Frames(); n != 0 {
+		t.Errorf("Frames before Close = %d, want 0", n)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// Five images, three pictures.
+	if n, anmf := s.Frames(), bytes.Count(buf.Bytes(), []byte("ANMF")); n != 3 || n != anmf {
+		t.Errorf("Frames = %d, file holds %d ANMF chunks, want 3", n, anmf)
+	}
+}

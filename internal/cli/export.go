@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,8 +40,13 @@ type exportFlags struct {
 	hold                      time.Duration
 	loops                     int
 	minDelay                  time.Duration
-	cursor                    string
-	fps                       int
+	// keepLeadingBlank is --keep-leading-blank: do not drop a blank first
+	// frame.
+	keepLeadingBlank bool
+	// poster is the --poster value.
+	poster string
+	cursor string
+	fps    int
 	// fallbackFonts are --fallback-font files, in the order given.
 	fallbackFonts []string
 	systemFonts   bool
@@ -84,6 +90,8 @@ func newExportCmd() *cobra.Command {
 	fl.DurationVar(&f.hold, "hold", 2*time.Second, "how long the final frame stays on screen; when given, scene holds are ignored (without it a scene hold is added to this one where a scene ends)")
 	fl.IntVar(&f.loops, "loops", 0, "number of times the animation plays (0 for forever)")
 	fl.DurationVar(&f.minDelay, "min-delay", 20*time.Millisecond, "shortest frame delay; shorter frames are merged into the previous one (0 to keep all)")
+	fl.BoolVar(&f.keepLeadingBlank, "keep-leading-blank", false, "keep a blank first frame; without it a blank screen shown for at most "+defaultLeadingBlank.String()+" at the start is dropped, so viewers that show only the first frame do not show an empty terminal")
+	fl.StringVar(&f.poster, "poster", defaultPoster, "apng only: the frame viewers without animation support show (Preview, Quick Look, chat previews): first, last, none or a time such as 12s on the output clock. A poster other than the first frame adds one full frame to the file")
 	addFPSFlag(cmd, &f.fps)
 	fl.StringVar(&f.cursor, "cursor", "block", "cursor shape: block, bar, underline or none")
 	fl.StringArrayVar(&f.fallbackFonts, "fallback-font", nil, "TTF/OTF/TTC `file` for glyphs the built-in fonts lack (repeatable; tried in order, after the built-in fonts)")
@@ -96,6 +104,10 @@ func newExportCmd() *cobra.Command {
 	addSVGFlags(cmd, &f.svg)
 	return cmd
 }
+
+// defaultLeadingBlank is the longest blank first frame export drops unless
+// --keep-leading-blank is given.
+const defaultLeadingBlank = 250 * time.Millisecond
 
 // cursorStyles maps the --cursor values to raster cursor styles.
 var cursorStyles = map[string]raster.CursorStyle{
@@ -227,6 +239,10 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	if err != nil {
 		return err
 	}
+	poster, err := posterOption(cmd, flags.poster, outFormat)
+	if err != nil {
+		return err
+	}
 	if output == "" {
 		output = defaultExportPath(input, outFormat)
 		if sameFile(input, output) {
@@ -277,6 +293,10 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	defer closeAll()
 	hdr := src.Head()
 
+	var trimBlank time.Duration
+	if !flags.keepLeadingBlank {
+		trimBlank = defaultLeadingBlank
+	}
 	var steps int
 	opts := pipeline.Options{
 		Timeline: timeline.Options{
@@ -285,11 +305,29 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 			Hold:      flags.hold,
 			MinDelay:  flags.minDelay,
 			Segments:  plan.Segments,
+
+			TrimLeadingBlank: trimBlank,
 		},
+		Poster:   poster,
 		Progress: func(_, total int) { steps = total },
 	}
+	// frames is the count to report: for a raster format what its sink wrote,
+	// which is fewer than the steps when it merged identical images.
+	frames := func() int { return steps }
 	write := func(f *os.File) error {
-		opts.NewSink = outFormat.New(settings)
+		newSink := outFormat.New(settings)
+		var sink pipeline.Sink
+		opts.NewSink = func(w io.Writer, width, height int) (pipeline.Sink, error) {
+			var err error
+			sink, err = newSink(w, width, height)
+			return sink, err
+		}
+		frames = func() int {
+			if fc, ok := sink.(pipeline.FrameCounter); ok {
+				return fc.Frames()
+			}
+			return steps
+		}
 		return pipeline.Export(cmd.Context(), fixedSize{src: it, cols: hdr.Cols, rows: hdr.Rows}, hdr.Cols, hdr.Rows, renderer, f, opts)
 	}
 	if outFormat.NewSteps != nil {
@@ -303,7 +341,7 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	if err := fonts.EmojiErr(); err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: some emoji were not drawn: %v\n", err)
 	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d frames (%.1f KB) to %s\n", steps, float64(size)/1024, output)
+	fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d frames (%.1f KB) to %s\n", frames(), float64(size)/1024, output)
 	return nil
 }
 

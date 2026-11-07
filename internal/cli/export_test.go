@@ -58,16 +58,16 @@ func compose(t *testing.T, a kettek.APNG, n int) *image.RGBA {
 	return canvas
 }
 
+// decodeAPNG decodes the animation in the file at path. An APNG's default
+// image (the default --poster) is not part of the animation and is left out;
+// the poster tests look at it.
 func decodeAPNG(t *testing.T, path string) kettek.APNG {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := kettek.DecodeAll(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
+	a, _ := animationOf(decodeAPNGBytes(t, data))
 	return a
 }
 
@@ -91,7 +91,7 @@ func TestExportWritesStyledAPNG(t *testing.T) {
 	in := writeExportFixture(t)
 	out := filepath.Join(t.TempDir(), "out.png")
 
-	code, stderr := runExportCmd(t, in, "-o", out, "--hold", "1s")
+	code, stderr := runExportCmd(t, in, "-o", out, "--hold", "1s", "--keep-leading-blank")
 	if code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
@@ -537,7 +537,7 @@ func TestExportFPSChangesFrameCount(t *testing.T) {
 	in := writeFile(t, "fps.shot", data)
 	for fps, want := range map[string]string{"10": "wrote 2 frames", "1000": "wrote 3 frames"} {
 		out := filepath.Join(t.TempDir(), "out.png")
-		code, stderr := runExportCmd(t, in, "-o", out, "--fps", fps, "--min-delay", "0")
+		code, stderr := runExportCmd(t, in, "-o", out, "--fps", fps, "--min-delay", "0", "--keep-leading-blank")
 		if code != 0 || !strings.HasPrefix(stderr, want) {
 			t.Errorf("--fps %s: exit %d, stderr %q, want %q", fps, code, stderr, want)
 		}
@@ -651,5 +651,34 @@ func TestExportFallbackFontAndSystemFontsAreAccepted(t *testing.T) {
 		if code != 0 {
 			t.Errorf("%v: exit %d, stderr %q", args, code, stderr)
 		}
+	}
+}
+
+// A short blank screen at the start is dropped by default, so the first frame
+// shows the first output; --keep-leading-blank keeps it.
+func TestExportDropsLeadingBlankFrame(t *testing.T) {
+	in := writeExportFixture(t)
+	dir := t.TempDir()
+	kept, dropped := filepath.Join(dir, "kept.png"), filepath.Join(dir, "dropped.png")
+
+	if code, stderr := runExportCmd(t, in, "-o", kept, "--hold", "1s", "--keep-leading-blank"); code != 0 {
+		t.Fatalf("--keep-leading-blank: exit %d, stderr %q", code, stderr)
+	}
+	code, stderr := runExportCmd(t, in, "-o", dropped, "--hold", "1s")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	if !strings.HasPrefix(stderr, "wrote 2 frames (") {
+		t.Errorf("stderr = %q, want a 'wrote 2 frames' line", stderr)
+	}
+	k, d := decodeAPNG(t, kept), decodeAPNG(t, dropped)
+	if len(k.Frames) != 3 || len(d.Frames) != 2 {
+		t.Fatalf("frames: kept %d, dropped %d, want 3 and 2", len(k.Frames), len(d.Frames))
+	}
+	if got, want := compose(t, d, 0), compose(t, k, 1); !samePixels(got, want) {
+		t.Error("first frame of the default export is not the first output screen")
+	}
+	if samePixels(compose(t, k, 0), compose(t, d, 0)) {
+		t.Error("kept export starts with the same frame: the blank screen was not kept")
 	}
 }
