@@ -1,8 +1,10 @@
 package timeline
 
 import (
+	"cmp"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"time"
 )
@@ -35,19 +37,27 @@ type Segment struct {
 	Skip bool
 }
 
+// validateSegment checks one segment on its own; i only labels the error.
+func validateSegment(i int, s Segment) error {
+	switch {
+	case s.From < 0 || s.To < 0:
+		return fmt.Errorf("timeline: segment %d [%v, %v): negative bound", i, s.From, s.To)
+	case s.From >= s.To:
+		return fmt.Errorf("timeline: segment %d [%v, %v): From must be before To", i, s.From, s.To)
+	case math.IsNaN(s.Speed) || math.IsInf(s.Speed, 0) || s.Speed < 0:
+		return fmt.Errorf("timeline: segment %d: invalid speed %v", i, s.Speed)
+	case s.IdleLimit < 0 || s.Hold < 0:
+		return fmt.Errorf("timeline: segment %d: idle limit and hold must not be negative", i)
+	}
+	return nil
+}
+
 // validateSegments checks that segs is sorted, non-overlapping (adjacent
 // segments are fine) and that every segment is well formed.
 func validateSegments(segs []Segment) error {
 	for i, s := range segs {
-		switch {
-		case s.From < 0 || s.To < 0:
-			return fmt.Errorf("timeline: segment %d [%v, %v): negative bound", i, s.From, s.To)
-		case s.From >= s.To:
-			return fmt.Errorf("timeline: segment %d [%v, %v): From must be before To", i, s.From, s.To)
-		case math.IsNaN(s.Speed) || math.IsInf(s.Speed, 0) || s.Speed < 0:
-			return fmt.Errorf("timeline: segment %d: invalid speed %v", i, s.Speed)
-		case s.IdleLimit < 0 || s.Hold < 0:
-			return fmt.Errorf("timeline: segment %d: idle limit and hold must not be negative", i)
+		if err := validateSegment(i, s); err != nil {
+			return err
 		}
 		if i == 0 {
 			continue
@@ -143,4 +153,104 @@ func stretchDelay(pieces []piece) float64 {
 func segmentSkips(segs []Segment, t time.Duration) bool {
 	i := segmentIndex(segs, t)
 	return i >= 0 && segs[i].Skip
+}
+
+// FlattenSegments turns possibly nested ranges into the sorted,
+// non-overlapping list that Options.Segments requires. It is for callers
+// that have an outer range (a scene with hints) containing inner ones (a
+// hidden span). The input may be in any order; it is not modified.
+//
+// Ranges must be well formed (as for Options.Segments) and properly nested:
+// two ranges are either disjoint (touching is fine) or one contains the
+// other. Partial overlaps are an error. Equal ranges nest in input order, the
+// later one being the inner.
+//
+// Each stretch of time is described by the chain of ranges covering it, from
+// outermost to innermost, and the inner range overrides the outer one:
+//
+//   - Speed and IdleLimit: the innermost non-zero value (zero inherits from
+//     the next range out, and finally from Options).
+//   - Skip: true if any covering range has Skip. A skipped outer range
+//     cannot be revived by an inner one.
+//   - Hold belongs to the end of the range it is set on. It lands on the
+//     piece that ends at the range's To; if several ranges end at the same
+//     instant their holds add up. It is never inherited by the pieces an
+//     inner range leaves before or after it.
+//
+// Time covered by no range is left out, so it follows Options. Neighbouring
+// pieces with identical settings are merged (only when the first has no
+// Hold), so a range that is not interrupted comes back as it went in. Empty
+// input returns nil.
+func FlattenSegments(ranges []Segment) ([]Segment, error) {
+	for i, r := range ranges {
+		if err := validateSegment(i, r); err != nil {
+			return nil, err
+		}
+	}
+	if len(ranges) == 0 {
+		return nil, nil
+	}
+
+	// Outer ranges first; equal ranges keep input order (later = inner).
+	ordered := slices.Clone(ranges)
+	slices.SortStableFunc(ordered, func(a, b Segment) int {
+		if c := cmp.Compare(a.From, b.From); c != 0 {
+			return c
+		}
+		return cmp.Compare(b.To, a.To)
+	})
+	var open []Segment
+	for _, r := range ordered {
+		for len(open) > 0 && open[len(open)-1].To <= r.From {
+			open = open[:len(open)-1]
+		}
+		if n := len(open); n > 0 && r.To > open[n-1].To {
+			return nil, fmt.Errorf("timeline: ranges [%v, %v) and [%v, %v) partially overlap; ranges must nest", open[n-1].From, open[n-1].To, r.From, r.To)
+		}
+		open = append(open, r)
+	}
+
+	points := make([]time.Duration, 0, 2*len(ordered))
+	for _, r := range ordered {
+		points = append(points, r.From, r.To)
+	}
+	slices.Sort(points)
+	points = slices.Compact(points)
+
+	var out []Segment
+	for k := 0; k+1 < len(points); k++ {
+		from, to := points[k], points[k+1]
+		piece := Segment{From: from, To: to}
+		covered := false
+		for _, r := range ordered { // outermost to innermost
+			if r.From > from || r.To < to {
+				continue
+			}
+			covered = true
+			if r.Speed != 0 {
+				piece.Speed = r.Speed
+			}
+			if r.IdleLimit != 0 {
+				piece.IdleLimit = r.IdleLimit
+			}
+			piece.Skip = piece.Skip || r.Skip
+			if r.To == to {
+				piece.Hold += r.Hold
+			}
+		}
+		if !covered {
+			continue
+		}
+		if n := len(out); n > 0 {
+			prev := &out[n-1]
+			if prev.To == piece.From && prev.Hold == 0 && prev.Speed == piece.Speed &&
+				prev.IdleLimit == piece.IdleLimit && prev.Skip == piece.Skip {
+				prev.To = piece.To
+				prev.Hold = piece.Hold
+				continue
+			}
+		}
+		out = append(out, piece)
+	}
+	return out, nil
 }

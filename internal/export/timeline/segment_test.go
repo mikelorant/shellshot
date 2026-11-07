@@ -613,3 +613,314 @@ func TestBuildSegmentsRandomTotals(t *testing.T) {
 		}
 	}
 }
+
+func TestFlattenSegments(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []Segment
+		want []Segment
+	}{
+		{name: "empty", in: nil, want: nil},
+		{
+			name: "single range passes through",
+			in:   []Segment{{From: sec, To: 4 * sec, Speed: 2, IdleLimit: sec, Hold: sec}},
+			want: []Segment{{From: sec, To: 4 * sec, Speed: 2, IdleLimit: sec, Hold: sec}},
+		},
+		{
+			name: "unsorted disjoint ranges are sorted",
+			in:   []Segment{{From: 5 * sec, To: 6 * sec, Speed: 3}, {From: 0, To: sec, Speed: 2}},
+			want: []Segment{{From: 0, To: sec, Speed: 2}, {From: 5 * sec, To: 6 * sec, Speed: 3}},
+		},
+		{
+			name: "hidden inside a scene splits it and overrides it",
+			in: []Segment{
+				{From: 0, To: 10 * sec, Speed: 8, IdleLimit: 2 * sec, Hold: sec},
+				{From: 4 * sec, To: 6 * sec, Skip: true},
+			},
+			want: []Segment{
+				{From: 0, To: 4 * sec, Speed: 8, IdleLimit: 2 * sec},
+				{From: 4 * sec, To: 6 * sec, Speed: 8, IdleLimit: 2 * sec, Skip: true},
+				{From: 6 * sec, To: 10 * sec, Speed: 8, IdleLimit: 2 * sec, Hold: sec},
+			},
+		},
+		{
+			name: "input order does not matter",
+			in: []Segment{
+				{From: 4 * sec, To: 6 * sec, Skip: true},
+				{From: 0, To: 10 * sec, Speed: 8, Hold: sec},
+			},
+			want: []Segment{
+				{From: 0, To: 4 * sec, Speed: 8},
+				{From: 4 * sec, To: 6 * sec, Speed: 8, Skip: true},
+				{From: 6 * sec, To: 10 * sec, Speed: 8, Hold: sec},
+			},
+		},
+		{
+			name: "hidden at the end of a scene carries the scene hold",
+			in: []Segment{
+				{From: 0, To: 10 * sec, Hold: sec},
+				{From: 7 * sec, To: 10 * sec, Skip: true},
+			},
+			want: []Segment{
+				{From: 0, To: 7 * sec},
+				{From: 7 * sec, To: 10 * sec, Skip: true, Hold: sec},
+			},
+		},
+		{
+			name: "hidden at the start of a scene",
+			in: []Segment{
+				{From: 0, To: 10 * sec, Speed: 2},
+				{From: 0, To: 3 * sec, Skip: true},
+			},
+			want: []Segment{
+				{From: 0, To: 3 * sec, Speed: 2, Skip: true},
+				{From: 3 * sec, To: 10 * sec, Speed: 2},
+			},
+		},
+		{
+			name: "two hidden spans in one scene",
+			in: []Segment{
+				{From: 0, To: 10 * sec, Speed: 2},
+				{From: 2 * sec, To: 3 * sec, Skip: true},
+				{From: 6 * sec, To: 7 * sec, Skip: true},
+			},
+			want: []Segment{
+				{From: 0, To: 2 * sec, Speed: 2},
+				{From: 2 * sec, To: 3 * sec, Speed: 2, Skip: true},
+				{From: 3 * sec, To: 6 * sec, Speed: 2},
+				{From: 6 * sec, To: 7 * sec, Speed: 2, Skip: true},
+				{From: 7 * sec, To: 10 * sec, Speed: 2},
+			},
+		},
+		{
+			name: "hidden between scenes keeps its own gap",
+			in: []Segment{
+				{From: 0, To: 2 * sec, Speed: 2},
+				{From: 5 * sec, To: 7 * sec, Speed: 4},
+				{From: 2 * sec, To: 3 * sec, Skip: true},
+			},
+			want: []Segment{
+				{From: 0, To: 2 * sec, Speed: 2},
+				{From: 2 * sec, To: 3 * sec, Skip: true},
+				{From: 5 * sec, To: 7 * sec, Speed: 4},
+			},
+		},
+		{
+			name: "inner non-zero overrides, zero inherits",
+			in: []Segment{
+				{From: 0, To: 10 * sec, Speed: 2, IdleLimit: sec},
+				{From: 3 * sec, To: 5 * sec, Speed: 8},
+			},
+			want: []Segment{
+				{From: 0, To: 3 * sec, Speed: 2, IdleLimit: sec},
+				{From: 3 * sec, To: 5 * sec, Speed: 8, IdleLimit: sec},
+				{From: 5 * sec, To: 10 * sec, Speed: 2, IdleLimit: sec},
+			},
+		},
+		{
+			name: "equal ranges: the later one is the inner",
+			in:   []Segment{{From: 0, To: 4 * sec, Speed: 2, IdleLimit: sec}, {From: 0, To: 4 * sec, Speed: 5}},
+			want: []Segment{{From: 0, To: 4 * sec, Speed: 5, IdleLimit: sec}},
+		},
+		{
+			name: "skip is sticky: an inner non-skip range cannot revive it",
+			in:   []Segment{{From: 0, To: 10 * sec, Skip: true}, {From: 2 * sec, To: 3 * sec, Speed: 4}},
+			want: []Segment{
+				{From: 0, To: 2 * sec, Skip: true},
+				{From: 2 * sec, To: 3 * sec, Speed: 4, Skip: true},
+				{From: 3 * sec, To: 10 * sec, Skip: true},
+			},
+		},
+		{
+			name: "holds of ranges ending together add up",
+			in: []Segment{
+				{From: 0, To: 10 * sec, Hold: sec},
+				{From: 6 * sec, To: 10 * sec, Hold: 2 * sec, Speed: 3},
+			},
+			want: []Segment{
+				{From: 0, To: 6 * sec},
+				{From: 6 * sec, To: 10 * sec, Speed: 3, Hold: 3 * sec},
+			},
+		},
+		{
+			name: "inner hold stays at the inner end",
+			in: []Segment{
+				{From: 0, To: 10 * sec},
+				{From: 2 * sec, To: 4 * sec, Hold: sec, Speed: 3},
+			},
+			want: []Segment{
+				{From: 0, To: 2 * sec},
+				{From: 2 * sec, To: 4 * sec, Speed: 3, Hold: sec},
+				{From: 4 * sec, To: 10 * sec},
+			},
+		},
+		{
+			name: "touching ranges with equal settings merge when no hold intervenes",
+			in:   []Segment{{From: 0, To: 2 * sec, Speed: 2}, {From: 2 * sec, To: 5 * sec, Speed: 2, Hold: sec}},
+			want: []Segment{{From: 0, To: 5 * sec, Speed: 2, Hold: sec}},
+		},
+		{
+			name: "touching ranges stay apart when the first has a hold",
+			in:   []Segment{{From: 0, To: 2 * sec, Speed: 2, Hold: sec}, {From: 2 * sec, To: 5 * sec, Speed: 2}},
+			want: []Segment{{From: 0, To: 2 * sec, Speed: 2, Hold: sec}, {From: 2 * sec, To: 5 * sec, Speed: 2}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			before := slices.Clone(tt.in)
+			got, err := FlattenSegments(tt.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got  %v\nwant %v", got, tt.want)
+			}
+			if !slices.Equal(tt.in, before) {
+				t.Error("input was modified")
+			}
+			if err := validateSegments(got); err != nil {
+				t.Errorf("result is not a valid Options.Segments: %v", err)
+			}
+		})
+	}
+}
+
+func TestFlattenSegmentsErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []Segment
+	}{
+		{"partial overlap", []Segment{{From: 0, To: 5 * sec}, {From: 3 * sec, To: 8 * sec}}},
+		{"partial overlap given inner first", []Segment{{From: 3 * sec, To: 8 * sec}, {From: 0, To: 5 * sec}}},
+		{"From equals To", []Segment{{From: sec, To: sec}}},
+		{"From after To", []Segment{{From: 2 * sec, To: sec}}},
+		{"negative bound", []Segment{{From: -1, To: sec}}},
+		{"negative speed", []Segment{{From: 0, To: sec, Speed: -2}}},
+		{"NaN speed", []Segment{{From: 0, To: sec, Speed: math.NaN()}}},
+		{"negative hold", []Segment{{From: 0, To: sec, Hold: -1}}},
+		{"negative idle", []Segment{{From: 0, To: sec, IdleLimit: -1}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, err := FlattenSegments(tt.in); err == nil {
+				t.Errorf("got %v, want error", got)
+			}
+		})
+	}
+}
+
+// randomNested appends a chain of properly nested ranges inside [from, to).
+func randomNested(r *rand.Rand, from, to time.Duration, depth int, out *[]Segment) {
+	if depth == 0 || to-from < 4*ms {
+		return
+	}
+	a := from + time.Duration(r.Int64N(int64(to-from)-1))
+	b := a + 1 + time.Duration(r.Int64N(int64(to-a)))
+	s := Segment{From: a, To: b}
+	switch r.IntN(4) {
+	case 0:
+		s.Skip = true
+	case 1:
+		s.Speed = []float64{0.5, 2, 8}[r.IntN(3)]
+	case 2:
+		s.IdleLimit = []time.Duration{sec, 3 * sec}[r.IntN(2)]
+	}
+	*out = append(*out, s)
+	randomNested(r, a, b, depth-1, out)
+}
+
+func TestFlattenSegmentsRandomNesting(t *testing.T) {
+	r := rand.New(rand.NewPCG(5, 6))
+	for iter := range 300 {
+		var in []Segment
+		var at time.Duration
+		for range 1 + r.IntN(3) { // disjoint top-level scenes
+			end := at + time.Duration(10+r.IntN(20000))*ms
+			top := Segment{From: at, To: end, Speed: []float64{0, 2}[r.IntN(2)], Hold: time.Duration(r.IntN(3)) * sec}
+			in = append(in, top)
+			randomNested(r, top.From, top.To, 3, &in)
+			at = end + time.Duration(r.IntN(3))*sec
+		}
+		r.Shuffle(len(in), func(i, j int) { in[i], in[j] = in[j], in[i] })
+		// The expected chain uses the same stable ordering as the
+		// function, so equal ranges shuffled either way agree.
+		got, err := FlattenSegments(in)
+		if err != nil {
+			t.Fatalf("iter %d: %v\nin %v", iter, err, in)
+		}
+		if err := validateSegments(got); err != nil {
+			t.Fatalf("iter %d: invalid output: %v", iter, err)
+		}
+		ordered := slices.Clone(in)
+		slices.SortStableFunc(ordered, func(a, b Segment) int {
+			if a.From != b.From {
+				return int(a.From - b.From)
+			}
+			return int(b.To - a.To)
+		})
+		for range 200 {
+			tm := time.Duration(r.Int64N(int64(at) + int64(sec)))
+			// Expected settings at tm: fold the covering chain outer to inner.
+			var want Segment
+			covered := false
+			for _, s := range ordered {
+				if s.From <= tm && tm < s.To {
+					covered = true
+					if s.Speed != 0 {
+						want.Speed = s.Speed
+					}
+					if s.IdleLimit != 0 {
+						want.IdleLimit = s.IdleLimit
+					}
+					want.Skip = want.Skip || s.Skip
+				}
+			}
+			i := segmentIndex(got, tm)
+			if (i >= 0) != covered {
+				t.Fatalf("iter %d t=%v: covered = %v, want %v", iter, tm, i >= 0, covered)
+			}
+			if !covered {
+				continue
+			}
+			g := got[i]
+			if g.Speed != want.Speed || g.IdleLimit != want.IdleLimit || g.Skip != want.Skip {
+				t.Fatalf("iter %d t=%v: got %+v, want %+v", iter, tm, g, want)
+			}
+		}
+		// Holds are conserved: every range's hold appears exactly once.
+		var inHold, outHold time.Duration
+		for _, s := range in {
+			inHold += s.Hold
+		}
+		for _, s := range got {
+			outHold += s.Hold
+		}
+		if inHold != outHold {
+			t.Fatalf("iter %d: hold in %v out %v", iter, inHold, outHold)
+		}
+	}
+}
+
+// TestFlattenedSegmentsBuild runs a scene with a hidden span end to end.
+func TestFlattenedSegmentsBuild(t *testing.T) {
+	segs, err := FlattenSegments([]Segment{
+		{From: 0, To: 10 * sec, Speed: 2, Hold: sec},
+		{From: 2 * sec, To: 6 * sec, Skip: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// c is the frame forced at the end of the hidden span.
+	frames := mk(fr{"a", 0}, fr{"h", 3 * sec}, fr{"c", 6 * sec}, fr{"d", 8 * sec}, fr{"e", 12 * sec})
+	got, err := Build(frames, Options{Hold: 500 * ms, Segments: segs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// a: 2s visible at 2x = 1s. h dropped. c: 2s at 2x = 1s. d: 2s at 2x
+	// plus 2s at 1x past the scene end = 3s, plus the scene's 1s hold; e
+	// gets Options.Hold.
+	want := []want{{"a", sec}, {"c", sec}, {"d", 4 * sec}, {"e", 500 * ms}}
+	if !slices.Equal(describe(got), want) {
+		t.Fatalf("got %v, want %v", describe(got), want)
+	}
+}
