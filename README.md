@@ -84,6 +84,9 @@ status        complete
 Every command has `--help`. Themes, fonts, cell size and timing flags for `export` are in
 [docs/export.md](docs/export.md). The file format is in [docs/format.md](docs/format.md).
 
+[examples/](examples/) has safe demo scripts (colours, emoji, cursor, animations) to record;
+`make examples` renders them all to `build/examples`.
+
 ## Script
 
 Today a recording is scripted through the command line.
