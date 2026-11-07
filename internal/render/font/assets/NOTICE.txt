@@ -85,3 +85,27 @@ modified, so it keeps its name. "Noto" is a trademark of Google Inc.
 Used as the fallback colour emoji font for exports (the Apple-derived font is
 the primary); the Twemoji Mozilla entry above is the previous fallback. See
 internal/render/emoji.
+
+Apple Color Emoji, compact derivative (Apple Inc. artwork; NOT open source)
+Asset: internal/render/emoji/assets/AppleColorEmoji-shellshot.ttf.zst (zstd -19;
+  decompressed font sha256 54e30e133d07b86e7765ad65f9f5e53777f5283af34f75a46c96687c8a6163ff,
+  also in AppleColorEmoji-shellshot.ttf.sha256). Embedded by
+  internal/render/emoji/apple_asset.go.
+Source: AppleColorEmoji-Linux.ttf (115,969,256 bytes; version 21.4d3e1, Copyright
+  2011-2026 Apple Inc.) as republished by github.com/samuelngs/apple-emoji-ttf,
+  release tag macos-26-20260722-484daf4e, sha256
+  e37c7af6265ac4a0af6d57bc65e86109a776d9966e8343334557f63da482516f
+  (https://github.com/samuelngs/apple-emoji-ttf/releases/download/macos-26-20260722-484daf4e/AppleColorEmoji-Linux.ttf).
+Modified: scripts/build-apple-emoji-asset.py (using the conversion code of
+  third_party/apple-emoji-ttf, MIT, pinned at 484daf4e) keeps one 96 ppem bitmap
+  strike, the glyphs for the Unicode emoji-test.txt sequences and the cmap
+  entries they need, palette-quantises the PNGs to 128 colours, replaces Apple's
+  AAT morx table with an OpenType GSUB "ccmp" ligature lookup, and drops the
+  other tables. OS/2 fsType is unchanged from the original font (4, preview and
+  print embedding); it was not reset.
+Licence: the emoji artwork and the font belong to Apple Inc. and are licensed
+  by Apple, not by this project; the MIT licence of apple-emoji-ttf covers its
+  conversion scripts only. The project owner has decided to embed this
+  derivative in shellshot binaries. Anyone who uses or redistributes shellshot
+  binaries, or exports (images, videos) that contain Apple's emoji artwork, is
+  responsible for complying with Apple's licence terms for that use.
