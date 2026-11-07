@@ -18,6 +18,8 @@ The Go binary links libghostty-vt through cgo. libghostty is built from the pinn
 | `make check-showcase` | Fails if `docs/assets/showcase.png` is stale (see "Regenerating the README image") |
 | `make test-examples` | Runs every `contrib/examples/*.sh` under dash, bash, sh and zsh (takes a few minutes); it checks exit status, terminal restore and Ctrl-C handling |
 | `make check-examples` | Records every `contrib/examples/*.sh` at 80x24 with the real binary, follows the cursor through the raw output to find lines that auto-wrap, and lists every non-ASCII character the demos print, flagging those no embedded font has (they render blank). Takes about a minute; needs `bin/shellshot` (it builds it), libghostty and `uv`. Not part of `make test` |
+| `make docker-build` | Builds the container image `shellshot:dev` (see "Container image") |
+| `make docker-smoke` | Runs that image: version, a `record -c`, an `export` to PNG, and `file` on the result |
 | `make fmt` | `gofmt -w .` |
 | `make clean` | Removes `bin/` |
 | `make distclean` | Removes `bin/` and `build/`; run `make deps` again afterwards |
@@ -89,6 +91,48 @@ flags change, and commit it deliberately. The demo runs in real time, so two run
 `docs/assets/showcase.png.src` holds a sha256 of `showcase.sh`, `lib.sh` and the record and export
 settings. `make check-showcase` recomputes it and fails with `showcase.png is stale: run make showcase`
 when they differ; `make test` runs it too. It is a hash comparison, so it is fast and needs no libghostty.
+
+## Container image
+
+The `Dockerfile` builds shellshot in a container: it installs a pinned zig (sha256 checked), builds
+libghostty-vt from the submodule, builds the Go binary, and copies it into a `debian:bookworm-slim`
+image (about 130 MB) that runs as the non-root user `shellshot` (uid 1000) in `/work`. The image has
+`bash` and `less` for demos; fonts are embedded in the binary.
+
+Prerequisites: Docker with BuildKit, and the submodule in the build context (the build stops with a
+message if `third_party/ghostty` is empty). The first build downloads zig dependencies and takes a
+few minutes; later builds reuse cache mounts.
+
+```sh
+git submodule update --init --depth 1 third_party/ghostty
+make docker-build     # docker build, tag shellshot:dev, VERSION from git describe
+make docker-smoke     # version, record -c 'echo hi', export to PNG in a temp dir
+```
+
+Use it from the `docker-compose.yaml` at the repository root (files go to `./recordings`, which is
+git-ignored). `record -c` and `export` need no `-t`; a bare `record` starts a shell and needs `-it`:
+
+```sh
+mkdir -p recordings
+docker compose run --rm shellshot record -o demo.shot -c 'echo hello'
+docker compose run --rm shellshot export demo.shot -o demo.png
+docker compose run --rm -it shellshot record -o session.shot
+docker compose run --rm demo      # profile `demo`: records and exports contrib/examples/showcase.sh
+```
+
+Ownership: Docker Desktop and OrbStack show bind-mounted files as yours. On Linux the container
+writes as uid 1000; run with `SHELLSHOT_UID=$(id -u) SHELLSHOT_GID=$(id -g)` set to write as yourself.
+
+Multi-arch (needs a buildx builder; the non-native platform builds under QEMU and is slow):
+
+```sh
+docker buildx build --platform linux/amd64,linux/arm64 \
+  --build-arg VERSION="$(git describe --tags --always --dirty)" -t shellshot:dev .
+```
+
+The GoReleaser archives are a separate path: they ship the binary per platform, built outside the
+container. The image build does not use them or `scripts/build-libghostty.sh`; it runs the same
+`zig build` itself. Publishing images to a registry is not configured.
 
 ## Worktrees
 

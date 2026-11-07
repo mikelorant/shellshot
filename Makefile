@@ -1,7 +1,7 @@
 export PKG_CONFIG_PATH := $(CURDIR)/build/libghostty/lib/pkgconfig
 export CGO_ENABLED := 1
 
-.PHONY: deps build test vet fmt noto-asset emoji-asset examples showcase check-showcase test-examples test-scripts check-examples clean distclean
+.PHONY: deps build test vet fmt noto-asset emoji-asset examples showcase check-showcase test-examples test-scripts check-examples docker-build docker-smoke clean distclean
 
 deps:
 	./scripts/build-libghostty.sh
@@ -67,6 +67,23 @@ emoji-asset:
 		--with fonttools==4.68.0 --with pillow==13.0.0 --with pyyaml==6.0.3 \
 		--with uharfbuzz==0.57.0 --with imagequant==1.1.5 --with zstandard==0.25.0 \
 		python scripts/build-apple-emoji-asset.py
+
+# Builds the container image shellshot:dev (needs the ghostty submodule: see docs/development.md).
+docker-build:
+	docker build \
+		--build-arg VERSION="$$(git describe --tags --always --dirty)" \
+		--build-arg REVISION="$$(git rev-parse HEAD)" \
+		-t shellshot:dev .
+
+# Runs the image: prints the version, records a command, exports it to a PNG and checks the file.
+docker-smoke:
+	@set -e; dir=$$(mktemp -d); trap 'rm -rf "$$dir"' EXIT; \
+	run="docker run --rm --user $$(id -u):$$(id -g) -v $$dir:/work shellshot:dev"; \
+	$$run version; \
+	$$run record -o smoke.shot -c 'echo hi'; \
+	$$run export smoke.shot -o smoke.png; \
+	file "$$dir/smoke.png" | grep -q 'PNG image data'; \
+	file "$$dir/smoke.png"
 
 clean:
 	rm -rf bin

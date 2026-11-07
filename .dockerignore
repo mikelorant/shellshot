@@ -1,0 +1,16 @@
+# Keep the context small. third_party/ghostty (the libghostty sources) and all Go files stay in.
+.git
+.worktrees
+bin
+build
+dist
+docs/research
+**/*.shot
+recordings
+
+# The submodule's .git is a pointer file to a gitdir outside the context.
+third_party/ghostty/.git
+third_party/apple-emoji-ttf
+
+# Keep the committed test recordings that .gitignore also excepts.
+!internal/recording/bin/testdata/*.shot
