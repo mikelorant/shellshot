@@ -116,7 +116,7 @@ func TestWriterFormat(t *testing.T) {
 	if err := w.WriteFrame(f); err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":1,"cols":3,"rows":1,"command":["ls"],"started":"2024-05-06T07:08:09Z"}` + "\n" +
+	want := `{"version":2,"cols":3,"rows":1,"command":["ls"],"started":"2024-05-06T07:08:09Z"}` + "\n" +
 		`{"t":1234,"lines":["a<"],"cx":2,"cy":0,"cv":true,"title":"T"}` + "\n"
 	if buf.String() != want {
 		t.Errorf("output =\n%s\nwant\n%s", buf.String(), want)
@@ -129,7 +129,8 @@ func TestNewWriterErrors(t *testing.T) {
 		mutate  func(*Header)
 		wantErr error
 	}{
-		{"unknown version", func(h *Header) { h.Version = 2 }, ErrVersion},
+		{"older version", func(h *Header) { h.Version = 1 }, ErrVersion},
+		{"unknown version", func(h *Header) { h.Version = 3 }, ErrVersion},
 		{"zero cols", func(h *Header) { h.Cols = 0 }, ErrMalformed},
 		{"negative rows", func(h *Header) { h.Rows = -1 }, ErrMalformed},
 	}

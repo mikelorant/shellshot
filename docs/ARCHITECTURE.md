@@ -49,8 +49,11 @@ The Go binding links via pkg-config, so builds run with
 POC target: macOS (native arch). Linux/Windows: out of scope.
 
 ## Recording format (JSON Lines, extension `.shot`)
-Line 1 header: `{"version":1,"cols":80,"rows":24,"command":["ls"],"started":"RFC3339"}`
-Following lines, one per frame: `{"t":<ms int>,"lines":[...],"cx":0,"cy":0,"cv":true,"title":""}`
+Line 1 header: `{"version":2,"cols":80,"rows":24,"command":["ls"],"started":"RFC3339"}`
+Following lines, one per frame: `{"t":<ms int>,"lines":[...],"cx":0,"cy":0,"cv":true,"title":"","spans":[...]}`
+
+- Version 2 is written; Reader accepts versions 1 and 2 (other versions → `ErrVersion`). Version 1 has no `spans`: its frames are unstyled (`Spans` nil).
+- `spans` is optional and emitted only when the frame has at least one span. It has exactly `rows` entries (one per line); each entry is an array of `[start,end,"<SGR>"]` triples, e.g. `"spans":[[[0,3,"31"]],[],[]]`. `start`/`end` are a half-open range of rune indexes into that line; `<SGR>` is `snapshot.Style.SGR()` (parsed with `snapshot.ParseSGR`). Spans are non-empty, in range, non-zero-styled, sorted and non-overlapping (`Snapshot.Validate`); Writer refuses to write, and Reader rejects (`ErrMalformed`), frames that violate this.
 
 ## Session semantics
 - Session owns one goroutine reading PTY output and writing to the terminal; snapshots are taken on that goroutine (vt is not concurrency-safe) on a ticker, emitted only if different from the previous frame; first frame at t=0 and a final frame on process exit (after draining output).
