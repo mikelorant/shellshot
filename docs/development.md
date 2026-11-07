@@ -11,6 +11,7 @@ The Go binary links libghostty-vt through cgo. libghostty is built from the pinn
 | `make build` | `go build -o bin/shellshot ./cmd/shellshot` |
 | `make test` | `go test ./...` |
 | `make vet` | `go vet ./...` |
+| `make showcase` | Records the showcase demo and exports the README image `docs/assets/showcase.png` (on demand; see below) |
 | `make test-examples` | Runs every `contrib/examples/*.sh` under dash, bash, sh and zsh (takes a few minutes); it checks exit status, terminal restore and Ctrl-C handling |
 | `make fmt` | `gofmt -w .` |
 | `make clean` | Removes `bin/` |
@@ -50,6 +51,20 @@ go test ./internal/recording/...
   ```sh
   go test ./internal/render/raster ./internal/render/sprite -update
   ```
+
+## Regenerating the README image
+
+`make showcase` builds the binary, records `contrib/examples/showcase.sh` at 80x24 and speed
+`normal` into `build/showcase.shot`, and exports it to `docs/assets/showcase.png` with every
+look and timing flag pinned (`scripts/build-showcase.sh` has the list): `--scale 2 --emoji-set noto`
+(licence-clean artwork), 60 fps, 1.25x speed, pauses capped at 1 s, 2 s final hold. That gives about
+29 s and 1.7 MB. The README shows it at half its pixel width (736 of 1472), so retina screens get
+sharp text. If you change `--scale` or `--font-size`, update the `width` in `README.md`.
+
+It runs only on demand, never as part of `make build`, because the image is committed and a new
+1.7 MB binary on every build would bloat the history. Regenerate it when the demo or the export
+flags change, and commit it deliberately. The demo runs in real time, so two runs can differ byte for byte
+(frame boundaries move by a few milliseconds) while looking the same.
 
 ## Worktrees
 

@@ -4,6 +4,8 @@ Record terminal sessions. Replay them. Export them as animated PNGs, GIFs, WebPs
 
 # shellshot
 
+<p align="center"><img src="docs/assets/showcase.png" width="736" alt="A shellshot export of its demo: colours, text styles, Unicode, emoji, cursor control, animation and a dashboard."></p>
+
 ## What it does
 
 `shellshot` records a terminal session, either your shell or a single command,
