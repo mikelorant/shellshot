@@ -75,6 +75,7 @@ func mustHex(t *testing.T, s string) []byte {
 }
 
 func TestMarshalGoldenMinimal(t *testing.T) {
+	t.Parallel()
 	got, err := Head{Cols: 80, Rows: 24}.Marshal()
 	if err != nil {
 		t.Fatal(err)
@@ -93,6 +94,7 @@ func TestMarshalGoldenMinimal(t *testing.T) {
 }
 
 func TestMarshalGoldenFull(t *testing.T) {
+	t.Parallel()
 	got, err := fullHead().Marshal()
 	if err != nil {
 		t.Fatal(err)
@@ -111,6 +113,7 @@ func TestMarshalGoldenFull(t *testing.T) {
 }
 
 func TestMarshalDefaultsTick(t *testing.T) {
+	t.Parallel()
 	a, _ := Head{Cols: 1, Rows: 1}.Marshal()
 	b, _ := Head{Cols: 1, Rows: 1, TickNS: DefaultTickNS}.Marshal()
 	if !bytes.Equal(a, b) {
@@ -119,6 +122,7 @@ func TestMarshalDefaultsTick(t *testing.T) {
 }
 
 func TestUnmarshalMissingTickUsesDefault(t *testing.T) {
+	t.Parallel()
 	h, err := Unmarshal(mustHex(t, "02025018"))
 	if err != nil {
 		t.Fatal(err)
@@ -181,6 +185,7 @@ func randHead(rng *rand.Rand) Head {
 }
 
 func TestRoundTripRandom(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(1))
 	for i := range 500 {
 		h := randHead(rng)
@@ -216,6 +221,7 @@ func sortedUnknown(u []RawField) []RawField {
 }
 
 func TestUnknownTagPreservedAndIgnored(t *testing.T) {
+	t.Parallel()
 	base, _ := Head{Cols: 80, Rows: 24}.Marshal()
 	in := append([]byte(nil), base...)
 	in = append(in, 0x7f, 3, 'a', 'b', 'c') // tag 127, unknown
@@ -238,6 +244,7 @@ func TestUnknownTagPreservedAndIgnored(t *testing.T) {
 }
 
 func TestMarshalUnknownSortedIntoPlace(t *testing.T) {
+	t.Parallel()
 	b, err := Head{Cols: 1, Rows: 1, Title: "x", Unknown: []RawField{{Tag: 40, Value: []byte{1}}, {Tag: 13 + 100, Value: nil}}}.Marshal()
 	if err != nil {
 		t.Fatal(err)
@@ -257,6 +264,7 @@ func TestMarshalUnknownSortedIntoPlace(t *testing.T) {
 }
 
 func TestRequiredFeatures(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		features uint64
 		ok       bool
@@ -275,6 +283,7 @@ func TestRequiredFeatures(t *testing.T) {
 }
 
 func TestUnmarshalErrors(t *testing.T) {
+	t.Parallel()
 	size := mustHex(t, "02025018")
 	field := func(tag uint64, v []byte) []byte {
 		return append(varint.AppendUvarint(varint.AppendUvarint(nil, tag), uint64(len(v))), v...)
@@ -345,6 +354,7 @@ func TestUnmarshalErrors(t *testing.T) {
 }
 
 func TestMarshalErrors(t *testing.T) {
+	t.Parallel()
 	ok := Head{Cols: 1, Rows: 1}
 	tests := []struct {
 		name string
@@ -397,6 +407,7 @@ func fieldBoundaries(t *testing.T, b []byte) map[int]bool {
 }
 
 func TestUnmarshalTruncation(t *testing.T) {
+	t.Parallel()
 	b, err := fullHead().Marshal()
 	if err != nil {
 		t.Fatal(err)
@@ -428,6 +439,7 @@ func TestUnmarshalTruncation(t *testing.T) {
 }
 
 func TestUnmarshalBitFlipsDoNotPanic(t *testing.T) {
+	t.Parallel()
 	b, _ := fullHead().Marshal()
 	rng := rand.New(rand.NewSource(2))
 	for range 5000 {

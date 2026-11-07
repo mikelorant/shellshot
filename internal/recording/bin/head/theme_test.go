@@ -25,6 +25,7 @@ func sampleTheme() Theme {
 }
 
 func TestThemeGolden(t *testing.T) {
+	t.Parallel()
 	b := MarshalTheme(sampleTheme())
 	if len(b) != ThemeLen || ThemeLen != 785 {
 		t.Fatalf("len = %d, ThemeLen = %d", len(b), ThemeLen)
@@ -50,6 +51,7 @@ func TestThemeGolden(t *testing.T) {
 }
 
 func TestThemeRoundTripRandom(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(3))
 	for i := range 200 {
 		var th Theme
@@ -69,6 +71,7 @@ func TestThemeRoundTripRandom(t *testing.T) {
 }
 
 func TestThemeErrors(t *testing.T) {
+	t.Parallel()
 	good := MarshalTheme(sampleTheme())
 	for i := 0; i < len(good); i++ {
 		if _, err := UnmarshalTheme(good[:i]); !errors.Is(err, ErrMalformed) {
@@ -97,6 +100,7 @@ func FuzzUnmarshalTheme(f *testing.F) {
 }
 
 func TestMetaGolden(t *testing.T) {
+	t.Parallel()
 	b, err := MarshalMeta(Meta{"b": "2", "a": "1", "": "empty", "zz": ""})
 	if err != nil {
 		t.Fatal(err)
@@ -115,6 +119,7 @@ func TestMetaGolden(t *testing.T) {
 }
 
 func TestMetaDeterministic(t *testing.T) {
+	t.Parallel()
 	m := Meta{}
 	for _, k := range strings.Split("q w e r t y u i o p a s d f g h j k l", " ") {
 		m[k] = k + k
@@ -129,6 +134,7 @@ func TestMetaDeterministic(t *testing.T) {
 }
 
 func TestMetaRoundTripRandom(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(4))
 	for i := range 200 {
 		m := Meta{}
@@ -147,6 +153,7 @@ func TestMetaRoundTripRandom(t *testing.T) {
 }
 
 func TestMetaEmpty(t *testing.T) {
+	t.Parallel()
 	b, err := MarshalMeta(nil)
 	if err != nil || !bytes.Equal(b, []byte{0}) {
 		t.Fatalf("empty meta = %x, %v", b, err)
@@ -158,6 +165,7 @@ func TestMetaEmpty(t *testing.T) {
 }
 
 func TestMetaTruncation(t *testing.T) {
+	t.Parallel()
 	b, _ := MarshalMeta(Meta{"alpha": "one", "beta": "two"})
 	for i := 0; i < len(b); i++ {
 		if _, err := UnmarshalMeta(b[:i]); !errors.Is(err, ErrMalformed) {
@@ -167,6 +175,7 @@ func TestMetaTruncation(t *testing.T) {
 }
 
 func TestMetaErrors(t *testing.T) {
+	t.Parallel()
 	big := strings.Repeat("a", MaxStringLen+1)
 	str := func(s string) []byte { return appendString(nil, s) }
 	cat := func(parts ...[]byte) []byte { return bytes.Join(parts, nil) }

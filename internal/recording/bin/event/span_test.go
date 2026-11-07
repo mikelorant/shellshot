@@ -31,6 +31,7 @@ func hexBytes(s string) []byte {
 
 // The bytes below are the hand-computed examples of docs/research/script-scenes.md §4.3.
 func TestSpanDocBytes(t *testing.T) {
+	t.Parallel()
 	install := Span{
 		Op: SpanBegin, ID: 1, Type: SpanScene, Name: "install",
 		Hints: SpanHints{Speed: 8000, Idle: 2 * time.Second, Hold: time.Second},
@@ -68,6 +69,7 @@ func TestSpanDocBytes(t *testing.T) {
 }
 
 func TestSpanRoundTrip(t *testing.T) {
+	t.Parallel()
 	spans := []Span{
 		{Op: SpanBegin, ID: 1, Type: SpanScene, Name: "héllo ✓"},
 		{Op: SpanBegin, ID: 300, Type: SpanBeat, Parent: 2, Name: strings.Repeat("n", MaxSpanName)},
@@ -94,6 +96,7 @@ func TestSpanRoundTrip(t *testing.T) {
 }
 
 func TestSpanForwardCompat(t *testing.T) {
+	t.Parallel()
 	// Unknown trailing bytes, an unknown hint tag, and trailing bytes after END.
 	begin := hexBytes("01 01 01 01 00 02 68 69 02  09 03 AA BB CC  01 02 C0 3E  FF FF")
 	s, err := ParseSpan(begin)
@@ -111,6 +114,7 @@ func TestSpanForwardCompat(t *testing.T) {
 }
 
 func TestSpanUnknownIsNotMalformed(t *testing.T) {
+	t.Parallel()
 	for name, hex := range map[string]string{
 		"version 2": "02 01 01 01 00 00 00",
 		"op 3":      "01 03 01",
@@ -124,6 +128,7 @@ func TestSpanUnknownIsNotMalformed(t *testing.T) {
 }
 
 func TestSpanMalformed(t *testing.T) {
+	t.Parallel()
 	long := strings.Repeat("a", MaxSpanName+1)
 	cases := map[string][]byte{
 		"empty":             nil,
@@ -159,6 +164,7 @@ func TestSpanMalformed(t *testing.T) {
 }
 
 func TestSpanValidate(t *testing.T) {
+	t.Parallel()
 	good := Span{Op: SpanBegin, ID: 1, Type: SpanScene, Name: "x"}
 	bads := map[string]Span{
 		"id 0":      {Op: SpanEnd},

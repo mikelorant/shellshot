@@ -16,6 +16,7 @@ import (
 // TestReplayThroughGhostty writes a real binary recording, replays it through
 // libghostty and checks the styled text and the mid-stream resize.
 func TestReplayThroughGhostty(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	now := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	w, err := bin.NewWriter(&buf, head.Head{Cols: 20, Rows: 4}, bin.WriterOptions{Now: func() time.Time { return now }})
@@ -85,6 +86,7 @@ func TestReplayThroughGhostty(t *testing.T) {
 // output, and checks that boundaries inside the gap yield forced frames that
 // show the unchanged screen at exactly the boundary times.
 func TestBoundariesInIdleGapThroughGhostty(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	now := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	w, err := bin.NewWriter(&buf, head.Head{Cols: 20, Rows: 4}, bin.WriterOptions{Now: func() time.Time { return now }})

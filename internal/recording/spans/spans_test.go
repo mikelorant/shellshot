@@ -62,6 +62,7 @@ func scan(t *testing.T, file []byte) ([]Span, error) {
 func sp(s event.Span) *event.Span { return &s }
 
 func TestScanNestingAndHints(t *testing.T) {
+	t.Parallel()
 	hints := event.SpanHints{Speed: 8000, Idle: 2 * time.Second, Hold: time.Second}
 	file := write(t, []step{
 		{at: 0, out: "$ "},
@@ -93,6 +94,7 @@ func TestScanNestingAndHints(t *testing.T) {
 }
 
 func TestScanOpenSpanAtCleanEOF(t *testing.T) {
+	t.Parallel()
 	file := write(t, []step{
 		{at: 0, span: sp(begin(1, event.SpanScene, 0, "a", event.SpanHints{}))},
 		{at: 10, span: sp(begin(2, event.SpanHidden, 1, "", event.SpanHints{}))},
@@ -108,6 +110,7 @@ func TestScanOpenSpanAtCleanEOF(t *testing.T) {
 }
 
 func TestScanTornTailWithOpenSpan(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w, err := bin.NewWriter(&buf, head.Head{Cols: 80, Rows: 24}, bin.WriterOptions{})
 	if err != nil {
@@ -159,6 +162,7 @@ func spanEv(at int, s event.Span) bin.Event {
 }
 
 func TestScanIgnorableEvents(t *testing.T) {
+	t.Parallel()
 	src := &fakeSource{evs: []bin.Event{
 		{At: 0, Kind: event.KindOut, Data: []byte("a")},
 		spanEv(1, end(9)), // unknown id
@@ -190,6 +194,7 @@ func TestScanIgnorableEvents(t *testing.T) {
 }
 
 func TestScanMalformedSpan(t *testing.T) {
+	t.Parallel()
 	src := &fakeSource{evs: []bin.Event{
 		spanEv(1, begin(1, event.SpanScene, 0, "a", event.SpanHints{})),
 		{At: ms(2), Kind: event.KindSpan, Data: []byte{1, 1}},
@@ -204,6 +209,7 @@ func TestScanMalformedSpan(t *testing.T) {
 }
 
 func TestScanNoSpans(t *testing.T) {
+	t.Parallel()
 	got, err := Scan(&fakeSource{evs: []bin.Event{{Kind: event.KindOut, Data: []byte("x")}}})
 	if err != nil || len(got) != 0 {
 		t.Fatalf("spans = %+v, err = %v", got, err)

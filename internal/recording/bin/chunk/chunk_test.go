@@ -37,6 +37,7 @@ func goldenChunks() []chunkData {
 }
 
 func TestMagicBytes(t *testing.T) {
+	t.Parallel()
 	want := []byte{0x89, 0x53, 0x48, 0x4f, 0x54, 0x0d, 0x0a, 0x1a}
 	if Magic != string(want) {
 		t.Fatalf("Magic = %x, want %x", Magic, want)
@@ -54,6 +55,7 @@ func TestMagicBytes(t *testing.T) {
 }
 
 func TestReadMagicErrors(t *testing.T) {
+	t.Parallel()
 	if err := ReadMagic(bytes.NewReader(nil)); err != io.EOF {
 		t.Errorf("empty: %v, want io.EOF", err)
 	}
@@ -76,6 +78,7 @@ func TestReadMagicErrors(t *testing.T) {
 }
 
 func TestCRC32CCheckValue(t *testing.T) {
+	t.Parallel()
 	// Standard CRC-32C check value for "123456789".
 	if got := crc32.Checksum([]byte("123456789"), castagnoli); got != 0xe3069283 {
 		t.Fatalf("castagnoli check value = %08x", got)
@@ -83,6 +86,7 @@ func TestCRC32CCheckValue(t *testing.T) {
 }
 
 func TestGoldenCRCs(t *testing.T) {
+	t.Parallel()
 	rest := goldenFile[len(Magic):]
 	for _, c := range goldenChunks() {
 		n := int(binary.LittleEndian.Uint32(rest))
@@ -102,6 +106,7 @@ func TestGoldenCRCs(t *testing.T) {
 }
 
 func TestWriteGolden(t *testing.T) {
+	t.Parallel()
 	var b bytes.Buffer
 	if err := WriteMagic(&b); err != nil {
 		t.Fatal(err)
@@ -117,6 +122,7 @@ func TestWriteGolden(t *testing.T) {
 }
 
 func TestReadGolden(t *testing.T) {
+	t.Parallel()
 	rd := bytes.NewReader(goldenFile)
 	if err := ReadMagic(rd); err != nil {
 		t.Fatal(err)
@@ -144,6 +150,7 @@ func TestReadGolden(t *testing.T) {
 }
 
 func TestWriteSingleCall(t *testing.T) {
+	t.Parallel()
 	var cw countingWriter
 	if err := Write(&cw, TypeEvent, []byte("abc")); err != nil {
 		t.Fatal(err)
@@ -158,6 +165,7 @@ type countingWriter struct{ calls, n int }
 func (c *countingWriter) Write(p []byte) (int, error) { c.calls++; c.n += len(p); return len(p), nil }
 
 func TestWriteTooLarge(t *testing.T) {
+	t.Parallel()
 	var cw countingWriter
 	err := Write(&cw, TypeBlob, make([]byte, MaxLen+1))
 	if !errors.Is(err, ErrTooLarge) || cw.calls != 0 {
@@ -169,6 +177,7 @@ func TestWriteTooLarge(t *testing.T) {
 }
 
 func TestWritePropagatesError(t *testing.T) {
+	t.Parallel()
 	want := errors.New("disk full")
 	if err := Write(errWriter{want}, TypeHead, nil); err != want {
 		t.Fatalf("got %v", err)
@@ -180,6 +189,7 @@ type errWriter struct{ err error }
 func (e errWriter) Write([]byte) (int, error) { return 0, e.err }
 
 func TestRoundTrip(t *testing.T) {
+	t.Parallel()
 	big := make([]byte, 3<<20+17) // forces several buffer growth steps
 	for i := range big {
 		big[i] = byte(i * 7)
@@ -226,6 +236,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestPayloadValidOnlyUntilNext(t *testing.T) {
+	t.Parallel()
 	var b bytes.Buffer
 	Write(&b, TypeEvent, []byte("first"))
 	Write(&b, TypeEvent, []byte("other"))
@@ -244,6 +255,7 @@ func TestPayloadValidOnlyUntilNext(t *testing.T) {
 }
 
 func TestTypeAncillary(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		typ  Type
 		name string
@@ -318,6 +330,7 @@ func multiChunkFile(t testing.TB) ([]byte, []chunkData) {
 }
 
 func TestTruncationAtEveryOffset(t *testing.T) {
+	t.Parallel()
 	files := map[string]struct {
 		data   []byte
 		chunks []chunkData
@@ -382,6 +395,7 @@ func TestTruncationAtEveryOffset(t *testing.T) {
 }
 
 func TestBitFlipAtEveryByte(t *testing.T) {
+	t.Parallel()
 	data, chunks := multiChunkFile(t)
 	ends := boundaries(chunks)
 	for pos := range data {
@@ -434,6 +448,7 @@ func TestBitFlipAtEveryByte(t *testing.T) {
 }
 
 func TestMaxLenCap(t *testing.T) {
+	t.Parallel()
 	mk := func(n int) []byte {
 		var b bytes.Buffer
 		Write(&b, TypeEvent, make([]byte, n))
@@ -510,6 +525,7 @@ func TestLyingLengthDoesNotAllocate(t *testing.T) {
 }
 
 func TestTrailer(t *testing.T) {
+	t.Parallel()
 	var b bytes.Buffer
 	if err := WriteTrailer(&b, 0x01020304); err != nil {
 		t.Fatal(err)
@@ -543,6 +559,7 @@ type failingReader struct{ err error }
 func (f failingReader) Read([]byte) (int, error) { return 0, f.err }
 
 func TestUnderlyingErrorIsNotTruncation(t *testing.T) {
+	t.Parallel()
 	want := errors.New("boom")
 	_, _, err := NewReader(failingReader{want}, Options{}).Next()
 	if !errors.Is(err, want) || errors.Is(err, ErrTruncated) || err == io.EOF {

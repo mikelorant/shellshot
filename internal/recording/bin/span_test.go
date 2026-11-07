@@ -23,6 +23,7 @@ func spanOf(t *testing.T, e Event) event.Span {
 }
 
 func TestWriterSpanRoundTrip(t *testing.T) {
+	t.Parallel()
 	begin := event.Span{Op: event.SpanBegin, ID: 1, Type: event.SpanScene, Name: "install",
 		Hints: event.SpanHints{Speed: 8000, Idle: 2 * time.Second, Hold: time.Second}}
 	end := event.Span{Op: event.SpanEnd, ID: 1}
@@ -59,6 +60,7 @@ func TestWriterSpanRoundTrip(t *testing.T) {
 }
 
 func TestWriterSpanRejectsInvalid(t *testing.T) {
+	t.Parallel()
 	w := mustWriter(t, io.Discard, testHead(), WriterOptions{})
 	err := w.Span(0, event.Span{Op: event.SpanBegin, ID: 1, Type: event.SpanScene, Name: string(make([]byte, 256))})
 	if !errors.Is(err, event.ErrMalformedSpan) {
@@ -71,6 +73,7 @@ func TestWriterSpanRejectsInvalid(t *testing.T) {
 
 // Spans must not be merged into, or reordered around, coalesced OUT runs.
 func TestWriterSpanOrderWithCoalescing(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := mustWriter(t, &buf, testHead(), WriterOptions{CoalesceTicks: 1000}) // 100ms
 	begin := event.Span{Op: event.SpanBegin, ID: 1, Type: event.SpanScene, Name: "a"}
@@ -122,6 +125,7 @@ func TestWriterSpanOrderWithCoalescing(t *testing.T) {
 // A span written just before Close must reach the file, with and without
 // coalescing, and a span alone in the pending block must flush on Close.
 func TestWriterSpanFlushedOnClose(t *testing.T) {
+	t.Parallel()
 	for _, co := range []uint64{0, 1000} {
 		rw := newRecordingWriter()
 		w := mustWriter(t, rw, testHead(), WriterOptions{CoalesceTicks: co})
@@ -150,6 +154,7 @@ func TestWriterSpanFlushedOnClose(t *testing.T) {
 }
 
 func TestWriterSpanFlushBySizeAndTime(t *testing.T) {
+	t.Parallel()
 	clock := newFakeClock()
 	rw := newRecordingWriter()
 	w := mustWriter(t, rw, testHead(), WriterOptions{Now: clock.Now, FlushInterval: time.Second})
@@ -169,6 +174,7 @@ func TestWriterSpanFlushBySizeAndTime(t *testing.T) {
 // A reader written before SPAN existed treats kind 64 as an opaque ancillary
 // event: it must still see every other event, in order.
 func TestSpansPassThroughOldReader(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := mustWriter(t, &buf, testHead(), WriterOptions{})
 	if err := w.Output(0, []byte("a")); err != nil {
@@ -220,6 +226,7 @@ func TestSpansPassThroughOldReader(t *testing.T) {
 // A recorder killed mid-write leaves a torn tail; the SPAN begin in the
 // intact blocks must still be readable.
 func TestSpanBeginSurvivesTornTail(t *testing.T) {
+	t.Parallel()
 	rw := newRecordingWriter()
 	w := mustWriter(t, rw, testHead(), WriterOptions{})
 	must := func(err error) {

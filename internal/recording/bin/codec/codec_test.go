@@ -37,6 +37,7 @@ func compressible(n int) []byte {
 var testDict = []byte("\x1b[32muser@host\x1b[0m:~$ total drwxr-xr-x\r\n")
 
 func TestRoundTrip(t *testing.T) {
+	t.Parallel()
 	inputs := map[string][]byte{
 		"empty":        {},
 		"tiny":         []byte("hi"),
@@ -76,6 +77,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestFlateLevels(t *testing.T) {
+	t.Parallel()
 	src := compressible(64 << 10)
 	for _, level := range []int{flate.HuffmanOnly, flate.DefaultCompression, flate.NoCompression, flate.BestSpeed, flate.BestCompression} {
 		c, err := NewFlateCodec(FlateOptions{Level: level})
@@ -94,6 +96,7 @@ func TestFlateLevels(t *testing.T) {
 }
 
 func TestDecompressNegativeMaxLen(t *testing.T) {
+	t.Parallel()
 	for _, c := range testCodecs(t) {
 		if _, err := c.Decompress(nil, nil, nil, -1); err == nil {
 			t.Fatalf("%s: negative maxLen accepted", c.ID())
@@ -102,6 +105,7 @@ func TestDecompressNegativeMaxLen(t *testing.T) {
 }
 
 func TestNoneTooLarge(t *testing.T) {
+	t.Parallel()
 	if _, err := (NoneCodec{}).Decompress(nil, []byte("abc"), nil, 2); !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
 	}
@@ -152,6 +156,7 @@ func TestDecompressionBomb(t *testing.T) {
 }
 
 func TestCorruptInput(t *testing.T) {
+	t.Parallel()
 	c, _ := NewFlateCodec(DefaultFlateOptions())
 	src := compressible(4096)
 	good, _ := c.Compress(nil, src, nil)
@@ -184,6 +189,7 @@ func TestCorruptInput(t *testing.T) {
 // DEFLATE has no dictionary checksum, so a wrong dictionary is either an
 // error or different output; it must never equal the original.
 func TestWrongDict(t *testing.T) {
+	t.Parallel()
 	c, _ := NewFlateCodec(DefaultFlateOptions())
 	src := bytes.Repeat(testDict, 20)
 	comp, _ := c.Compress(nil, src, testDict)
@@ -200,6 +206,7 @@ func TestWrongDict(t *testing.T) {
 }
 
 func TestConcurrentUse(t *testing.T) {
+	t.Parallel()
 	c, _ := NewFlateCodec(DefaultFlateOptions())
 	var wg sync.WaitGroup
 	for g := 0; g < 8; g++ {
@@ -229,6 +236,7 @@ func TestConcurrentUse(t *testing.T) {
 }
 
 func TestRegistry(t *testing.T) {
+	t.Parallel()
 	r := DefaultRegistry()
 	for _, id := range []ID{None, Flate, Zstd} {
 		c, err := r.Get(id)

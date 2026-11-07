@@ -64,6 +64,7 @@ func newZstd(t testing.TB, level zstd.EncoderLevel) *ZstdCodec {
 }
 
 func TestZstdRoundTrip(t *testing.T) {
+	t.Parallel()
 	train := terminalBlocks(1, 60, 1500)
 	rawDict := BuildDict(train, 8<<10)
 	fmtDict, err := BuildZstdDict(train, 8<<10)
@@ -121,6 +122,7 @@ func TestZstdRoundTrip(t *testing.T) {
 }
 
 func TestZstdLevelValidation(t *testing.T) {
+	t.Parallel()
 	if _, err := NewZstdCodec(ZstdOptions{Level: 99}); err == nil {
 		t.Fatal("level 99 accepted")
 	}
@@ -133,6 +135,7 @@ func TestZstdLevelValidation(t *testing.T) {
 }
 
 func TestZstdWrongDict(t *testing.T) {
+	t.Parallel()
 	c := newZstd(t, 0)
 	train := terminalBlocks(1, 60, 1500)
 	dictA := BuildDict(train, 8<<10)
@@ -175,6 +178,7 @@ func TestZstdWrongDict(t *testing.T) {
 }
 
 func TestZstdInvalidFormattedDict(t *testing.T) {
+	t.Parallel()
 	c := newZstd(t, 0)
 	bad := append(append([]byte(nil), zstdDictMagic...), 1, 2, 3, 4, 5)
 	if _, err := c.Compress(nil, []byte("abc"), bad); err == nil {
@@ -187,6 +191,7 @@ func TestZstdInvalidFormattedDict(t *testing.T) {
 }
 
 func TestZstdDictCache(t *testing.T) {
+	t.Parallel()
 	c := newZstd(t, zstd.SpeedFastest)
 	src := compressible(2000)
 	// More distinct dictionaries than cache entries: still correct.
@@ -343,6 +348,7 @@ func BenchmarkZstdDecompressLyingMaxLen(b *testing.B) {
 }
 
 func TestZstdCorruptInput(t *testing.T) {
+	t.Parallel()
 	c := newZstd(t, 0)
 	src := terminalBlocks(4, 1, 4096)[0]
 	good, _ := c.Compress(nil, src, nil)
@@ -376,6 +382,7 @@ func TestZstdCorruptInput(t *testing.T) {
 }
 
 func TestZstdConcurrentUse(t *testing.T) {
+	t.Parallel()
 	c := newZstd(t, zstd.SpeedFastest)
 	dicts := [][]byte{nil, testDict, BuildDict(terminalBlocks(1, 20, 1000), 4<<10)}
 	var wg sync.WaitGroup
@@ -437,6 +444,7 @@ func FuzzZstdDecompress(f *testing.F) {
 }
 
 func TestBuildDict(t *testing.T) {
+	t.Parallel()
 	if BuildDict(nil, 100) != nil || BuildDict([][]byte{[]byte("abc")}, 0) != nil {
 		t.Fatal("empty input or zero size must return nil")
 	}
@@ -463,6 +471,7 @@ func TestBuildDict(t *testing.T) {
 // TestDictShrinksSmallBlocks checks that dictionaries built from earlier
 // blocks make small similar blocks measurably smaller, with every codec.
 func TestDictShrinksSmallBlocks(t *testing.T) {
+	t.Parallel()
 	train := terminalBlocks(1, 200, 1500)
 	test := terminalBlocks(2, 100, 1500)
 	rawDict := BuildDict(train, 16<<10)

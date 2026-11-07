@@ -17,6 +17,7 @@ func run(c *Coalescer, in []Event) []Event {
 }
 
 func TestCoalescerTable(t *testing.T) {
+	t.Parallel()
 	mark := Event{Tick: 12, Kind: KindMark, Data: []byte("m")}
 	cases := []struct {
 		name     string
@@ -68,6 +69,7 @@ func TestCoalescerTable(t *testing.T) {
 }
 
 func TestCoalescerHoldsUntilFlush(t *testing.T) {
+	t.Parallel()
 	c := NewCoalescer(10, 0)
 	if got := c.Add(out(0, "a")); len(got) != 0 {
 		t.Fatalf("Add returned %+v", got)
@@ -89,6 +91,7 @@ func TestCoalescerHoldsUntilFlush(t *testing.T) {
 }
 
 func TestCoalescerCopiesCallerBuffer(t *testing.T) {
+	t.Parallel()
 	c := NewCoalescer(10, 0)
 	buf := []byte("aa")
 	c.Add(Event{Tick: 0, Kind: KindOut, Data: buf})
@@ -101,6 +104,7 @@ func TestCoalescerCopiesCallerBuffer(t *testing.T) {
 }
 
 func TestCoalescerDefaultMaxBytes(t *testing.T) {
+	t.Parallel()
 	c := NewCoalescer(1000, 0)
 	chunk := make([]byte, DefaultMaxMerged/2)
 	var got []Event
@@ -114,6 +118,7 @@ func TestCoalescerDefaultMaxBytes(t *testing.T) {
 }
 
 func TestCoalescedBlockRoundTrips(t *testing.T) {
+	t.Parallel()
 	c := NewCoalescer(10, 0)
 	in := []Event{out(0, "a"), out(3, "b"), NewMark(20, "m"), out(40, "c"), NewExit(50, 3)}
 	evs := run(c, in)

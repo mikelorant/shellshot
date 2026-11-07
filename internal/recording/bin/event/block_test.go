@@ -3,6 +3,7 @@ package event
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"runtime"
@@ -53,6 +54,7 @@ func goldenBlock() Block {
 }
 
 func TestEncodeGoldenNone(t *testing.T) {
+	t.Parallel()
 	want := []byte{
 		0x00, 0x00, 0x0a, 0x0f, 0x02, 0x09, // codec dict start end n raw_len
 		0x00, 0x05, // dt
@@ -74,6 +76,7 @@ func TestEncodeGoldenNone(t *testing.T) {
 }
 
 func TestEncodeGoldenFlate(t *testing.T) {
+	t.Parallel()
 	want := []byte{
 		0x01, 0x00, 0x0a, 0x0f, 0x02, 0x09, // codec dict start end n raw_len
 		// raw DEFLATE of 00 05 00 03 02 01 'h' 'i' 'x': a stored block, then
@@ -142,6 +145,7 @@ func randomBlock(rng *rand.Rand) Block {
 }
 
 func TestRoundTripRandom(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(20240607))
 	dict := []byte("\x1b[0m\x1b[1;32m$ ls -la\r\n")
 	dicts := func(id uint64) ([]byte, bool) {
@@ -196,6 +200,7 @@ func TestRoundTripRandom(t *testing.T) {
 }
 
 func TestEmptyBlock(t *testing.T) {
+	t.Parallel()
 	b := Block{StartTick: 42, EndTick: 42}
 	for _, id := range []codec.ID{codec.None, codec.Flate, codec.Zstd} {
 		got, err := decode(encode(t, b, id, nil, 0))
@@ -209,6 +214,7 @@ func TestEmptyBlock(t *testing.T) {
 }
 
 func TestTypedPayloads(t *testing.T) {
+	t.Parallel()
 	r := ResizePayload{Cols: 120, Rows: 40, CellPxW: 9, CellPxH: 18}
 	e := NewResize(5, r)
 	if e.Kind != KindResize || e.Tick != 5 {
@@ -252,6 +258,7 @@ func TestTypedPayloads(t *testing.T) {
 }
 
 func TestKindRanges(t *testing.T) {
+	t.Parallel()
 	for k := 0; k < 256; k++ {
 		kd := Kind(k)
 		wantRes := k >= 5 && k <= 63
@@ -265,6 +272,7 @@ func TestKindRanges(t *testing.T) {
 }
 
 func TestReservedKind(t *testing.T) {
+	t.Parallel()
 	var enc Encoder
 	for _, k := range []Kind{5, 6, 63} {
 		b := Block{StartTick: 0, EndTick: 0, Events: []Event{{Kind: k}}}
@@ -290,6 +298,7 @@ func TestReservedKind(t *testing.T) {
 }
 
 func TestEncodeRejectsInvalidBlocks(t *testing.T) {
+	t.Parallel()
 	var enc Encoder
 	none := mustCodec(t, codec.None)
 	ev := func(ticks ...uint64) []Event {
@@ -323,6 +332,7 @@ func TestEncodeRejectsInvalidBlocks(t *testing.T) {
 }
 
 func TestDecodeRejectsInconsistentHeaders(t *testing.T) {
+	t.Parallel()
 	good := []byte{0, 5, 0, 3, 2, 1, 'h', 'i', 'x'} // body of goldenBlock
 	cases := []struct {
 		name string
@@ -362,6 +372,7 @@ func TestDecodeRejectsInconsistentHeaders(t *testing.T) {
 }
 
 func TestDecodeDictionary(t *testing.T) {
+	t.Parallel()
 	dict := []byte("preset dictionary text")
 	b := goldenBlock()
 	p := encode(t, b, codec.Flate, dict, 3)
@@ -378,6 +389,7 @@ func TestDecodeDictionary(t *testing.T) {
 }
 
 func TestLimits(t *testing.T) {
+	t.Parallel()
 	p := encode(t, goldenBlock(), codec.None, nil, 0)
 	reg := codec.DefaultRegistry()
 	cases := map[string]Limits{
@@ -396,6 +408,7 @@ func TestLimits(t *testing.T) {
 }
 
 func TestReadHeaderOnly(t *testing.T) {
+	t.Parallel()
 	b := Block{StartTick: 100, EndTick: 100 + 3_000_000, Events: []Event{
 		{Tick: 100, Kind: KindOut, Data: bytes.Repeat([]byte("abc"), 100)},
 		{Tick: 100 + 3_000_000, Kind: KindExit, Data: varint.AppendSvarint(nil, 0)},
@@ -428,6 +441,7 @@ func TestReadHeaderOnly(t *testing.T) {
 }
 
 func TestIdleGapCostsFewBytes(t *testing.T) {
+	t.Parallel()
 	size := func(gap uint64) int {
 		b := Block{StartTick: 0, EndTick: gap, Events: []Event{
 			{Tick: 0, Kind: KindOut, Data: []byte("a")},
@@ -449,6 +463,7 @@ func TestIdleGapCostsFewBytes(t *testing.T) {
 }
 
 func TestDecodeDataAliasingIsClipped(t *testing.T) {
+	t.Parallel()
 	blk, err := decode(encode(t, goldenBlock(), codec.None, nil, 0))
 	if err != nil {
 		t.Fatal(err)
@@ -464,28 +479,37 @@ func TestDecodeDataAliasingIsClipped(t *testing.T) {
 }
 
 func TestTruncationAtEveryOffset(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(1))
 	dict := []byte("dict")
 	dicts := func(uint64) ([]byte, bool) { return dict, true }
 	reg := codec.DefaultRegistry()
-	for i := 0; i < 6; i++ {
-		b := randomBlock(rng)
+	var blocks []Block
+	for range 6 {
+		blocks = append(blocks, randomBlock(rng))
+	}
+	for i, b := range blocks {
 		for _, tc := range []struct {
+			name   string
 			id     codec.ID
 			dict   []byte
 			dictID uint64
-		}{{codec.None, nil, 0}, {codec.Flate, nil, 0}, {codec.Flate, dict, 1}} {
-			p := encode(t, b, tc.id, tc.dict, tc.dictID)
-			for n := 0; n < len(p); n++ {
-				if _, err := Decode(p[:n], reg, dicts, Limits{}); err == nil {
-					t.Fatalf("block %d codec %v: prefix %d of %d decoded without error", i, tc.id, n, len(p))
+		}{{"none", codec.None, nil, 0}, {"flate", codec.Flate, nil, 0}, {"flate with dict", codec.Flate, dict, 1}} {
+			t.Run(fmt.Sprintf("block %d/%s", i, tc.name), func(t *testing.T) {
+				t.Parallel()
+				p := encode(t, b, tc.id, tc.dict, tc.dictID)
+				for n := 0; n < len(p); n++ {
+					if _, err := Decode(p[:n], reg, dicts, Limits{}); err == nil {
+						t.Fatalf("block %d codec %v: prefix %d of %d decoded without error", i, tc.id, n, len(p))
+					}
 				}
-			}
+			})
 		}
 	}
 }
 
 func TestCorruptionAtEveryOffsetNeverPanics(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(2))
 	reg := codec.DefaultRegistry()
 	for i := 0; i < 4; i++ {
