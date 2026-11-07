@@ -91,6 +91,7 @@ func newExportCmd() *cobra.Command {
 	fl.BoolVar(&f.showHidden, "show-hidden", false, "render hidden spans like the rest of the recording instead of cutting them")
 	fl.StringVar(&f.emojiSet, "emoji-set", emoji.SetApple.String(), "colour emoji artwork: apple or noto. apple draws Apple Color Emoji, whose artwork belongs to Apple Inc. and is not open source, and takes the few emoji it lacks from Noto. noto draws Noto Color Emoji only (SIL OFL 1.1): the licence-clean choice for exports you share")
 	fl.StringVar(&f.emojiFont, "emoji-font", "", "COLR v0 or CBDT/CBLC colour emoji font `file`, tried before the --emoji-set fonts for every emoji")
+	addGIFFlags(cmd)
 	return cmd
 }
 
@@ -226,6 +227,10 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 			return fmt.Errorf("export: output %s would overwrite the input recording", output)
 		}
 	}
+	settings, err := exportSettings(cmd, flags)
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
 	emojiSet, _ := emoji.ParseSet(flags.emojiSet) // validated above
 	fonts, err := fontchain.New(fontchain.Options{
 		Files:     flags.fallbackFonts,
@@ -274,7 +279,7 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 			MinDelay:  flags.minDelay,
 			Segments:  plan.Segments,
 		},
-		NewSink:  outFormat.New(format.Settings{Loops: flags.loops}),
+		NewSink:  outFormat.New(settings),
 		Progress: func(_, total int) { steps = total },
 	}
 	size, err := writeFileAtomic(output, func(f *os.File) error {
