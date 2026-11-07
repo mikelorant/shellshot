@@ -76,6 +76,31 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+// A small incompressible body makes compress/flate fall back to a stored block. Before Go 1.27
+// that stored block also contained the preset dictionary, so the stream inflated to dict+body
+// and Decompress failed with ErrTooLarge. go.mod requires a toolchain without that bug.
+func TestFlateStoredBlockWithDict(t *testing.T) {
+	t.Parallel()
+	fc, err := NewFlateCodec(DefaultFlateOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []int{1, 9, 100, 1079, 4000} {
+		src := randomBytes(n)
+		comp, err := fc.Compress(nil, src, testDict)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := fc.Decompress(nil, comp, testDict, len(src))
+		if err != nil {
+			t.Fatalf("%d random bytes: %v", n, err)
+		}
+		if !bytes.Equal(got, src) {
+			t.Fatalf("%d random bytes: round trip mismatch", n)
+		}
+	}
+}
+
 func TestFlateLevels(t *testing.T) {
 	t.Parallel()
 	src := compressible(64 << 10)
