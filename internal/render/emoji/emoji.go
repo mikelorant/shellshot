@@ -7,6 +7,9 @@
 // A Font looks up a whole grapheme cluster (a ZWJ family, a flag, a skin
 // tone, a keycap, a variation-selector sequence or a single emoji) and
 // renders it as a square RGBA image of any pixel size, cached per size.
+//
+// Bitmap handles CBLC/CBDT PNG fonts such as Apple Color Emoji; Load picks
+// the backend for a font file.
 package emoji
 
 import (
