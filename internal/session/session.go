@@ -53,6 +53,13 @@ const chunkQueueLen = 16
 // Config.OnStart receives the start time once, before the process is read, and
 // Config.OnTick is called on every tick before sampling (see Config).
 //
+// If cfg.Driver is set (see Driver) the process must also implement
+// io.Writer. Run polls the driver on its own goroutine at the start, after
+// output and at the driver's deadlines, carries out its writes, marks, spans
+// and shutdown, and keeps running until the driver is done and the process
+// has exited, with Events.Exit logged once at the end. A driver error, or a
+// cancelled ctx, ends the driver's open spans in the event log first.
+//
 // If ctx is cancelled Run closes proc and returns an error wrapping ctx.Err().
 // A sink error, terminal error or non-EOF read error also aborts the run with
 // a wrapped error. On every path Run closes the terminal and proc and does not
@@ -64,6 +71,14 @@ func Run(ctx context.Context, proc Process, newTerm vt.Factory, cfg Config, sink
 
 	if cfg.FPS > MaxFPS {
 		return -1, fmt.Errorf("%w: %d (maximum %d)", ErrFPS, cfg.FPS, MaxFPS)
+	}
+	var drv *driverState
+	if cfg.Driver != nil {
+		w, ok := proc.(io.Writer)
+		if !ok {
+			return -1, ErrDriverNeedsWriter
+		}
+		drv = newDriverState(cfg.Driver, w)
 	}
 	if err := ctx.Err(); err != nil {
 		return -1, cancelError(err)
@@ -81,7 +96,7 @@ func Run(ctx context.Context, proc Process, newTerm vt.Factory, cfg Config, sink
 		return -1, fmt.Errorf("session: resize process: %w", err)
 	}
 
-	s := &session{proc: proc, term: term, sink: sink, cfg: cfg}
+	s := &session{proc: proc, term: term, sink: sink, cfg: cfg, drv: drv}
 	exitCode, err = s.run(ctx)
 	if err != nil {
 		return -1, err
@@ -100,6 +115,11 @@ type session struct {
 	start time.Time
 	last  snapshot.Snapshot
 	dirty bool // terminal written since the last snapshot
+
+	in      <-chan chunk // output chunks; nil once the reader has finished with a driver
+	readErr error        // set by the reader before it closes the chunk channel
+	waited  <-chan waitResult
+	drv     *driverState // nil without Config.Driver
 }
 
 // waitResult is the outcome of Process.Wait.
@@ -110,27 +130,34 @@ type waitResult struct {
 
 // run is the main loop. It returns once the process has exited or the run
 // has been aborted, and joins every goroutine it started.
+//
+// With a Driver the loop also serves the driver's timers and the process
+// exit: it does not end when the output ends but once the driver is done and
+// the process has exited (see driver.go). Without one it is as it always was.
 func (s *session) run(ctx context.Context) (int, error) {
 	s.start = s.cfg.Clock() // set before the reader starts: it stamps chunks with it
 	if s.cfg.OnStart != nil {
 		s.cfg.OnStart(s.start)
 	}
 	chunks := make(chan chunk, chunkQueueLen)
+	s.in = chunks
 	stop := make(chan struct{})
-	var readErr error // written by the reader before it closes chunks
 	go func() {
 		defer close(chunks)
-		readErr = pump(s.proc, chunks, stop, s.elapsed)
+		s.readErr = pump(s.proc, chunks, stop, s.elapsed)
 	}()
 
-	var waited <-chan waitResult
 	defer func() {
 		close(stop)
 		_ = s.proc.Close() // unblocks a pending Read and Wait
 		for range chunks { // returns once the reader has exited
 		}
-		if waited != nil {
-			<-waited
+		if s.waited != nil {
+			<-s.waited
+		}
+		if s.drv != nil {
+			s.drv.deadline.cancel()
+			s.drv.grace.cancel()
 		}
 	}()
 
@@ -145,24 +172,45 @@ func (s *session) run(ctx context.Context) (int, error) {
 		return 0, err
 	}
 
+	// These stay nil (never ready) without a driver.
+	var again <-chan struct{}
+	if s.drv != nil {
+		again = s.drv.again
+		if err := s.driverPoll(); err != nil {
+			return 0, err
+		}
+	}
+
 loop:
 	for {
-		select {
-		case <-ctx.Done():
-			return 0, cancelError(ctx.Err())
-		case c, ok := <-chunks:
-			if !ok {
+		var deadline, grace <-chan time.Time
+		if s.drv != nil {
+			if s.drv.finished() {
 				break loop
 			}
-			if s.cfg.Events != nil {
-				if err := s.cfg.Events.Output(c.at, c.b); err != nil {
-					return 0, fmt.Errorf("session: events: %w", err)
+			deadline, grace = s.drv.deadline.armed(), s.drv.grace.armed()
+		}
+		select {
+		case <-ctx.Done():
+			return 0, s.cancelled(ctx.Err())
+		case c, ok := <-s.in:
+			if !ok {
+				if s.drv == nil {
+					break loop
+				}
+				if err := s.handleEOF(); err != nil {
+					return 0, err
+				}
+				continue
+			}
+			if err := s.handleChunk(c); err != nil {
+				return 0, err
+			}
+			if s.drv != nil {
+				if err := s.driverPoll(); err != nil {
+					return 0, err
 				}
 			}
-			if _, err := s.term.Write(c.b); err != nil {
-				return 0, fmt.Errorf("session: write terminal: %w", err)
-			}
-			s.dirty = true
 		case <-ticks:
 			if s.cfg.OnTick != nil {
 				if err := s.cfg.OnTick(s.cfg.Clock()); err != nil {
@@ -172,15 +220,30 @@ loop:
 			if err := s.sample(); err != nil {
 				return 0, err
 			}
+		case <-deadline:
+			s.drv.deadline.cancel()
+			if err := s.driverPoll(); err != nil {
+				return 0, err
+			}
+		case <-again:
+			if err := s.driverPoll(); err != nil {
+				return 0, err
+			}
+		case <-grace:
+			s.closeOnGrace()
+		case r := <-s.waited:
+			if err := s.handleExit(r); err != nil {
+				return 0, err
+			}
 		}
 	}
 
 	// The reader has finished and every chunk has been written to the terminal.
 	if ctx.Err() != nil {
-		return 0, cancelError(ctx.Err())
+		return 0, s.cancelled(ctx.Err())
 	}
-	if readErr != nil {
-		return 0, fmt.Errorf("session: read process output: %w", readErr)
+	if s.drv == nil && s.readErr != nil {
+		return 0, fmt.Errorf("session: read process output: %w", s.readErr)
 	}
 	snap, err = s.term.Snapshot()
 	if err != nil {
@@ -190,17 +253,21 @@ loop:
 		return 0, err
 	}
 
-	ch := make(chan waitResult, 1)
-	waited = ch
-	go func() {
-		code, err := s.proc.Wait()
-		ch <- waitResult{code, err}
-	}()
+	if s.drv != nil {
+		if s.cfg.Events != nil {
+			if err := s.cfg.Events.Exit(s.elapsed(), s.drv.exitCode); err != nil {
+				return 0, fmt.Errorf("session: events: %w", err)
+			}
+		}
+		return s.drv.exitCode, nil
+	}
+
+	s.startWait()
 	select {
 	case <-ctx.Done():
 		return 0, cancelError(ctx.Err())
-	case r := <-ch:
-		waited = nil
+	case r := <-s.waited:
+		s.waited = nil
 		if r.err != nil {
 			return 0, fmt.Errorf("session: wait for process: %w", r.err)
 		}
@@ -211,6 +278,34 @@ loop:
 		}
 		return r.code, nil
 	}
+}
+
+// handleChunk logs a chunk of output and writes it to the terminal.
+func (s *session) handleChunk(c chunk) error {
+	if s.cfg.Events != nil {
+		if err := s.cfg.Events.Output(c.at, c.b); err != nil {
+			return fmt.Errorf("session: events: %w", err)
+		}
+	}
+	if _, err := s.term.Write(c.b); err != nil {
+		return fmt.Errorf("session: write terminal: %w", err)
+	}
+	s.dirty = true
+	if s.drv != nil {
+		s.drv.textValid = false
+	}
+	return nil
+}
+
+// startWait waits for the process on a goroutine of its own (Wait does not
+// touch the terminal) and delivers the result on s.waited.
+func (s *session) startWait() {
+	ch := make(chan waitResult, 1)
+	s.waited = ch
+	go func() {
+		code, err := s.proc.Wait()
+		ch <- waitResult{code, err}
+	}()
 }
 
 // sample takes a snapshot and emits it if the screen changed since the last

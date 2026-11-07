@@ -167,3 +167,57 @@ func TestBinSinkConfigure(t *testing.T) {
 		t.Errorf("Clock() = %v, want the sink clock", got)
 	}
 }
+
+// Compile-time check that the adapter satisfies the session's event sink,
+// including the mark and span events a driver produces.
+var _ session.EventSink = (*binSink)(nil)
+
+func TestBinSinkWritesMarkAndSpan(t *testing.T) {
+	clk := &testClock{t: time.Unix(1000, 0)}
+	s, buf := newTestSink(t, 0, bin.WriterOptions{Uncompressed: true}, clk)
+
+	begin := event.Span{Op: event.SpanBegin, ID: 1, Type: event.SpanScene, Name: "build"}
+	end := event.Span{Op: event.SpanEnd, ID: 1}
+	if err := s.Output(10*time.Millisecond, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Span(20*time.Millisecond, begin); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Mark(30*time.Millisecond, "ready"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Span(40*time.Millisecond, end); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.close(); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := readRecording(t, buf.Bytes())
+	if !errors.Is(rec.err, io.EOF) || len(rec.events) != 4 {
+		t.Fatalf("read = %d events, %v", len(rec.events), rec.err)
+	}
+	if e := rec.events[1]; e.Kind != event.KindSpan || e.At != 20*time.Millisecond {
+		t.Errorf("event 1 = %+v, want span at 20ms", e)
+	} else if got, err := event.ParseSpan(e.Data); err != nil || got != begin {
+		t.Errorf("span = %+v, %v, want %+v", got, err, begin)
+	}
+	if e := rec.events[2]; e.Kind != event.KindMark || string(e.Data) != "ready" || e.At != 30*time.Millisecond {
+		t.Errorf("event 2 = %+v, want mark ready at 30ms", e)
+	}
+	if e := rec.events[3]; e.Kind != event.KindSpan {
+		t.Errorf("event 3 = %+v, want span end", e)
+	}
+}
+
+func TestBinSinkSpanRejectsOtherOperations(t *testing.T) {
+	clk := &testClock{t: time.Unix(1000, 0)}
+	s, _ := newTestSink(t, 0, bin.WriterOptions{Uncompressed: true}, clk)
+	if err := s.Span(0, "not a span"); err == nil {
+		t.Error("Span(string) = nil, want an error")
+	}
+	if err := s.Span(0, event.Span{Op: event.SpanEnd}); !errors.Is(err, event.ErrMalformedSpan) {
+		t.Errorf("Span(invalid) = %v, want ErrMalformedSpan", err)
+	}
+}
