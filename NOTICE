@@ -52,7 +52,7 @@ Linked into the binary; each module's licence text is in its source distribution
   go.mitchellh.com/libghostty (Go binding for libghostty)   MIT
   github.com/creack/pty                                      MIT
   github.com/HugoSmits86/nativewebp (lossless WebP encoder)  MIT
-  github.com/klauspost/compress                              BSD-3-Clause
+  github.com/klauspost/compress (zstd)                       BSD-3-Clause; its LICENSE also holds Apache-2.0 and MIT parts
   github.com/spf13/cobra                                     Apache-2.0
   github.com/spf13/pflag                                     BSD-3-Clause
   golang.org/x/image, golang.org/x/sys, golang.org/x/term, golang.org/x/text   BSD-3-Clause
