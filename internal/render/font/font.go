@@ -111,19 +111,46 @@ func Load(regular, bold, italic, boldItalic []byte, fallbacks ...FallbackFont) (
 		s.fonts[i] = f
 	}
 	for _, fb := range fallbacks {
-		coll, err := opentype.ParseCollection(fb.Data)
+		f, err := fb.parse()
 		if err != nil {
-			return nil, fmt.Errorf("font: parse fallback %q: %w", fb.Name, err)
-		}
-		f, err := coll.Font(0)
-		if err != nil {
-			return nil, fmt.Errorf("font: parse fallback %q: %w", fb.Name, err)
+			return nil, err
 		}
 		s.fallbacks = append(s.fallbacks, f)
 		s.fallbackNames = append(s.fallbackNames, fb.Name)
 	}
 	return s, nil
 }
+
+// parse parses the font, or the first font of a collection.
+func (fb FallbackFont) parse() (*opentype.Font, error) {
+	coll, err := opentype.ParseCollection(fb.Data)
+	if err != nil {
+		return nil, &FallbackError{fb.Name, err}
+	}
+	f, err := coll.Font(0)
+	if err != nil {
+		return nil, &FallbackError{fb.Name, err}
+	}
+	return f, nil
+}
+
+// Validate reports whether fb parses as a font, with a *FallbackError if not.
+func (fb FallbackFont) Validate() error {
+	_, err := fb.parse()
+	return err
+}
+
+// FallbackError reports a fallback font that could not be parsed.
+type FallbackError struct {
+	Name string // the FallbackFont's Name
+	Err  error
+}
+
+func (e *FallbackError) Error() string {
+	return fmt.Sprintf("font: parse fallback %q: %v", e.Name, e.Err)
+}
+
+func (e *FallbackError) Unwrap() error { return e.Err }
 
 // Emoji renders cluster, a grapheme cluster (a base rune with its zero-width
 // followers), as a side x side colour image from the colour emoji font. It
