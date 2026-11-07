@@ -65,6 +65,8 @@ type Renderer struct {
 	regular xfont.Face
 	faces   [4]xfont.Face // indexed by faceIndex(bold, italic)
 	cursor  CursorStyle
+
+	maskScratch image.Alpha // reused by contrastFace
 }
 
 // New validates o, applies defaults and resolves the cell metrics from f.

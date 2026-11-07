@@ -49,7 +49,7 @@ func (r *Renderer) fallback(img *image.RGBA, c cell) bool {
 	d := &xfont.Drawer{
 		Dst:  img.SubImage(cellRect).(*image.RGBA),
 		Src:  image.NewUniform(c.st.fg),
-		Face: face,
+		Face: r.contrastFace(face, c.st.fg, c.st.bg),
 		Dot:  dot,
 	}
 	d.DrawString(string(c.c))
@@ -143,7 +143,7 @@ func (r *Renderer) drawGlyph(img *image.RGBA, d *xfont.Drawer, c cell) {
 		r.fallback(img, c) // the primary face lacks c: try the fallback fonts
 		return
 	}
-	d.Face = face
+	d.Face = r.contrastFace(face, c.st.fg, c.st.bg)
 	d.Src = image.NewUniform(c.st.fg)
 	d.Dot = r.baselineDot(c.col, c.row)
 	if c.mark {
