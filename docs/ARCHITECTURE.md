@@ -1,5 +1,7 @@
 # shellshot — Architecture
 
+See the [README](../README.md) for build and usage instructions.
+
 POC: run a command in a PTY, feed its output into a **headless terminal
 (libghostty-vt)**, take screen **snapshots**, and store them as a **recording**
 that can be replayed.
