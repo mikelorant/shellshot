@@ -1,0 +1,37 @@
+process
+  size    80x24
+  shell   /bin/sh
+  env     "PS1=$ "
+  env     EXAMPLES_SPEED=normal
+  output  tour.shot
+  seed    1
+estimate
+  total   24.7s to 2m8s, 3 waits, 3 scenes
+  scene   #1 start: 2.5s to 12.5s
+  scene   #2 watch: 20.5s to 50.5s
+  scene   #3 quit: 1.5s to 1m1s
+ops
+   1  13:1    start            span-begin #1 scene "start"
+   2  14:3    start            type "./examples/showcase.sh --pause" typing=50ms
+   3  14:3    start            press enter after-gap typing=50ms
+   4  14:3    start            settle off
+   5  14:3    start            linger 500ms
+   6  15:3    start            wait "shellshot" timeout=10s
+   7  15:3    start            linger 500ms
+   8  16:1    start            span-end #1
+   9  18:1    watch            span-begin #2 scene "watch" speed=1x
+  10  20:3    watch            sleep 20s
+  11  21:3    watch            wait "That was shellshot" timeout=30s
+  12  21:3    watch            linger 500ms
+  13  22:1    watch            span-end #2
+  14  24:1    quit             span-begin #3 scene "quit" hold=2s
+  15  26:3    quit             press enter typing=50ms
+  16  26:3    quit             linger 500ms
+  17  27:3    quit             wait idle quiet=500ms timeout=1m0s
+  18  27:3    quit             linger 500ms
+  19  28:3    quit             mark "tour-done"
+  20  29:1    quit             span-end #3
+  21  -       hidden           span-begin #4 hidden
+  22  -       hidden           drain quiet=200ms timeout=2s (never fails)
+  23  -       hidden           exit grace=2s
+  24  -       hidden           span-end #4

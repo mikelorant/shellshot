@@ -1,0 +1,39 @@
+process
+  size    80x24
+  shell   /bin/sh
+  env     "PS1=$ "
+  env     EXAMPLES_SPEED=fast
+  env     NO_COLOR=
+  output  ci-smoke.shot
+  seed    42
+estimate
+  total   1.51s to 1m34.71s, 0 waits, 3 scenes
+  scene   #1 build: 430ms to 30.23s
+  scene   #2 colours: 410ms to 30.21s
+  scene   #3 refuse: 470ms to 30.27s
+ops
+   1  14:1    build            span-begin #1 scene "build"
+   2  15:3    build            type "sh examples/buildlog.sh" typing=10ms
+   3  15:3    build            press enter after-gap typing=10ms
+   4  15:3    build            settle quiet=200ms timeout=30s (fails at timeout)
+   5  16:3    build            wait "BUILD OK" assert
+   6  17:3    build            wait /BUILD OK in [0-9.]+s/ assert
+   7  18:3    build            mark "build-ok"
+   8  19:1    build            span-end #1
+   9  21:1    colours          span-begin #2 scene "colours"
+  10  22:3    colours          type "sh examples/colors.sh" typing=10ms
+  11  22:3    colours          press enter after-gap typing=10ms
+  12  22:3    colours          settle quiet=200ms timeout=30s (fails at timeout)
+  13  23:3    colours          wait "truecolour" assert
+  14  24:3    colours          wait "16 colours" assert
+  15  25:1    colours          span-end #2
+  16  27:1    refuse           span-begin #3 scene "refuse"
+  17  28:3    refuse           type "sh examples/colors.sh | cat" typing=10ms
+  18  28:3    refuse           press enter after-gap typing=10ms
+  19  28:3    refuse           settle quiet=200ms timeout=30s (fails at timeout)
+  20  29:3    refuse           wait "stdout is not a terminal" assert
+  21  30:1    refuse           span-end #3
+  22  -       hidden           span-begin #4 hidden
+  23  -       hidden           drain quiet=200ms timeout=2s (never fails)
+  24  -       hidden           exit grace=2s
+  25  -       hidden           span-end #4

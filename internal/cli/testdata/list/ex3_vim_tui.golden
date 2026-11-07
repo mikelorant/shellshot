@@ -1,0 +1,39 @@
+process
+  size    90x24
+  shell   /bin/sh
+  env     "PS1=$ "
+  cwd     /tmp
+  output  (default)
+  seed    1
+estimate
+  total   11.1s to 44.7s, 2 waits, 3 scenes
+  scene   #1 open: 1.2s to 21s
+  scene   #2 edit: 9.6s to 9.6s
+  scene   #3 save: 100ms to 10.1s
+ops
+   1  7:1     open             span-begin #1 scene "open"
+   2  8:3     open             type "vim --clean demo.txt" typing=50ms
+   3  8:3     open             press enter after-gap typing=50ms
+   4  8:3     open             settle quiet=200ms timeout=10s (fails at timeout)
+   5  9:3     open             wait /^~/ timeout=10s
+   6  10:1    open             span-end #1
+   7  12:1    edit             span-begin #2 scene "edit"
+   8  15:3    edit             press i typing=80ms
+   9  15:3    edit             linger 1s
+  10  16:3    edit             type "Hello from a scripted vim session.\nSecond line, typed by she"... (67 runes) typing=80ms
+  11  16:3    edit             linger 1s
+  12  20:3    edit             press esc typing=80ms
+  13  20:3    edit             linger 1s
+  14  21:3    edit             press left x5 typing=80ms
+  15  21:3    edit             linger 1s
+  16  22:1    edit             span-end #2
+  17  24:1    save             span-begin #3 scene "save"
+  18  25:3    save             type ":wq" typing=50ms
+  19  26:3    save             mark "saving"
+  20  27:3    save             press enter typing=50ms
+  21  28:3    save             wait /^\$$/ timeout=10s
+  22  29:1    save             span-end #3
+  23  -       hidden           span-begin #4 hidden
+  24  -       hidden           drain quiet=200ms timeout=2s (never fails)
+  25  -       hidden           exit grace=2s
+  26  -       hidden           span-end #4

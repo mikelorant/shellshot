@@ -3,6 +3,7 @@ module github.com/michaellorant/shellshot
 go 1.26.0
 
 require (
+	github.com/HugoSmits86/nativewebp v1.3.0
 	github.com/creack/pty v1.1.24
 	github.com/kettek/apng v0.0.0-20250827064933-2bb5f5fcf253
 	github.com/klauspost/compress v1.20.3

@@ -56,9 +56,10 @@ func (f svgFlags) options(cmd *cobra.Command, of format.Format) (svg.Options, er
 // svgWriteFunc returns the function that writes the SVG of the recording from
 // src to the output file: it reads the timeline steps and hands them to the
 // format's StepsWriter. It stores the number of steps it wrote in steps.
-func svgWriteFunc(cmd *cobra.Command, of format.Format, o svg.Options, flags exportFlags, r *raster.Renderer, fonts *font.Set,
+func svgWriteFunc(cmd *cobra.Command, of format.Format, settings format.Settings, flags exportFlags, r *raster.Renderer, fonts *font.Set,
 	src pipeline.Source, cols, rows int, tl timeline.Options, steps *int) func(*os.File) error {
 	return func(w *os.File) error {
+		o := settings.SVG
 		if o.Text == svg.TextText && (len(flags.fallbackFonts) > 0 || flags.systemFonts) {
 			fmt.Fprintln(cmd.ErrOrStderr(), "note: --fallback-font and --system-fonts only change svg output with --svg-text paths; text mode leaves glyphs to the viewer's fonts")
 		}
@@ -66,12 +67,12 @@ func svgWriteFunc(cmd *cobra.Command, of format.Format, o svg.Options, flags exp
 		if err != nil {
 			return err
 		}
-		o.Geometry = svg.NewGeometry(r, fonts)
+		settings.SVG.Geometry = svg.NewGeometry(r, fonts)
 		*steps = len(ts)
 		if o.Frame.Kind != svg.FrameNone {
 			*steps = 1
 		}
-		if err := of.NewSteps(format.Settings{Loops: flags.loops, SVG: o}).WriteSteps(w, cols, rows, ts); err != nil {
+		if err := of.NewSteps(settings).WriteSteps(w, cols, rows, ts); err != nil {
 			return fmt.Errorf("export: %w", err)
 		}
 		return nil

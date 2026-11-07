@@ -71,10 +71,10 @@ func TestExportRejectsUnknownFormat(t *testing.T) {
 		args []string
 		want []string
 	}{
-		{"unknown --format", "o.png", []string{"--format", "gif"}, []string{`unknown --format "gif"`, "supported: apng"}},
+		{"unknown --format", "o.png", []string{"--format", "tiff"}, []string{`unknown --format "tiff"`, "supported: apng"}},
 		{"empty-looking --format", "o.png", []string{"--format", " "}, []string{"unknown --format", "supported: apng"}},
-		{"unknown extension", "o.gif", nil, []string{`extension ".gif"`, "o.gif", "--format", "supported: apng"}},
-		{"unknown upper-case extension", "o.GIF", nil, []string{`extension ".GIF"`, "supported: apng"}},
+		{"unknown extension", "o.tiff", nil, []string{`extension ".tiff"`, "o.tiff", "--format", "supported: apng"}},
+		{"unknown upper-case extension", "o.TIFF", nil, []string{`extension ".TIFF"`, "supported: apng"}},
 	}
 	for _, tc := range cases {
 		out := filepath.Join(dir, tc.out)

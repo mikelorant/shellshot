@@ -1,6 +1,5 @@
-# Not runnable until `record --script` ships.
 # A deterministic smoke test: runs two demos and asserts what is on screen.
-# Planned use, from the repository root:
+# Run from the repository root:
 #   shellshot record --script examples/scripts/ci-smoke.script
 size 80x24
 shell /bin/sh

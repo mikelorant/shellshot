@@ -1,0 +1,17 @@
+process
+  size    60x10
+  shell   /bin/bash --noprofile --norc
+  env     "PS1=$ "
+  output  (default)
+  seed    1
+estimate
+  total   2.25s to 20.85s, 0 waits, 0 scenes
+ops
+   1  8:1     -                type "echo hello, world" typing=50ms
+   2  8:1     -                press enter after-gap typing=50ms
+   3  8:1     -                settle quiet=200ms timeout=15s (fails at timeout)
+   4  8:1     -                linger 1s
+   5  -       hidden           span-begin #1 hidden
+   6  -       hidden           drain quiet=200ms timeout=2s (never fails)
+   7  -       hidden           exit grace=2s
+   8  -       hidden           span-end #1

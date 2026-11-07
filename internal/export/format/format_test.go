@@ -11,8 +11,8 @@ import (
 
 func TestDefaultRegistersAPNGAndSVG(t *testing.T) {
 	r := Default()
-	if got := r.Names(); !slices.Equal(got, []string{"apng", "svg"}) {
-		t.Errorf("Names = %v, want [apng svg]", got)
+	if got := r.Names(); !slices.Equal(got, []string{"apng", "gif", "svg", "webp"}) {
+		t.Errorf("Names = %v, want [apng gif svg webp]", got)
 	}
 	if f, ok := r.ByExtension("shot.SVG"); !ok || f.Name != "svg" || f.New != nil || f.NewSteps == nil {
 		t.Errorf("ByExtension(shot.SVG) = %+v, %v; want the steps format svg", f, ok)
@@ -45,7 +45,7 @@ func TestLookupIgnoresCaseAndRejectsUnknown(t *testing.T) {
 	if _, ok := r.Lookup("APNG"); !ok {
 		t.Error("Lookup(APNG) not found")
 	}
-	for _, name := range []string{"", "gif", "png", "apng "} {
+	for _, name := range []string{"", "tiff", "png", "apng "} {
 		if _, ok := r.Lookup(name); ok {
 			t.Errorf("Lookup(%q) found a format", name)
 		}
@@ -59,7 +59,7 @@ func TestByExtension(t *testing.T) {
 			t.Errorf("ByExtension(%q) = %q, %v; want apng", path, f.Name, ok)
 		}
 	}
-	for _, path := range []string{"", "a", "a.gif", "a.png.bak", "png", "dir.png/a", "-"} {
+	for _, path := range []string{"", "a", "a.tiff", "a.png.bak", "png", "dir.png/a", "-"} {
 		if f, ok := r.ByExtension(path); ok {
 			t.Errorf("ByExtension(%q) = %q; want none", path, f.Name)
 		}
@@ -89,6 +89,38 @@ func TestAPNGFactoryBuildsAPNGSink(t *testing.T) {
 	}
 	var buf bytes.Buffer
 	if _, err := f.New(Settings{})(&buf, 0, 0); err == nil {
+		t.Error("a 0x0 canvas was accepted")
+	}
+}
+
+func TestGIFFormatIsRegistered(t *testing.T) {
+	r := Default()
+	for _, path := range []string{"a.gif", "dir/A.GIF"} {
+		if f, ok := r.ByExtension(path); !ok || f.Name != "gif" {
+			t.Errorf("ByExtension(%q) = %q, %v; want gif", path, f.Name, ok)
+		}
+	}
+	f, ok := r.Lookup("GIF")
+	if !ok || f.Extensions[0] != ".gif" {
+		t.Fatalf("Lookup(GIF) = %+v, %v", f, ok)
+	}
+}
+
+func TestGIFFactoryPassesSettingsToTheSink(t *testing.T) {
+	f, _ := Default().Lookup("gif")
+	for _, s := range []Settings{{}, {Loops: 3, GIFColors: 16, GIFDither: true}} {
+		sink, err := f.New(s)(io.Discard, 4, 4)
+		if err != nil {
+			t.Fatalf("%+v: %v", s, err)
+		}
+		if _, ok := sink.(pipeline.DelayLimiter); !ok {
+			t.Errorf("%+v: the GIF sink has no MaxDelay", s)
+		}
+	}
+	if _, err := f.New(Settings{GIFColors: 1})(io.Discard, 4, 4); err == nil {
+		t.Error("GIFColors 1 was accepted")
+	}
+	if _, err := f.New(Settings{})(io.Discard, 0, 0); err == nil {
 		t.Error("a 0x0 canvas was accepted")
 	}
 }

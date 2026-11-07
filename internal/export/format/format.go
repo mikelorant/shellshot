@@ -15,6 +15,7 @@ import (
 	"github.com/michaellorant/shellshot/internal/export/pipeline"
 	"github.com/michaellorant/shellshot/internal/export/svg"
 	"github.com/michaellorant/shellshot/internal/export/timeline"
+	"github.com/michaellorant/shellshot/internal/export/webp"
 )
 
 // Settings holds the export knobs the formats share. A format ignores the
@@ -27,6 +28,12 @@ type Settings struct {
 	// SVG holds the SVG writer's options; Loops is taken from the field
 	// above.
 	SVG svg.Options
+	// GIFColors is the largest number of picture colours of a GIF palette,
+	// 2 to 255; 0 means 255.
+	GIFColors int
+	// GIFDither makes a GIF diffuse colour error when the palette is
+	// quantised.
+	GIFDither bool
 }
 
 // StepsWriter writes an export from the timeline steps themselves, for a
@@ -71,7 +78,9 @@ func Default() *Registry {
 				return pipeline.APNGSinkFactory(s.Loops, s.Compression)
 			},
 		},
+		gifFormat(),
 		Format{Name: "svg", Extensions: []string{".svg"}, NewSteps: newSVG},
+		Format{Name: "webp", Extensions: []string{".webp"}, New: func(s Settings) pipeline.SinkFactory { return webp.SinkFactory(s.Loops) }},
 	)
 }
 

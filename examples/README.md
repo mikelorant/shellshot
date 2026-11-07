@@ -34,7 +34,9 @@ a terminal), `--pause` (wait for Enter at the end), `--help`.
 | `showcase.sh` | nine short scenes from the others | 34 s |
 
 `lib.sh` holds the shared helpers (sourced, not run). `scripts/*.script` are
-automation samples for `record --script`; they cannot run until that ships.
+automation samples for `shellshot record --script FILE`, run from the repository
+root; `make test-scripts` runs them all (about a minute).
+
 ## What the exporter draws today
 
 Checked by exporting the demos and looking at the frames. "Recorded" means the

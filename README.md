@@ -1,6 +1,6 @@
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="shellshot" src="docs/assets/logo.svg" width="360"></picture></p>
 
-Record terminal sessions. Replay them. Export them as animated PNGs.
+Record terminal sessions. Replay them. Export them as animated PNGs, GIFs or WebPs.
 
 # shellshot
 
@@ -9,7 +9,7 @@ Record terminal sessions. Replay them. Export them as animated PNGs.
 `shellshot` records a terminal session, either your shell or a single command,
 through a headless terminal emulator ([libghostty](https://github.com/ghostty-org/ghostty)).
 It stores the session as a compact event log (a `.shot` file), replays it in your
-terminal, and exports it as an animated PNG.
+terminal, and exports it as an animated PNG, GIF or WebP.
 
 ## Install
 
@@ -89,9 +89,42 @@ Every command has `--help`. Output formats (`--format`), themes, fonts, cell siz
 
 ## Script
 
-Today a recording is scripted through the command line.
+A `.script` file types into a shell and waits for output for you, so a recording does not depend on
+your typing. Save this as `demo.script`:
 
-Run a command, or pipe input to a shell, and get a recording with a fixed size:
+```
+shell /bin/sh
+env PS1="$ "
+size 50x8
+output demo.shot
+
+scene greet {
+  linger 500ms
+  run echo hello, world
+  wait /^hello, world$/ 0s    # anchored: the typed command is on screen too
+}
+```
+
+```console
+$ shellshot record --script demo.script
+recorded 28 events (0.5 KB) to demo.shot
+$ shellshot info demo.shot | grep -A1 ^scenes
+scenes        1
+  1 greet  0:00.2 +2.1s
+```
+
+`--list` checks the script and prints the plan and its estimated duration without running it
+(exit 2 and `file:line:col: message` if it is invalid). `-o`, `--cols` and `--rows` beat the script's
+`output` and `size`. `--watch` shows the terminal while it runs. A failed `wait` or a `run` that never
+goes quiet exits 3 and keeps the partial recording; otherwise `record` exits with the shell's status,
+as without `--script`. Scenes and hidden blocks are stored in the file and used by
+`export`. The format and the exit codes are in [docs/scripting.md](docs/scripting.md);
+[examples/scripts/](examples/scripts/) has runnable samples (`make test-scripts`).
+
+Not built yet: `fresh`, `cleanup`, `caption`, `require` and `export --scene`.
+
+Without a script, a recording is made from the command line. Run a command, or pipe input to a
+shell, and get a recording with a fixed size:
 
 ```sh
 shellshot record -o ci.shot --cols 100 --rows 30 -c 'make test'
@@ -109,10 +142,6 @@ to always exit 0.
 ```sh
 for f in recordings/*.shot; do shellshot export "$f" --scale 2; done
 ```
-
-`.script` files, which would describe scenes, typed text, waits and key presses, are designed
-but not built: there is no `record --script`. The format is specified in
-[docs/scripting.md](docs/scripting.md).
 
 ## Limits
 

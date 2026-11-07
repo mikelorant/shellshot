@@ -1,25 +1,109 @@
 # Export reference
 
-`shellshot export FILE [-o OUT.png] [flags]` renders a recording as an animated PNG
-(APNG). The result is a standard PNG that carries animation data. Browsers, GitHub, Slack
-and Discord animate it; at the time of writing, macOS Preview and Quick Look show only the
-first frame. Run `shellshot export --help` for the flag list.
+`shellshot export FILE [-o OUT] [flags]` renders a recording as an animated PNG (APNG, the
+default), an animated GIF or an animated WebP. An APNG is a standard PNG that carries animation data. Browsers,
+GitHub, Slack and Discord animate it; at the time of writing, macOS Preview and Quick Look show
+only the first frame. Run `shellshot export --help` for the flag list.
 
 ## Output format
 
 `--format NAME` chooses the output format. Without it, the format comes from the extension of
 `-o` (case-insensitive), and is `apng` when there is no `-o` or `-o` has no extension. An
 extension that no format owns, or an unknown `--format` name, fails with the list of supported
-formats (`supported: apng`); `--format` then lets you write any file name.
+formats (`supported: apng, gif, webp`); `--format` then lets you write any file name.
 
 | Format | `--format` | Extensions | Notes |
 | --- | --- | --- | --- |
-| Animated PNG | `apng` | `.png`, `.apng` | The default. Plays in browsers, GitHub, Slack and Discord. |
+| Animated PNG | `apng` | `.png`, `.apng` | The default. Full colour. Plays in browsers, GitHub, Slack and Discord. |
+| Animated GIF | `gif` | `.gif` | At most 255 colours plus transparency. Plays everywhere. See [GIF](#gif). |
+| Animated WebP | `webp` | `.webp` | Lossless, smaller than APNG. Plays in current browsers; see [WebP](#webp) for sharing sites. |
+
+## GIF
+
+`--format gif` (or an `-o` ending in `.gif`) writes an animated GIF that plays in every browser,
+chat tool and image viewer.
+
+- **256 colours.** A GIF has one palette of 256 entries, one of them transparent, so a frame has
+  at most 255 colours. Export counts the colours of the whole animation. If they fit, the GIF is
+  exact. If not, which is usual because anti-aliased text has hundreds of blends (a 7-colour text
+  session had about 1,000 colours), export builds one palette for all frames by a
+  popularity-weighted median cut. Plain text stays visually unchanged (the measured error was
+  about 0.01 of 255 levels on average), because the rare colours it merges are few pixels.
+- **Emoji banding.** Colour emoji have smooth gradients, so a GIF with emoji bands slightly
+  (stepped colours in the gradients of a face). `--gif-dither` hides the steps with a
+  Floyd-Steinberg dither, at the price of visible grain, a 6 to 25 % larger file and
+  several times the encode time (still under a second for the recordings measured). Plain text shows no benefit, so it is off by default. `--gif-colors N` (2 to 255, default
+  255) lowers the palette size for smaller files and coarser colour.
+- **Size.** Only the rectangle that changed is stored for each frame, and identical frames
+  merge. On the recordings measured, the GIF was about 2 to 2.5 times smaller than the APNG of the same
+  recording because it has 8 bits per pixel. Smooth gradients are where a GIF loses the most
+  quality.
+- **Timing.** A GIF delay is a whole number of centiseconds, so every frame lasts at least 2 cs
+  (20 ms), because browsers show shorter frames as 100 ms. Rounding errors carry to the next
+  frame, so the total length stays within 1 cs. Holds longer than 655.35 s are split.
+- **Looping.** `--loops 0` (default) loops forever, `--loops N` plays the animation N times.
+- `--gif-colors` and `--gif-dither` are ignored for other formats, and `--gif-dither` does
+  nothing when the palette is exact.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--gif-colors N` | 255 | Largest number of picture colours, 2 to 255 |
+| `--gif-dither` | off | Dither when the animation has more colours than the palette |
+
+## WebP
+
+`--format webp` (or `-o out.webp`) writes an animated lossless WebP. The pixels are exactly the
+ones the APNG has: there is no lossy mode and no quality flag, because lossy WebP smears the
+coloured one-pixel strokes of terminal text.
+
+- Each frame after the first stores only the rectangle that changed since the previous frame,
+  with "do not blend" and no disposal, so every frame recomposes exactly. WebP stores a frame's
+  offset in units of two pixels, so a rectangle starts at the even coordinates up and left of the
+  first changed pixel and may be one pixel larger than the APNG's.
+- A frame is never shorter than 10 ms; shorter delays are raised to it (`--min-delay` defaults to
+  20ms, so this only matters when you lower it). Whether a given player clamps short delays
+  itself was not verified. One frame can last up to 16777215 ms (about 4.6 hours); longer holds
+  are split.
+- `--loops` is stored in 16 bits, so the WebP maximum is 65535 (the APNG has no such limit).
+- The canvas is at most 16384 pixels in each direction (a limit of the lossless bitstream).
+- Exports are opaque, so the file does not set the WebP alpha flag.
+- Encoding is pure Go (the lossless encoder of `github.com/HugoSmits86/nativewebp`, MIT). It adds
+  about 0.3 MB to the binary and is slower and uses more memory than the APNG encoder: the
+  whole file is held in memory until the export ends.
+
+Measured on the 60x12 line-counting recording and the 80x30 emoji recording
+(`examples/emoji.sh`), same machine, same flags:
+
+| Recording | `--scale` | APNG | WebP |
+|---|---|---|---|
+| lines, 41 frames | 1 | 260,389 B | 192,572 B |
+| lines, 41 frames | 2 | 537,828 B | 354,858 B |
+| emoji, 14 frames | 1 | 87,757 B | 71,170 B |
+| emoji, 14 frames | 2 | 241,793 B | 186,100 B |
+
+The WebP files are 19 to 34 percent smaller. Export time was 0.2 to 0.6 s (APNG 0.1 to 0.5 s);
+peak memory was up to 188 MB for the emoji recording at `--scale 2` (APNG 124 MB).
+
+Where the result plays:
+
+| Where | Animated WebP |
+|---|---|
+| Chrome, Firefox, Safari (current) | Yes (background knowledge, not re-checked) |
+| VS Code Markdown preview | Probably (it is Chromium; unverified) |
+| Discord | Yes, since the mobile app release of November 2024 (from Discord's blog; unverified here) |
+| GitHub README `<img>` | Unverified |
+| GitHub issue and PR upload | Unverified. Community discussion 171343 says WebP uploads work, but the GitHub documentation does not list WebP |
+| Slack | Unverified; likely a still image |
+| macOS Preview and Quick Look | Unverified; Quick Look may play it, Preview probably not |
+
+Use `apng` or `gif` for places you have not tested. The files were checked
+with libwebp's `webpinfo` and `webpmux` and decoded with `ffmpeg`, which gives frames identical to
+the APNG's.
 
 ## Output file
 
 - Without `-o`, the output is `FILE` with its extension replaced by the first extension of the
-  format (`.png` for `apng`).
+  format (`.png` for `apng`, `.gif` for `gif`, `.webp` for `webp`).
 - `-o` is used as typed, whatever its extension, and the extension picks the format unless
   `--format` is given. `-o -` writes a file named `-`; export does not write to stdout.
 - Export refuses to overwrite the input recording and replaces any other existing file.
