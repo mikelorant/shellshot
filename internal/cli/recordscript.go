@@ -121,7 +121,8 @@ type scriptFlags struct {
 }
 
 // scriptSettings is what a script run uses: the script's own settings, as
-// overridden by explicit flags, over the defaults.
+// overridden by explicit flags, over the defaults. An empty Output means a new
+// timestamped file (see createRecording).
 type scriptSettings struct {
 	Argv       []string
 	Env        []string // the complete environment of the child
@@ -135,12 +136,11 @@ type scriptSettings struct {
 // termRows are the default size.
 func resolveScriptSettings(p run.Process, f scriptFlags, environ []string, termCols, termRows int) scriptSettings {
 	set := scriptSettings{
-		Argv:   p.Shell,
-		Env:    mergeEnv(environ, p.Env),
-		Dir:    p.Cwd,
-		Cols:   termCols,
-		Rows:   termRows,
-		Output: defaultRecordingFile,
+		Argv: p.Shell,
+		Env:  mergeEnv(environ, p.Env),
+		Dir:  p.Cwd,
+		Cols: termCols,
+		Rows: termRows,
 	}
 	if len(set.Argv) == 0 {
 		shell := lookupEnv(environ, "SHELL")
@@ -262,10 +262,11 @@ func runScript(cmd *cobra.Command, so scriptOptions, ro recordOptions, wopts bin
 	tracked := &trackedProcess{Process: proc}
 	defer func() { _ = tracked.Close() }()
 
-	f, err := os.Create(set.Output)
+	f, path, _, err := createRecording(ro, set.Output)
 	if err != nil {
 		return fmt.Errorf("create recording: %w", err)
 	}
+	set.Output = path
 	wopts.Meta = map[string]string{"script": filepath.Base(so.File)}
 	w, err := bin.NewWriter(f, buildHead(headInputs{
 		Cols:        set.Cols,

@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -10,8 +12,9 @@ import (
 	"github.com/mikelorant/shellshot/internal/recording/bin"
 )
 
-// defaultRecordingFile is the output file of "shellshot record" without -o.
-const defaultRecordingFile = "recording.shot"
+// defaultRecordingPattern is how the usage text describes the recording file
+// of "shellshot record" without -o.
+const defaultRecordingPattern = "shellshot-YYYYMMDD-HHMMSS.shot"
 
 // inputNotice is printed to stderr when --record-input is set.
 const inputNotice = "shellshot: recording keyboard input"
@@ -19,19 +22,55 @@ const inputNotice = "shellshot: recording keyboard input"
 // recordOptions holds the flags of "shellshot record" other than the shared
 // capture flags.
 type recordOptions struct {
+	// Output is the -o file; empty means a new timestamped file.
 	Output      string
 	IgnoreExit  bool
 	RecordInput bool
 	Coalesce    time.Duration
 	Codec       string
+
+	// now is the clock that names a default recording; outDir is where it is
+	// created. Tests set them; the command uses time.Now and ".".
+	now    func() time.Time
+	outDir string
+}
+
+// createRecording creates the recording file and returns it with its path.
+// An explicit path is created or truncated. With none, a new file
+// shellshot-YYYYMMDD-HHMMSS.shot is created in ro.outDir from the local time
+// now; if that name exists, -2, -3, ... is added before the extension, so a
+// default recording never replaces another file. generated reports the second
+// case.
+func createRecording(ro recordOptions, explicit string) (f *os.File, path string, generated bool, err error) {
+	if explicit != "" {
+		f, err = os.Create(explicit)
+		return f, explicit, false, err
+	}
+	stamp := ro.now().Format("20060102-150405")
+	for n := 1; ; n++ {
+		name := "shellshot-" + stamp + ".shot"
+		if n > 1 {
+			name = fmt.Sprintf("shellshot-%s-%d.shot", stamp, n)
+		}
+		path = filepath.Join(ro.outDir, name)
+		f, err = os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		if !errors.Is(err, os.ErrExist) {
+			return f, path, true, err
+		}
+	}
 }
 
 // newRecordCmd builds "shellshot record", an interactive recorder: it runs a
 // shell or command on a live passthrough terminal and saves the terminal
 // output, with its timing, to a binary recording file.
 func newRecordCmd() *cobra.Command {
+	return newRecordCmdWith(recordOptions{now: time.Now, outDir: "."})
+}
+
+// newRecordCmdWith is newRecordCmd with the clock and directory of ro, whose
+// other fields are set from the flags.
+func newRecordCmdWith(ro recordOptions) *cobra.Command {
 	var opts captureOptions
-	var ro recordOptions
 	var commandString string
 	var so scriptOptions
 	cmd := &cobra.Command{
@@ -60,7 +99,7 @@ func newRecordCmd() *cobra.Command {
 		},
 	}
 	addCaptureFlags(cmd, &opts, 0, 0)
-	cmd.Flags().StringVarP(&ro.Output, "output", "o", defaultRecordingFile, "recording file to write")
+	cmd.Flags().StringVarP(&ro.Output, "output", "o", "", "recording file (default "+defaultRecordingPattern+")")
 	addIgnoreExitStatusFlag(cmd, &ro.IgnoreExit)
 	cmd.Flags().StringVarP(&commandString, "command", "c", "", "shell command string to run with $SHELL -c")
 	cmd.Flags().BoolVar(&ro.RecordInput, "record-input", false, "also record the keystrokes sent to the command")
@@ -71,7 +110,8 @@ func newRecordCmd() *cobra.Command {
 }
 
 // runRecord captures opts.Command, shown live on cmd's stdout and fed from its
-// stdin, into the file ro.Output. A non-zero exit code of the command is
+// stdin, into the file ro.Output, or a new timestamped file when that is empty
+// (see createRecording). A non-zero exit code of the command is
 // reported on stderr after the recording is written and returned as an
 // ExitError, unless ro.IgnoreExit is set.
 //
@@ -92,7 +132,7 @@ func runRecord(cmd *cobra.Command, opts captureOptions, ro recordOptions) error 
 		fmt.Fprintln(errOut, inputNotice)
 	}
 
-	f, err := os.Create(ro.Output)
+	f, path, generated, err := createRecording(ro, ro.Output)
 	if err != nil {
 		return fmt.Errorf("create recording: %w", err)
 	}
@@ -107,7 +147,10 @@ func runRecord(cmd *cobra.Command, opts captureOptions, ro recordOptions) error 
 	}), wopts)
 	if err != nil {
 		_ = f.Close()
-		return fmt.Errorf("write recording %s: %w", ro.Output, err)
+		if generated {
+			_ = os.Remove(path)
+		}
+		return fmt.Errorf("write recording %s: %w", path, err)
 	}
 	sink := newBinSink(w, time.Now)
 	opts.Events, opts.RecordInput = sink, ro.RecordInput
@@ -118,12 +161,15 @@ func runRecord(cmd *cobra.Command, opts captureOptions, ro recordOptions) error 
 		closeErr = cerr
 	}
 	if runErr != nil {
+		if generated && sink.stats().Events == 0 {
+			_ = os.Remove(path)
+		}
 		return runErr
 	}
 	if closeErr != nil {
-		return fmt.Errorf("write recording %s: %w", ro.Output, closeErr)
+		return fmt.Errorf("write recording %s: %w", path, closeErr)
 	}
 	st := sink.stats()
-	fmt.Fprintf(errOut, "recorded %d events (%.1f KB) to %s\n", st.Events, float64(st.BytesWritten)/1024, ro.Output)
+	fmt.Fprintf(errOut, "recorded %d events (%.1f KB) to %s\n", st.Events, float64(st.BytesWritten)/1024, path)
 	return reportExit(errOut, code, ro.IgnoreExit)
 }

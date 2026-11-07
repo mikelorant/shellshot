@@ -24,7 +24,7 @@ func TestRecordFlagDefaults(t *testing.T) {
 	t.Parallel()
 	cmd := newRecordCmd()
 	for name, want := range map[string]string{
-		"output":       "recording.shot",
+		"output":       "",
 		"command":      "",
 		"cols":         "0",
 		"rows":         "0",

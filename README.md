@@ -45,7 +45,8 @@ recorded 2 events (0.3 KB) to demo.shot
 $ shellshot record -o demo.shot --cols 100 --rows 30 -- ls -l
 ```
 
-`record` runs `$SHELL` when you give it no command. The terminal size is fixed for the whole
+`record` runs `$SHELL` when you give it no command. Without `-o` the recording is named by the
+time it started, `shellshot-20261108-093045.shot`, and never replaces an existing file. The terminal size is fixed for the whole
 recording: it defaults to your current one (80x24 when stdin is not a terminal), and `--cols` and
 `--rows` set it. Keystrokes are not stored unless you pass `--record-input`. If the command exits
 non-zero, the recording is still written and `record` exits with the command's status, so a failing
