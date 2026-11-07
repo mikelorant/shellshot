@@ -110,7 +110,7 @@ func TestReplayCropsToTerminal(t *testing.T) {
 	cmd.SetContext(t.Context())
 	cmd.SetOut(&out)
 	cmd.SetErr(&errBuf)
-	if err := runReplay(cmd, path, 60, replay.Options{Speed: 1000, Clear: true, Cols: 4, Rows: 1}); err != nil {
+	if err := runReplay(cmd, path, 60, replay.Options{Speed: 1000, Clear: true, Cols: 4, Rows: 1}, true); err != nil {
 		t.Fatalf("runReplay() error = %v", err)
 	}
 	if want := "shellshot: replay: recording is 10x2 but the terminal is 4x1: cropping (use --no-crop to disable)\n"; errBuf.String() != want {
@@ -120,7 +120,7 @@ func TestReplayCropsToTerminal(t *testing.T) {
 		t.Errorf("stdout = %q, want the last row cropped to 4 columns", out.String())
 	}
 
-	code, _, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear", "--no-crop")
+	code, _, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear", "--no-crop", "-q")
 	if code != 0 || stderr != "" {
 		t.Errorf("--no-crop: exit code = %d, stderr = %q", code, stderr)
 	}
@@ -202,7 +202,7 @@ func TestReplayIdleLimitCapsPauses(t *testing.T) {
 		cmd.SetContext(t.Context())
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
-		if err := runReplay(cmd, path, 60, opts); err != nil {
+		if err := runReplay(cmd, path, 60, opts, true); err != nil {
 			t.Fatalf("runReplay() error = %v", err)
 		}
 		return got

@@ -89,6 +89,19 @@ func (s *prefixSource) warnIncomplete(w io.Writer) {
 	}
 }
 
+// incompleteReason says why the source ended early, for the replay summary:
+// "truncated (N bytes valid)" for a torn tail, "incomplete (no exit event)"
+// for a clean end without an EXIT event, and "" otherwise.
+func (s *prefixSource) incompleteReason() string {
+	switch {
+	case s.truncated:
+		return fmt.Sprintf("truncated (%d bytes valid)", s.r.ValidBytes())
+	case s.ended && !s.sawExit:
+		return "incomplete (no exit event)"
+	}
+	return ""
+}
+
 // scanSpans reads the recording at path to its end and returns its scenes and
 // hidden spans. A torn tail is not an error (the valid prefix is scanned), and
 // neither is damage further in: the spans found so far are returned and the
