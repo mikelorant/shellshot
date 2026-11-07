@@ -13,7 +13,7 @@ import (
 
 // lowerSrc parses and lowers src; a parse diagnostic or lowering error fails
 // the test.
-func lowerSrc(t *testing.T, src string) *Plan {
+func lowerSrc(t testing.TB, src string) *Plan {
 	t.Helper()
 	s, diags := script.ParseString("t.script", src)
 	if len(diags) > 0 {
