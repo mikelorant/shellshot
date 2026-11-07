@@ -1,5 +1,5 @@
 structure.script:2:1: scene "a" has no steps (a block must contain at least one step)
-structure.script:5:1: duplicate scene name "a" (first used on line 2)
+structure.script:5:1: duplicate name "a" (already used by scene on line 2)
 structure.script:7:3: "scene" cannot be nested inside scene "a" (blocks nest one level at most: only hidden may sit inside a scene)
 structure.script:11:5: "hidden" cannot be nested inside hidden (blocks nest one level at most: only hidden may sit inside a scene)
 structure.script:17:1: bad scene name "-bad" (a scene name is letters, digits, _ and -, written bare)

@@ -196,7 +196,22 @@ func TestValidateStructure(t *testing.T) {
 		{"settings only", "scene a {\n  typing 1ms\n}\n", []string{`1:1: scene "a" has no steps (a block must contain at least one step)`}},
 		{"empty hidden in scene", "scene a {\n  run x\n  hidden {\n  }\n}\n", []string{`3:3: hidden block has no steps (a block must contain at least one step)`}},
 		{"unique scene names", "scene a {\n  run x\n}\nscene b {\n  run x\n}\nscene a {\n  run x\n}\n", []string{
-			`7:1: duplicate scene name "a" (first used on line 1)`}},
+			`7:1: duplicate name "a" (already used by scene on line 1)`}},
+		{"hidden with a name", "hidden setup {\n  run x\n}\n", nil},
+		{"hidden name in a scene", "scene a {\n  hidden setup {\n    run x\n  }\n  run y\n}\n", nil},
+		{"unnamed hidden blocks repeat", "hidden {\n  run x\n}\nhidden {\n  run x\n}\n", nil},
+		{"hidden clashes with a scene", "scene a {\n  run x\n}\nhidden a {\n  run x\n}\n", []string{
+			`4:1: duplicate name "a" (already used by scene on line 1)`}},
+		{"scene clashes with a hidden", "hidden a {\n  run x\n}\nscene a {\n  run x\n}\n", []string{
+			`4:1: duplicate name "a" (already used by hidden on line 1)`}},
+		{"hidden inside a scene clashes with the scene", "scene a {\n  hidden a {\n    run x\n  }\n  run y\n}\n", []string{
+			`2:3: duplicate name "a" (already used by scene on line 1)`}},
+		{"hidden clashes with a hidden", "hidden a {\n  run x\n}\nscene s {\n  hidden a {\n    run x\n  }\n  run y\n}\n", []string{
+			`5:3: duplicate name "a" (already used by hidden on line 1)`}},
+		{"bad hidden name", "hidden -a {\n  run x\n}\n", []string{`1:1: bad hidden name "-a" (a hidden name is letters, digits, _ and -, written bare)`}},
+		{"empty named hidden", "hidden setup {\n}\n", []string{`1:1: hidden "setup" has no steps (a block must contain at least one step)`}},
+		{"nesting names the hidden block", "hidden setup {\n  scene s {\n    run y\n  }\n}\n", []string{
+			`2:3: "scene" cannot be nested inside hidden "setup" (blocks nest one level at most: only hidden may sit inside a scene)`}},
 		{"scene names", "scene a_b-c9 {\n  run x\n}\nscene 9x {\n  run x\n}\nscene A {\n  run x\n}\n", nil},
 		{"scene name starting with dash", "scene -a {\n  run x\n}\n", []string{`1:1: bad scene name "-a" (a scene name is letters, digits, _ and -, written bare)`}},
 		{"scene name starting with underscore", "scene _a {\n  run x\n}\n", []string{`1:1: bad scene name "_a" (a scene name is letters, digits, _ and -, written bare)`}},
@@ -224,8 +239,7 @@ func TestValidateHandBuilt(t *testing.T) {
 		{"unknown step", &Script{Items: []Item{Step{Pos: Pos{3, 1, 0}, Kind: "rn", Text: "x"}}}, []string{
 			`3:1: unknown command "rn" (did you mean "run"?)`}},
 		{"pointer items", &Script{Items: []Item{&step, &Block{Pos: Pos{5, 1, 0}, Kind: BlockHidden, Items: []Item{&step}}, (*Step)(nil), (*Block)(nil)}}, nil},
-		{"hidden with a name", &Script{Items: []Item{Block{Pos: Pos{2, 1, 0}, Kind: BlockHidden, Name: "x", Items: []Item{step}}}}, []string{
-			`2:1: hidden takes no name (write hidden {)`}},
+		{"hidden with a name", &Script{Items: []Item{Block{Pos: Pos{2, 1, 0}, Kind: BlockHidden, Name: "x", Items: []Item{step}}}}, nil},
 		{"scene without a name", &Script{Items: []Item{Block{Pos: Pos{2, 1, 0}, Kind: BlockScene, Items: []Item{step}}}}, []string{
 			`2:1: scene needs a name (write scene NAME {)`}},
 		{"setting after a step with At past the end", &Script{

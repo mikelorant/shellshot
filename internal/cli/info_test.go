@@ -312,23 +312,23 @@ func TestInfoErrors(t *testing.T) {
 	}
 }
 
-// spanFixture has two scenes, a hidden span inside the first and one at top
+// spanFixture has two scenes, a named hidden span inside the first and an unnamed one at top
 // level, and a third scene that is never closed.
 func spanFixture(t *testing.T, exit bool) []byte {
 	return buildRecording(t, infoFixtureHead(), bin.WriterOptions{Uncompressed: true}, func(w *bin.Writer, _ *bytes.Buffer) {
 		scene := func(at time.Duration, id uint64, name string, h event.SpanHints) {
 			must(t, w.Span(at, event.Span{Op: event.SpanBegin, ID: id, Type: event.SpanScene, Name: name, Hints: h}))
 		}
-		hidden := func(at time.Duration, id, parent uint64) {
-			must(t, w.Span(at, event.Span{Op: event.SpanBegin, ID: id, Type: event.SpanHidden, Parent: parent}))
+		hidden := func(at time.Duration, id, parent uint64, name string) {
+			must(t, w.Span(at, event.Span{Op: event.SpanBegin, ID: id, Type: event.SpanHidden, Parent: parent, Name: name}))
 		}
 		end := func(at time.Duration, id uint64) { must(t, w.Span(at, event.Span{Op: event.SpanEnd, ID: id})) }
 
-		hidden(0, 1, 0)
+		hidden(0, 1, 0, "")
 		must(t, w.Output(500*time.Millisecond, []byte("setup")))
 		end(time.Second, 1)
 		scene(2300*time.Millisecond, 2, "install", event.SpanHints{Speed: 8000, Idle: 2 * time.Second, Hold: time.Second})
-		hidden(5*time.Second, 3, 2)
+		hidden(5*time.Second, 3, 2, "setup")
 		end(7*time.Second, 3)
 		end(17900*time.Millisecond, 2)
 		scene(65*time.Second, 4, "outro", event.SpanHints{Speed: 1500})
@@ -367,10 +367,11 @@ scenes        2
   2 install  0:02.3 +15.6s  speed 8x idle 2s hold 1s
   4 outro  1:05.0 +5.0s  speed 1.5x  (open)
 hidden        2 spans, 3.0s
+  3 setup  0:05.0 +2.0s
 out bytes     8
-payload bytes 75
-file bytes    228
-file/payload  3.04
+payload bytes 80
+file bytes    233
+file/payload  2.91
 status        interrupted
 `
 	if stdout != want {

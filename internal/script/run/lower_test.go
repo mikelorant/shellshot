@@ -346,12 +346,12 @@ func TestSleepAndMark(t *testing.T) {
 }
 
 func TestSpanIDsAndNesting(t *testing.T) {
-	src := `hidden {
+	src := `hidden setup {
   run a
 }
 scene one {
   type b
-  hidden {
+  hidden warm-up {
     type c
   }
   type d
@@ -384,9 +384,9 @@ hidden {
 		}
 	}
 	want := []span{
-		{1, 0, event.SpanHidden, ""},
+		{1, 0, event.SpanHidden, "setup"},
 		{2, 0, event.SpanScene, "one"},
-		{3, 2, event.SpanHidden, ""},
+		{3, 2, event.SpanHidden, "warm-up"},
 		{4, 0, event.SpanScene, "two"},
 		{5, 0, event.SpanHidden, ""},
 		{6, 0, event.SpanHidden, ""}, // the implicit exit span

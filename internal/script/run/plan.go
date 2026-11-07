@@ -164,7 +164,7 @@ type OpSpanBegin struct {
 	Meta
 	ID     uint64
 	Type   event.SpanType // event.SpanScene or event.SpanHidden
-	Name   string         // scene name; empty for hidden
+	Name   string         // scene name; optional for hidden
 	Parent uint64
 	Hints  event.SpanHints
 }

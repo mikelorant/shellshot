@@ -1,6 +1,6 @@
 missing_brace.script:1:8: expected "{" to open the scene block (write the brace after a space on the same line)
 missing_brace.script:5:7: scene needs a name (write scene NAME {)
-missing_brace.script:9:8: hidden takes no name (write hidden {)
+missing_brace.script:9:14: expected "{" to open the hidden block (write the brace after a space on the same line)
 missing_brace.script:13:9: expected "{" to open the scene block (write the brace after a space on the same line)
 missing_brace.script:17:7: a scene name is written bare, not in quotes (write scene q {)
 missing_brace.script:21:11: unexpected "run" after "{" (the body of the block starts on the next line)

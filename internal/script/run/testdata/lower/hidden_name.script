@@ -1,0 +1,15 @@
+# A named hidden block, one inside a scene, and an unnamed one.
+hidden setup {
+  run echo prepare
+}
+
+scene demo {
+  hidden warm-up {
+    run echo warm
+  }
+  run echo shown
+}
+
+hidden {
+  run echo cleanup
+}

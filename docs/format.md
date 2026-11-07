@@ -82,11 +82,11 @@ END:   id
 BEGIN: id | type | parent_id | name_len | name | n_hints | n_hints x { tag | len | value }
 ```
 
-`type` is 1 for a scene, 2 for a hidden span and 3 (reserved). `name` is at most 255 bytes. Hint tags
+`type` is 1 for a scene, 2 for a hidden span and 3 (reserved). `name` is at most 255 bytes; it is the scene name, and for a hidden span the optional name given in the script (empty when unnamed). Hint tags
 are 1 speed (milli-x), 2 idle (µs), 3 hold (µs) and 4 caption (UTF-8). Decoders skip unknown hint
 tags and bytes after the last known field. An unknown version, op or type makes the event ignorable.
 A span still open at the end of the readable events ends at the last event. `info` lists scenes and
-hidden spans when a recording has them, and `export` applies their hints. `record --script` writes
+hidden spans (with their names, when they have one) when a recording has them, and `export` applies their hints. `record --script` writes
 them (see [scripting.md](scripting.md)); a plain `record` writes none.
 
 ## Compression

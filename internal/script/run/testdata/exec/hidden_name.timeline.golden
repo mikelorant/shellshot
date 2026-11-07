@@ -1,0 +1,60 @@
+t=+0s span-begin hidden:setup id=1 parent=0
+t=+0s write "e"
+t=+50ms write "c"
+t=+100ms write "h"
+t=+150ms write "o"
+t=+200ms write " "
+t=+250ms write "p"
+t=+300ms write "r"
+t=+350ms write "e"
+t=+400ms write "p"
+t=+450ms write "a"
+t=+500ms write "r"
+t=+550ms write "e"
+t=+600ms write "\r"
+t=+820ms span-end id=1
+t=+820ms span-begin scene:demo id=2 parent=0
+t=+820ms span-begin hidden:warm-up id=3 parent=2
+t=+820ms write "e"
+t=+870ms write "c"
+t=+920ms write "h"
+t=+970ms write "o"
+t=+1.02s write " "
+t=+1.07s write "w"
+t=+1.12s write "a"
+t=+1.17s write "r"
+t=+1.22s write "m"
+t=+1.27s write "\r"
+t=+1.49s span-end id=3
+t=+1.49s write "e"
+t=+1.54s write "c"
+t=+1.59s write "h"
+t=+1.64s write "o"
+t=+1.69s write " "
+t=+1.74s write "s"
+t=+1.79s write "h"
+t=+1.84s write "o"
+t=+1.89s write "w"
+t=+1.94s write "n"
+t=+1.99s write "\r"
+t=+2.21s span-end id=2
+t=+2.21s span-begin hidden id=4 parent=0
+t=+2.21s write "e"
+t=+2.26s write "c"
+t=+2.31s write "h"
+t=+2.36s write "o"
+t=+2.41s write " "
+t=+2.46s write "c"
+t=+2.51s write "l"
+t=+2.56s write "e"
+t=+2.61s write "a"
+t=+2.66s write "n"
+t=+2.71s write "u"
+t=+2.76s write "p"
+t=+2.81s write "\r"
+t=+3.03s span-end id=4
+t=+3.03s span-begin hidden id=5 parent=0
+t=+3.23s shutdown
+t=+3.24s child-exit 0
+t=+3.24s span-end id=5
+t=+3.24s done

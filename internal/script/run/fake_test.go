@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
 	"github.com/mikelorant/shellshot/internal/script/keys"
 )
 
@@ -178,8 +179,10 @@ func (d *driver) apply(s Step) bool {
 		ev := s.Span.Event
 		if ev.Op == 1 {
 			name := "hidden"
-			if ev.Name != "" {
+			if ev.Type == event.SpanScene {
 				name = "scene:" + ev.Name
+			} else if ev.Name != "" {
+				name = "hidden:" + ev.Name
 			}
 			d.record("span-begin", fmt.Sprintf("%s id=%d parent=%d%s", name, ev.ID, ev.Parent, hintText(s.Span)))
 		} else {

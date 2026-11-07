@@ -139,13 +139,15 @@ A block is one step.
 scene NAME {      # letters, digits, _ and -; unique
   ...
 }
-hidden {          # runs and is recorded; export may drop it
+hidden [NAME] {   # runs and is recorded; export may drop it; the name is optional
   ...
 }
 ```
 
 A block contains at least one step. A `hidden` block may sit inside a `scene`; no other nesting is
-allowed. Scenes and hidden blocks are recorded as `SPAN` events (see [format.md](format.md#spans)).
+allowed. A hidden name follows the rules of a scene name (written bare), and scenes and hidden
+blocks share one namespace: a name is used by at most one block in the script. `info` lists named
+hidden spans. The implicit hidden block at the end has no name. Scenes and hidden blocks are recorded as `SPAN` events (see [format.md](format.md#spans)).
 After the last step the runner always exits the shell inside an implicit hidden block, so a script
 cannot leave a live shell running.
 
@@ -191,7 +193,7 @@ env PS1="\\w $ "
 output git-demo.shot
 typing 40ms
 
-hidden {
+hidden setup {
   run lines {
     rm -rf .git README.md
     clear

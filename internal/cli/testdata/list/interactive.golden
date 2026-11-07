@@ -11,7 +11,7 @@ estimate
   scene   #3 colours: 7.69s to 29.71s
   scene   #4 tour: 6.139s to 1m10.801s
 ops
-   1  14:1    hidden           span-begin #1 hidden
+   1  14:1    hidden           span-begin #1 hidden "setup"
    2  15:3    hidden           type "clear" typing=60ms jitter=30%
    3  15:3    hidden           press enter after-gap typing=60ms jitter=30%
    4  15:3    hidden           settle quiet=200ms timeout=15s (fails at timeout)

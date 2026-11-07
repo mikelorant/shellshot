@@ -122,6 +122,9 @@ func opText(op Op) string {
 			s += "scene " + strconv.Quote(op.Name)
 		} else {
 			s += "hidden"
+			if op.Name != "" {
+				s += " " + strconv.Quote(op.Name)
+			}
 		}
 		if op.Parent != 0 {
 			s += fmt.Sprintf(" parent=#%d", op.Parent)
