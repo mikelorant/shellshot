@@ -180,4 +180,4 @@ Reserved, not built: `fresh`, `cleanup`, `caption`, `require` and `export --scen
 - Build errors about missing libghostty headers after switching worktrees or moving the checkout:
   `go clean -cache`, then `make deps build`.
 
-Licences and third-party attributions: [NOTICE](NOTICE).
+Licence: [MIT](LICENSE). Third-party licences and attributions: [NOTICE](NOTICE).

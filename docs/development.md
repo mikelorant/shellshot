@@ -154,8 +154,7 @@ Run `make release-libs` once (and again after bumping the libghostty pin), then 
 `dist/` holds:
 
 - `shellshot_<version>_<os>_<arch>.tar.gz` for `darwin_amd64`, `darwin_arm64`, `linux_amd64` and
-  `linux_arm64`. Each contains `shellshot`, `README.md` and `NOTICE` (the repository has no
-  `LICENSE` file, so none is shipped);
+  `linux_arm64`. Each contains `shellshot`, `README.md`, `LICENSE` and `NOTICE`;
 - `checksum.txt` (sha256 of the four archives);
 - one directory per target with the bare binary (`dist/shellshot_linux_arm64_v8.0/shellshot`), plus
   goreleaser's `config.yaml`, `artifacts.json` and `metadata.json`.
@@ -210,9 +209,20 @@ the Actions tab (Run workflow) and download the `archives` artifact.
 Repository settings: nothing beyond the defaults, because the jobs ask for their own permissions
 (`contents: write`, `packages: write`). If the repository's Actions setting for workflow permissions
 is "read-only" that is still enough, since job-level `permissions` override it. The first push
-creates the GHCR package as private and linked to the repository; set its visibility under the
-package settings once the release is public. The repository has no `LICENSE` and the embedded emoji
-font is Apple artwork: see `NOTICE` before making a release or the image public.
+creates the GHCR package linked to the repository (the image carries
+`org.opencontainers.image.source=https://github.com/mikelorant/shellshot`), but new packages start
+private: make it public once.
+
+One-time manual step after the first image push (GitHub has no API for this with `GITHUB_TOKEN`):
+
+1. Open <https://github.com/users/mikelorant/packages/container/shellshot/settings> (or Profile >
+   Packages > shellshot > Package settings).
+2. Under "Manage Actions access" / repository connection, check the package is connected to
+   `mikelorant/shellshot` and "Inherit access from repository" is set.
+3. Under "Danger Zone" choose "Change visibility" > Public.
+
+The code is MIT licensed (`LICENSE`); the embedded Apple emoji font is Apple artwork, see `NOTICE`
+before making the image public.
 
 ## Worktrees
 

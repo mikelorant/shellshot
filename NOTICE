@@ -1,9 +1,12 @@
-shellshot third-party notices
-============================
+shellshot licence and third-party notices
+=========================================
 
-shellshot embeds fonts and links libraries written by others. This file lists them and where their
-licence texts are. Checksums, sources and modification notes for each embedded font are in the
-NOTICE.txt next to its files (one directory per font group).
+shellshot's own source code is MIT licensed: see LICENSE. The MIT licence does not extend to the
+third-party material listed below, which keeps its own licences; in particular the Apple Color Emoji
+artwork belongs to Apple Inc. (see its entry). The fonts and libraries are embedded or linked by
+shellshot; this file lists them and where their licence texts are. Checksums, sources and
+modification notes for each embedded font are in the NOTICE.txt next to its files (one directory per
+font group).
 
 Embedded text fonts (internal/render/font/assets/)
 --------------------------------------------------

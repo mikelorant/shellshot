@@ -66,6 +66,7 @@ ARG VERSION=dev
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="shellshot" \
       org.opencontainers.image.source="https://github.com/mikelorant/shellshot" \
+      org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
 
@@ -74,6 +75,7 @@ RUN useradd --uid 1000 --create-home --shell /bin/bash shellshot \
  && install -d -o shellshot -g shellshot /work
 
 COPY --from=build /out/shellshot /usr/local/bin/shellshot
+COPY LICENSE NOTICE /usr/share/doc/shellshot/
 
 ENV TERM=xterm-256color LANG=C.UTF-8 SHELL=/bin/bash
 USER shellshot

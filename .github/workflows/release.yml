@@ -115,6 +115,7 @@ jobs:
             mkdir -p "dist/context/linux/$arch"
             tar -xzf dist/shellshot_*_linux_"$arch".tar.gz -C "dist/context/linux/$arch" shellshot
           done
+          cp LICENSE NOTICE dist/context/
           ls -l dist/context/linux/*/shellshot
 
       # The image only copies prebuilt binaries, but its useradd step runs in the arm64 image.
@@ -135,6 +136,8 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
+          labels: |
+            org.opencontainers.image.licenses=MIT
           # On a stable tag: 1.2.3, 1.2 and latest. A prerelease tag gets only 1.2.3-rc.1. Otherwise sha-<short>.
           tags: |
             type=semver,pattern={{version}}
