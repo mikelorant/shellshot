@@ -23,23 +23,28 @@ internal/pty              // spawn command in a PTY: Process{Read, Resize, Wait,
 internal/session          // orchestrates pty + vt + sampler -> emits snapshot.Frame to a Sink
 internal/recording        // file format (JSON Lines): Writer, Reader
 internal/replay           // plays frames to an io.Writer with timing
-scripts/fetch-libghostty.sh, Makefile   // dependency + build tooling
+scripts/build-libghostty.sh, Makefile   // dependency + build tooling
 ```
 Dependency rules (enforced in review): `snapshot` imports nothing; `vt`, `recording`,
 `replay` import only `snapshot`; `session` imports `snapshot`, `vt`, `pty` (via small
 interfaces it declares itself); only `vt/ghostty` imports cgo/libghostty; only `cli`
 imports cobra and wires concrete types. Define interfaces at the consumer.
 
-## libghostty: distributed release, not compiled in-tree
-We never build Ghostty/zig. `scripts/fetch-libghostty.sh` downloads the official
-release asset `ghostty-vt.xcframework.zip` from the GitHub release of
-`ghostty-org/ghostty` (currently the `tip` release; version pinned via a
-variable + SHA-256 recorded in the script), extracts
-`macos-arm64_x86_64/{libghostty-vt.a,Headers}` into `third_party/libghostty/`
-(git-ignored) and generates `third_party/libghostty/lib/pkgconfig/libghostty-vt-static.pc`.
-The Go binding `go.mitchellh.com/libghostty` links via pkg-config, so builds run with
-`PKG_CONFIG_PATH=$PWD/third_party/libghostty/lib/pkgconfig` (set by the Makefile).
-POC target: macOS (arm64/x86_64). Linux/Windows: out of scope.
+## libghostty: git submodule, built from source with zig only
+libghostty-vt is built from source. `third_party/ghostty` is a git submodule of
+`ghostty-org/ghostty` pinned to commit `66af4c7458db7e19ae7adb44aa7054879be58b6b`
+(the commit `go.mitchellh.com/libghostty` pins; its headers match). Bump the
+pin by checking out another commit in the submodule and committing the pointer.
+`scripts/build-libghostty.sh` (`make deps`) runs
+`git submodule update --init --depth 1 third_party/ghostty` and then, inside the
+submodule, `zig build -Demit-lib-vt -Doptimize=ReleaseFast --prefix <repo>/build/libghostty`.
+Only zig (0.17.x, per `minimum_zig_version` in the submodule's `build.zig.zon`) is
+needed: no xcodebuild, no cmake. The output (git-ignored under `/build/`) is
+`build/libghostty/{include,lib/libghostty-vt.a,lib/pkgconfig/libghostty-vt-static.pc}`.
+The Go binding links via pkg-config, so builds run with
+`PKG_CONFIG_PATH=$PWD/build/libghostty/lib/pkgconfig` (set by the Makefile).
+`make clean` keeps `build/libghostty`; `make distclean` removes it.
+POC target: macOS (native arch). Linux/Windows: out of scope.
 
 ## Recording format (JSON Lines, extension `.shot`)
 Line 1 header: `{"version":1,"cols":80,"rows":24,"command":["ls"],"started":"RFC3339"}`

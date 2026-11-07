@@ -1,10 +1,10 @@
-export PKG_CONFIG_PATH := $(CURDIR)/third_party/libghostty/lib/pkgconfig
+export PKG_CONFIG_PATH := $(CURDIR)/build/libghostty/lib/pkgconfig
 export CGO_ENABLED := 1
 
-.PHONY: deps build test vet fmt clean
+.PHONY: deps build test vet fmt clean distclean
 
 deps:
-	./scripts/fetch-libghostty.sh
+	./scripts/build-libghostty.sh
 
 build:
 	go build -o bin/shellshot ./cmd/shellshot
@@ -20,3 +20,7 @@ fmt:
 
 clean:
 	rm -rf bin
+
+# Also removes the libghostty build output (rebuild with `make deps`).
+distclean: clean
+	rm -rf build
