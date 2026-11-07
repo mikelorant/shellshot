@@ -16,7 +16,11 @@ func testCodecs(t *testing.T) []Codec {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return []Codec{NoneCodec{}, fc}
+	zc, err := NewZstdCodec(ZstdOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []Codec{NoneCodec{}, fc, zc}
 }
 
 func randomBytes(n int) []byte {
@@ -226,14 +230,11 @@ func TestConcurrentUse(t *testing.T) {
 
 func TestRegistry(t *testing.T) {
 	r := DefaultRegistry()
-	for _, id := range []ID{None, Flate} {
+	for _, id := range []ID{None, Flate, Zstd} {
 		c, err := r.Get(id)
 		if err != nil || c.ID() != id {
 			t.Fatalf("Get(%v) = %v, %v", id, c, err)
 		}
-	}
-	if _, err := r.Get(Zstd); !errors.Is(err, ErrUnknownCodec) {
-		t.Fatalf("Get(Zstd) err = %v, want ErrUnknownCodec", err)
 	}
 	if _, err := r.Get(99); !errors.Is(err, ErrUnknownCodec) {
 		t.Fatalf("Get(99) err = %v, want ErrUnknownCodec", err)
