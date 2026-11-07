@@ -1,0 +1,4 @@
+# Unknown names are parse errors; Check stops there.
+rn echo a
+sze 80x24
+size 0x0

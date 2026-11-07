@@ -1,0 +1,14 @@
+# More than ten errors: the first ten by position are reported.
+run echo a
+size 1x1
+shell /bin/sh
+env A=1
+cwd /tmp
+seed 1
+output a.shot
+speed 2x
+idle 1s
+hold 1s
+wait /(/
+run ""
+mark ""

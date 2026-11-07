@@ -1,0 +1,32 @@
+# Setting legality per context (docs §3.2).
+size 80x24
+speed 2x
+speed 3x
+seed 1
+seed 2
+env A=1
+env A=2
+typing 10ms
+typing 20ms
+
+run echo first
+
+size 100x30
+speed 8x
+typing 40ms
+
+scene intro {
+  cwd /tmp
+  speed 4x
+  hidden {
+    speed 2x
+    env B=1
+    run echo hidden
+  }
+  run echo shown
+}
+
+hidden {
+  hold 1s
+  run echo cleanup
+}
