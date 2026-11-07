@@ -106,12 +106,12 @@ const (
 	BlockHidden = "hidden"
 )
 
-// Block is a "scene NAME { ... }" or "hidden { ... }" block.
+// Block is a "scene NAME { ... }" or "hidden [NAME] { ... }" block.
 type Block struct {
 	Pos  Pos // the block keyword
 	End  Pos // the closing "}"; the end of the file if the block is not closed
 	Kind string
-	Name string // scene only; as written, not yet checked
+	Name string // required for a scene, optional for hidden; as written, not yet checked
 	// Settings and Items are the contents, related by Setting.At like those
 	// of Script.
 	Settings []Setting

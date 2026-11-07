@@ -75,6 +75,7 @@ func TestFormatRoundTripAwkward(t *testing.T) {
 		"run paragraphs {\n  a\n  b\n\n\n\n  c\n  }\n}\n",
 		"run lines {\n  }\n  x\n}\n",
 		"scene a {\n  hidden {\n    run lines {\n      x\n    }\n  }\n  run lines {\n    }\n    y\n  }\n}\n",
+		"hidden setup {\n  run lines {\n    x\n  }\n}\nhidden {\n  run y\n}\nscene a {\n  hidden  teardown  {\n    run z\n  }\n}\n",
 		"hidden {\n}\nscene a {\n}\nsize 1x1\nrun x\nsize 2x2\n",
 		"scene a { # c\n  typing 1s # c\n  mark x # c\n} # c\n",
 		"  run   x   \n\t type  lines  {  \n\t   a\n\t }\n",

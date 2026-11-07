@@ -28,7 +28,7 @@ func Validate(s *Script) []Diagnostic {
 	if s == nil {
 		return nil
 	}
-	v := &validator{sceneLine: map[string]int{}}
+	v := &validator{blockName: map[string]blockUse{}}
 	if len(s.Items) > 0 {
 		v.firstLine = s.Items[0].ItemPos().Line
 	}
@@ -44,22 +44,41 @@ func Validate(s *Script) []Diagnostic {
 
 type validator struct {
 	diags     []Diagnostic
-	firstLine int            // line of the first item of the script, 0 if none
-	sceneLine map[string]int // scene name -> line of its first use
+	firstLine int                 // line of the first item of the script, 0 if none
+	blockName map[string]blockUse // block name -> its first use
+}
+
+// blockUse is the first block that used a name: scenes and hidden blocks share
+// one namespace.
+type blockUse struct {
+	kind string
+	line int
 }
 
 // blockContext is where a setting or an item sits: the top level (the zero
 // value), a scene or a hidden block.
 type blockContext struct {
 	kind string // "", BlockScene or BlockHidden
-	name string // the scene name
+	name string // the block name, empty for an unnamed hidden block
 }
 
 func (c blockContext) describe() string {
 	if c.kind == BlockScene {
 		return fmt.Sprintf("scene %q", c.name)
 	}
+	if c.name != "" {
+		return fmt.Sprintf("hidden %q", c.name)
+	}
 	return "hidden"
+}
+
+// blockLabel describes a block in a message: scene "a", hidden "a" or "hidden
+// block" for an unnamed hidden block.
+func blockLabel(b Block) string {
+	if b.Kind == BlockScene || b.Name != "" {
+		return fmt.Sprintf("%s %q", b.Kind, b.Name)
+	}
+	return "hidden block"
 }
 
 func (v *validator) add(pos Pos, msg, hint string) {
@@ -112,33 +131,28 @@ func (v *validator) block(ctx blockContext, b Block) {
 			"blocks nest one level at most: only hidden may sit inside a scene")
 		return
 	}
-	if b.Kind == BlockScene {
-		v.sceneName(b)
-	} else if b.Name != "" {
-		v.add(b.Pos, "hidden takes no name", "write hidden {")
-	}
+	v.checkName(b)
 	if len(b.Items) == 0 {
-		what := "hidden block"
-		if b.Kind == BlockScene {
-			what = fmt.Sprintf("scene %q", b.Name)
-		}
-		v.add(b.Pos, what+" has no steps", "a block must contain at least one step")
+		v.add(b.Pos, blockLabel(b)+" has no steps", "a block must contain at least one step")
 	}
 	v.scope(blockContext{kind: b.Kind, name: b.Name}, b.Settings, b.Items)
 }
 
-func (v *validator) sceneName(b Block) {
+// checkName checks the name of a block: required for a scene, optional for
+// hidden, and unique across all blocks.
+func (v *validator) checkName(b Block) {
 	switch {
-	case b.Name == "":
+	case b.Name == "" && b.Kind == BlockScene:
 		v.add(b.Pos, "scene needs a name", "write scene NAME {")
+	case b.Name == "":
 	case !isSceneName(b.Name):
-		v.add(b.Pos, fmt.Sprintf("bad scene name %q", b.Name), "a scene name is letters, digits, _ and -, written bare")
+		v.add(b.Pos, fmt.Sprintf("bad %s name %q", b.Kind, b.Name), fmt.Sprintf("a %s name is letters, digits, _ and -, written bare", b.Kind))
 	default:
-		if line, dup := v.sceneLine[b.Name]; dup {
-			v.add(b.Pos, fmt.Sprintf("duplicate scene name %q", b.Name), fmt.Sprintf("first used on line %d", line))
+		if first, dup := v.blockName[b.Name]; dup {
+			v.add(b.Pos, fmt.Sprintf("duplicate name %q", b.Name), fmt.Sprintf("already used by %s on line %d", first.kind, first.line))
 			return
 		}
-		v.sceneLine[b.Name] = b.Pos.Line
+		v.blockName[b.Name] = blockUse{kind: b.Kind, line: b.Pos.Line}
 	}
 }
 

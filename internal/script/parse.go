@@ -158,7 +158,7 @@ func hasIllegal(toks []Token) bool {
 	return slices.ContainsFunc(toks, func(t Token) bool { return t.Kind == KindIllegal })
 }
 
-// block parses "scene NAME {" or "hidden {" and the lines up to the closing
+// block parses "scene NAME {", "hidden {" or "hidden NAME {" and the lines up to the closing
 // brace. A broken header still opens the block, so one mistake in the header
 // does not make the whole body fail.
 func (p *parser) block(ln line) Block {
@@ -170,32 +170,25 @@ func (p *parser) block(ln line) Block {
 	body, end, closed := p.parseBody(false)
 	b.Settings, b.Items, b.End = body.settings, body.items, end
 	if !closed {
-		what := "hidden block"
-		if b.Kind == BlockScene {
-			what = fmt.Sprintf("scene %q", b.Name)
-		}
-		p.errorf(b.Pos, "unterminated "+what+`: expected a line with only "}" before the end of the file`, "")
+		p.errorf(b.Pos, "unterminated "+blockLabel(b)+`: expected a line with only "}" before the end of the file`, "")
 	}
 	return b
 }
 
-// blockHeader checks the words after the block keyword and returns the scene
-// name.
+// blockHeader checks the words after the block keyword and returns the block
+// name, which is empty for an unnamed hidden block.
 func (p *parser) blockHeader(kind string, ln line) (name string) {
 	args := ln.toks[1:]
 	i := 0
 	named := i < len(args) && (args[i].Kind == KindWord || args[i].Kind == KindString)
 	switch {
-	case kind == BlockScene && named && args[i].Kind == KindString:
-		p.errorf(args[i].Pos, "a scene name is written bare, not in quotes", `write scene `+args[i].Text+` {`)
+	case named && args[i].Kind == KindString:
+		p.errorf(args[i].Pos, "a "+kind+" name is written bare, not in quotes", `write `+kind+` `+args[i].Text+` {`)
 		name, i = args[i].Text, i+1
-	case kind == BlockScene && named:
+	case named:
 		name, i = args[i].Text, i+1
 	case kind == BlockScene:
 		p.errorf(p.posOrEnd(args, i, ln), "scene needs a name", `write scene NAME {`)
-	case named:
-		p.errorf(args[i].Pos, "hidden takes no name", `write hidden {`)
-		i++
 	}
 	if i >= len(args) || args[i].Kind != KindLBrace {
 		p.errorf(p.posOrEnd(args, i, ln), `expected "{" to open the `+kind+` block`, "write the brace after a space on the same line")

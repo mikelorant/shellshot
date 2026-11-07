@@ -6,7 +6,7 @@ scene {
   run y
 }
 
-hidden extra {
+hidden extra more {
   run z
 }
 

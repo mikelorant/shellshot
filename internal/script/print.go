@@ -59,7 +59,7 @@ func (f *formatter) item(indent string, it Item) {
 	switch it := it.(type) {
 	case Block:
 		header := it.Kind + " {"
-		if it.Kind == BlockScene {
+		if it.Name != "" {
 			header = it.Kind + " " + it.Name + " {"
 		}
 		f.emit(groupBlock, indent, header)

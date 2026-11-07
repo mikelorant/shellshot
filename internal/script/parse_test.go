@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -108,6 +109,38 @@ func TestParseStructure(t *testing.T) {
 	}
 	if h, ok := b.Items[0].(Block); !ok || h.Kind != BlockHidden || h.ItemPos().Line != 4 {
 		t.Fatalf("hidden: %+v", b.Items[0])
+	}
+}
+
+func TestParseHiddenName(t *testing.T) {
+	const src = "hidden setup {\n  run x\n}\nhidden {\n  run y\n}\nscene a {\n  hidden  teardown  { # c\n    run z\n  }\n}\n"
+	s, diags := ParseString("", src)
+	if len(diags) > 0 {
+		t.Fatal(renderDiags(diags))
+	}
+	a := s.Items[2].(Block)
+	got := []string{s.Items[0].(Block).Name, s.Items[1].(Block).Name, a.Items[0].(Block).Name}
+	if want := []string{"setup", "", "teardown"}; !slices.Equal(got, want) {
+		t.Fatalf("hidden names %q, want %q", got, want)
+	}
+	if out := Format(s); out != "hidden setup {\n  run x\n}\n\nhidden {\n  run y\n}\n\nscene a {\n  hidden teardown {\n    run z\n  }\n}\n" {
+		t.Fatalf("format:\n%s", out)
+	}
+}
+
+func TestParseHiddenNameErrors(t *testing.T) {
+	for _, tc := range []struct{ name, src, want string }{
+		{"quoted", "hidden \"setup\" {\n  run x\n}\n", `1:8: a hidden name is written bare, not in quotes (write hidden setup {)`},
+		{"two names", "hidden a b {\n  run x\n}\n", `1:10: expected "{" to open the hidden block (write the brace after a space on the same line)`},
+		{"no brace", "hidden a\n  run x\n}\n", `1:9: expected "{" to open the hidden block (write the brace after a space on the same line)`},
+		{"unterminated", "hidden a {\n  run x\n", `1:1: unterminated hidden "a": expected a line with only "}" before the end of the file`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := ParseString("", tc.src)
+			if got := renderDiags(diags); len(got) == 0 || got[0] != tc.want {
+				t.Fatalf("got %q\nwant first %q", got, tc.want)
+			}
+		})
 	}
 }
 

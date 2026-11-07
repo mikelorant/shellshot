@@ -128,7 +128,7 @@ func TestValidateReportsAllKindsTogether(t *testing.T) {
 		`1:1: run text is empty (` + emptyTextHint + `)`,
 		`2:1: bad regular expression /(/ (missing closing ))`,
 		`3:1: scene "a" has no steps (a block must contain at least one step)`,
-		`5:1: duplicate scene name "a" (first used on line 3)`,
+		`5:1: duplicate name "a" (already used by scene on line 3)`,
 		`9:1: "speed" must appear before the first step or inside a scene (first step: line 1)`,
 	}
 	if got := renderDiags(Validate(s)); !slices.Equal(got, want) {
