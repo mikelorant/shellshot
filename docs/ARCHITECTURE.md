@@ -7,7 +7,7 @@ that can be replayed.
 ## Commands (cobra)
 | Command | Purpose |
 |---|---|
-| `shellshot record [-o file] [--cols N --rows N] [--interval d] -- cmd args...` | Run cmd in a PTY, snapshot on an interval (only when the screen changed) plus a final frame, write recording |
+| `shellshot record [-o file] [-c "cmd"] [--cols N --rows N] [--interval d] [-- cmd args...]` | Interactive recorder (asciicast-style): runs $SHELL (or the given command) on a live passthrough terminal and records snapshot frames |
 | `shellshot snap [--cols --rows] -- cmd args...` | Run cmd, print the final screen as plain text |
 | `shellshot replay file [--speed f]` | Play recording frames to stdout with original timing |
 | `shellshot version` | Print version |
@@ -19,7 +19,9 @@ internal/cli              // cobra wiring only: flags -> config structs -> calls
 internal/snapshot         // pure data: Snapshot, Cursor, Frame (no deps)            [exists]
 internal/vt               // interface Terminal + Factory (no cgo)                   [exists]
 internal/vt/ghostty       // cgo adapter over go.mitchellh.com/libghostty implementing vt.Terminal
-internal/pty              // spawn command in a PTY: Process{Read, Resize, Wait, Close}
+internal/pty              // spawn command in a PTY: Process{Read, Write, Resize, Wait, Close}
+internal/tty              // IsTerminal, Size, MakeRaw; wraps golang.org/x/term (no cgo)
+internal/live             // stdin -> process pump + output tee; depends only on io interfaces
 internal/session          // orchestrates pty + vt + sampler -> emits snapshot.Frame to a Sink
 internal/recording        // file format (JSON Lines): Writer, Reader
 internal/replay           // plays frames to an io.Writer with timing
@@ -58,3 +60,10 @@ Following lines, one per frame: `{"t":<ms int>,"lines":[...],"cx":0,"cy":0,"cv":
 Worktrees in `.worktrees/<task>`, branch `task/<task>`. Workers write code + tests only;
 the **build subagent** runs `make test`/`make build`; the **merge subagent** merges
 to `main` (fast-forward/squash, one task = one commit, Conventional Commits).
+
+## Interactive `record` (asciicast-style) — design addendum
+- No command given → run `$SHELL` (fallback `/bin/sh`) interactively. `-c` runs a shell command string via `$SHELL -c`; `-- cmd args` runs argv directly. Recording ends when the child exits.
+- When stdin is a TTY: put it in raw mode (restored on exit), forward stdin → PTY. PTY output is teed to the real stdout live AND fed to the headless terminal (session).
+- Size defaults to the current terminal size (override with --cols/--rows). POC limit: size is fixed for the recording; SIGWINCH is not propagated (the format has one fixed size). Follow-up: resize events in the format.
+- Non-TTY stdin/stdout still works (pipes): no raw mode, no size detection (80x24 default).
+- New packages: `internal/tty` (IsTerminal, Size, MakeRaw; wraps golang.org/x/term, no cgo) and `internal/live` (stdin→process pump + output tee; depends only on io interfaces). `pty.Process` gains `Write` (io.ReadWriter). `session` is unchanged: the tee is a Process decorator supplied by `live`.
