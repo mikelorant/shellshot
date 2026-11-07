@@ -45,7 +45,7 @@ internal/session            pty + vt + sampler: emits frames and recording event
 internal/recording/bin      binary format: chunk, varint, codec, head, event; Writer and Reader
 internal/recording/spans    SPAN events -> scenes and hidden spans
 internal/recording/frames   recorded events -> snapshot frames through a vt.Factory
-internal/replay             plays frames to an io.Writer with timing
+internal/replay             plays frames to an io.Writer with timing (via export/timeline)
 internal/export/timeline    frames -> timed steps: idle cap, speed, hold, minimum delay, leading blank trim
 internal/export/spanplan    scenes and hidden spans -> timeline segments and forced frames (pure)
 internal/export/pipeline    timeline + raster: frames -> images for a sink; the sink interface and the PNG poster
@@ -68,7 +68,9 @@ scripts/build-libghostty.sh, Makefile   dependency and build tooling
 
 Dependency rules, enforced in review:
 
-- `snapshot` imports nothing. `vt`, `replay`, `export/timeline` and `render/theme` import only `snapshot`.
+- `snapshot` imports nothing. `vt`, `export/timeline` and `render/theme` import only `snapshot`;
+  `replay` imports only `snapshot` and `export/timeline` (it shares the idle cap and leading-blank
+  policy).
 - Only `vt/ghostty` imports cgo and libghostty. Everything else builds without it.
 - Only `cli` imports cobra and wires concrete types.
 - `export/apng`, `gif` and `webp` are sinks for `export/pipeline`; `export/svg` imports `timeline`,
