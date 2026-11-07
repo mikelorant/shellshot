@@ -10,8 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/mikelorant/shellshot/internal/recording/bin"
 	"github.com/mikelorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/replay"
 )
 
 func runReplayCmd(t *testing.T, args ...string) (code int, stdout, stderr string) {
@@ -21,7 +24,8 @@ func runReplayCmd(t *testing.T, args ...string) (code int, stdout, stderr string
 	return code, out.String(), errBuf.String()
 }
 
-const clearSeq = "\x1b[H\x1b[2J"
+// frameStart opens each frame drawn with --clear: a synchronized update.
+const frameStart = "\x1b[?2026h"
 
 func TestReplayColorFlag(t *testing.T) {
 	path := writeFile(t, "styled.shot", styledRecording(t))
@@ -76,11 +80,41 @@ func TestReplayClearFlag(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %q", code, stderr)
 	}
-	if n := strings.Count(stdout, clearSeq); n != 3 {
-		t.Errorf("want a clear before each of 3 frames, got %d in %q", n, stdout)
+	if n := strings.Count(stdout, frameStart); n != 3 {
+		t.Errorf("want 3 synchronized frames, got %d in %q", n, stdout)
+	}
+	if strings.Contains(stdout, "\x1b[2J") {
+		t.Errorf("stdout clears the screen between frames: %q", stdout)
 	}
 	if strings.Index(stdout, "first") > strings.Index(stdout, "second") {
 		t.Errorf("frames out of order: %q", stdout)
+	}
+}
+
+// A recording larger than the terminal is cropped to it and the note says so;
+// --no-crop is accepted. The terminal size is passed in directly because the
+// test output is a buffer, not a terminal.
+func TestReplayCropsToTerminal(t *testing.T) {
+	t.Parallel()
+	path := writeFile(t, "demo.shot", simpleRecording(t)) // 10x2
+	var out, errBuf bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetContext(t.Context())
+	cmd.SetOut(&out)
+	cmd.SetErr(&errBuf)
+	if err := runReplay(cmd, path, 60, replay.Options{Speed: 1000, Clear: true, Cols: 4, Rows: 1}); err != nil {
+		t.Fatalf("runReplay() error = %v", err)
+	}
+	if want := "shellshot: replay: recording is 10x2 but the terminal is 4x1: cropping (use --no-crop to disable)\n"; errBuf.String() != want {
+		t.Errorf("stderr = %q, want %q", errBuf.String(), want)
+	}
+	if !strings.Contains(out.String(), "seco") || strings.Contains(out.String(), "secon") || strings.Contains(out.String(), "first") {
+		t.Errorf("stdout = %q, want the last row cropped to 4 columns", out.String())
+	}
+
+	code, _, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear", "--no-crop")
+	if code != 0 || stderr != "" {
+		t.Errorf("--no-crop: exit code = %d, stderr = %q", code, stderr)
 	}
 }
 
@@ -95,7 +129,7 @@ func TestReplayFPSChangesFrameCount(t *testing.T) {
 	path := writeFile(t, "fps.shot", data)
 	for fps, want := range map[string]int{"10": 2, "1000": 3} { // blank + final, or blank + a + final
 		_, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear", "--fps", fps)
-		if n := strings.Count(stdout, clearSeq); n != want {
+		if n := strings.Count(stdout, frameStart); n != want {
 			t.Errorf("--fps %s: %d frames, want %d (stderr %q)", fps, n, want, stderr)
 		}
 	}
@@ -114,7 +148,7 @@ func TestReplayIdleGapIsInstant(t *testing.T) {
 	if elapsed := time.Since(start); elapsed > 3*time.Second {
 		t.Errorf("replay took %v, want well under the 5 minute gap", elapsed)
 	}
-	if n := strings.Count(stdout, clearSeq); n < 3 || n > 5 {
+	if n := strings.Count(stdout, frameStart); n < 3 || n > 5 {
 		t.Errorf("%d frames for a recording with two bursts, want 3 to 5", n)
 	}
 	if !strings.Contains(stdout, "after") {

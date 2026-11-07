@@ -50,13 +50,13 @@ func TestRender(t *testing.T) {
 			name:  "clear with visible cursor",
 			snap:  snapshot.Snapshot{Lines: []string{"ab", "cd"}, Cursor: snapshot.Cursor{X: 2, Y: 1, Visible: true}},
 			clear: true,
-			want:  "\x1b[H\x1b[2Jab\r\ncd\x1b[2;3H\x1b[?25h",
+			want:  frameHead + "ab\x1b[K\r\n\x1b[Jcd\x1b[2;3H\x1b[?25h" + ansiSyncEnd,
 		},
 		{
 			name:  "clear with hidden cursor",
 			snap:  snapshot.Snapshot{Lines: []string{"x"}},
 			clear: true,
-			want:  "\x1b[H\x1b[2Jx\x1b[1;1H\x1b[?25l",
+			want:  frameHead + "\x1b[Jx\x1b[1;1H" + ansiSyncEnd,
 		},
 		{
 			name: "no lines",
@@ -147,9 +147,37 @@ func TestPlayClearOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Play() error = %v", err)
 	}
-	want := "\x1b[H\x1b[2Ja\x1b[1;1H\x1b[?25l" + "\x1b[H\x1b[2Jb\x1b[1;1H\x1b[?25l"
+	want := frameHead + "\x1b[Ja\x1b[1;1H" + ansiSyncEnd + frameHead + "\x1b[Jb\x1b[1;1H" + ansiSyncEnd
 	if out.String() != want {
 		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+}
+
+// countingWriter records the size of every Write.
+type countingWriter struct{ sizes []int }
+
+func (c *countingWriter) Write(p []byte) (int, error) {
+	c.sizes = append(c.sizes, len(p))
+	return len(p), nil
+}
+
+// TestPlayWritesOnceAndCropsFrames checks that each frame reaches the writer in
+// one Write, and that a frame larger than Cols x Rows is cropped before it is
+// written.
+func TestPlayWritesOnceAndCropsFrames(t *testing.T) {
+	big := snapshot.Snapshot{Cols: 6, Rows: 4, Lines: []string{"abcdef", "ghijkl", "mnopqr", "stuvwx"}}
+	src := &sliceSource{frames: []snapshot.Frame{{At: 0, Snapshot: big}, {At: time.Second, Snapshot: big}}}
+	var w countingWriter
+	err := Play(t.Context(), src, &w, Options{
+		Clear: true, Color: true, Cols: 3, Rows: 2,
+		Sleep: func(context.Context, time.Duration) error { return nil },
+	})
+	if err != nil {
+		t.Fatalf("Play() error = %v", err)
+	}
+	want := len(frameHead + "mno\r\n\x1b[Jstu\x1b[1;1H" + ansiSyncEnd)
+	if !slices.Equal(w.sizes, []int{want, want}) {
+		t.Errorf("write sizes = %v, want one write of %d bytes per frame", w.sizes, want)
 	}
 }
 
