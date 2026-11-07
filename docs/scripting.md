@@ -1,4 +1,4 @@
-Status: designed, not yet implemented. The lexer and parser exist; the runner does not.
+Status: designed, partly implemented. The lexer, parser, validator and lowering to a run plan exist; the runner (`record --script`) does not.
 
 # Script format
 

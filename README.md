@@ -1,3 +1,7 @@
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="shellshot" src="docs/assets/logo.svg" width="360"></picture></p>
+
+Record terminal sessions. Replay them. Export them as animated PNGs.
+
 # shellshot
 
 ## What it does
