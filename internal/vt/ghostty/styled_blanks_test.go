@@ -54,6 +54,15 @@ func TestStyledBlanksKeepOnlyUpToTheLastVisibleOne(t *testing.T) {
 	wantSpans(t, s, 0, snapshot.Span{Start: 2, End: 4, Style: blueBg()})
 }
 
+func TestStyledBlanksBeforeClearedCells(t *testing.T) {
+	term := newTerminal(t, 20, 1)
+	write(t, term, "ab\x1b[44m  \x1b[0m\x1b[K")
+
+	s := snap(t, term)
+	wantLines(t, s, 1, "ab  ")
+	wantSpans(t, s, 0, snapshot.Span{Start: 2, End: 4, Style: blueBg()})
+}
+
 func TestEraseToEndOfLineWithBackgroundFillsTheRow(t *testing.T) {
 	term := newTerminal(t, 80, 2)
 	write(t, term, "\x1b[44m\x1b[K\x1b[0m")

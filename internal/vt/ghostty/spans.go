@@ -39,13 +39,20 @@ type cellInfo struct {
 // counts one rune per codepoint. Entries are clipped at keep, so styling and
 // widths past the end of the kept text are dropped.
 func (t *terminal) rowLayout(trimmed int) (rowLayout, error) {
+	var layout rowLayout
+	n, err := t.cellsToRead()
+	if err != nil {
+		return rowLayout{}, err
+	}
+	if n == 0 {
+		return layout, nil
+	}
 	if err := t.rows.Cells(t.cells); err != nil {
 		return rowLayout{}, fmt.Errorf("load cells: %w", err)
 	}
 
-	var layout rowLayout
 	pos, visibleEnd := 0, 0
-	for t.cells.Next() {
+	for i := 0; i < n && t.cells.Next(); i++ {
 		cell, err := t.readCell()
 		if err != nil {
 			return rowLayout{}, err
@@ -62,6 +69,23 @@ func (t *terminal) rowLayout(trimmed int) (rowLayout, error) {
 	layout.spans = clipSpans(layout.spans, layout.keep)
 	layout.widths = clipWides(layout.widths, layout.keep)
 	return layout, nil
+}
+
+// cellsToRead returns how many cells at the start of the current row can hold
+// text or a style: the row's width minus the cells at its end that are still
+// in the state a cleared cell has. A cleared cell's packed value is zero (no
+// text, no style, narrow), which is checked without decoding any bits, so the
+// long empty tail of most rows costs no call into libghostty.
+func (t *terminal) cellsToRead() (int, error) {
+	view, err := t.rows.CellsRaw()
+	if err != nil {
+		return 0, fmt.Errorf("raw cells: %w", err)
+	}
+	n := view.Len()
+	for n > 0 && view.Cell(n-1).PackedValue() == 0 {
+		n--
+	}
+	return n, nil
 }
 
 // rendersOnBlank reports whether a blank cell with style s looks different
