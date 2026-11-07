@@ -25,25 +25,32 @@ type cell struct {
 
 // fallback draws c with a fallback font when the primary face lacks its
 // glyph (Nerd Font icons, ...). It reports whether it drew c. The fallback
-// face has the primary's pixel size and is not scaled: some icons are
-// designed to overflow their cell, and those are clipped to the cell rect
-// (c.width cells wide: 1, or 2 for a wide rune). A rune no font has is left
-// blank.
+// face is scaled to fit the c.width cells c occupies (see Fonts.FitFace) and
+// its ink box is centred in that cell span, horizontally and vertically, on
+// whole pixels. The result is still clipped to the cell rect as a safety
+// net. A rune no font has is left blank.
 func (r *Renderer) fallback(img *image.RGBA, c cell) bool {
-	face, ok, err := r.fonts.FaceFor(c.c, c.st.bold, c.st.italic, r.sizePx)
+	face, ok, err := r.fonts.FitFace(c.c, c.st.bold, c.st.italic, r.sizePx, r.metrics.CellWidth, r.metrics.CellHeight, c.width)
 	if err != nil || !ok {
 		return false
 	}
 	o := r.cellOrigin(c.col, c.row)
 	cellRect := image.Rect(o.X, o.Y, o.X+c.width*r.metrics.CellWidth, o.Y+r.metrics.CellHeight)
+	dot := r.baselineDot(c.col, c.row)
+	if bounds, _, ok := face.GlyphBounds(c.c); ok {
+		// bounds are relative to the dot, y growing downwards (top is negative).
+		inkMidX := (bounds.Min.X + bounds.Max.X) / 2
+		inkMidY := (bounds.Min.Y + bounds.Max.Y) / 2
+		dot.X = fixed.I((cellRect.Min.X+cellRect.Max.X)/2) - inkMidX
+		dot.Y = fixed.I((cellRect.Min.Y+cellRect.Max.Y)/2) - inkMidY
+		dot.X = fixed.I(dot.X.Round())
+		dot.Y = fixed.I(dot.Y.Round())
+	}
 	d := &xfont.Drawer{
 		Dst:  img.SubImage(cellRect).(*image.RGBA),
 		Src:  image.NewUniform(c.st.fg),
 		Face: face,
-		Dot:  r.baselineDot(c.col, c.row),
-	}
-	if c.mark {
-		d.Dot.X += c.advance
+		Dot:  dot,
 	}
 	d.DrawString(string(c.c))
 	return true

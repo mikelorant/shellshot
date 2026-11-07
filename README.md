@@ -212,8 +212,10 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
   fallback font bundled is Symbols Nerd Font Mono (icons and Powerline/Nerd Font
   symbols), so CJK and emoji cells render blank in `export`. (`snap` and `replay`
   print them as text.)
-- **Nerd Font icons are clipped to their cell.** Icons from the fallback font are
-  not yet scaled to fit, so oversized ones are cut off at the cell edge.
+- **Nerd Font icons are scaled down to fit their cell.** Icons from the fallback
+  font are shrunk to the cell width (and height) and centred, as in the "Nerd Font
+  Mono" variants, so they render smaller than in terminals that let icons overflow
+  into the next cell.
 - JSON recordings are large and store full-screen text per frame; there is no compression yet.
 - Stable only on macOS; no input events or resize events are recorded.
 
