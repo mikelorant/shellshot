@@ -66,7 +66,10 @@ shellshot replay demo.shot --speed 2
 On a terminal, each frame is drawn in place as one synchronized update (DEC mode 2026), without
 clearing the screen first, so supporting terminals do not flicker. A recording larger than the
 terminal is cropped to it, keeping the newest rows in view, with a note on stderr; `--no-crop`
-turns that off. Resizing the terminal during playback is not followed.
+turns that off. Resizing the terminal during playback is not followed. When playback ends, or you
+press Ctrl-C (exit status 130), the cursor is restored and a short summary goes to stderr (frames,
+time played and saved, file); `-q` turns it off, and nothing is printed when stdout is not a
+terminal.
 
 Export it as an animated image:
 
