@@ -35,6 +35,7 @@ func newRootCmd() *cobra.Command {
 	}
 	root.AddCommand(
 		newRecordCmd(),
+		newReplayCmd(),
 		newSnapCmd(),
 		newVersionCmd(),
 	)
