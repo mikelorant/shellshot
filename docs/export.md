@@ -102,3 +102,22 @@ Lines are right-trimmed, so a background colour painted on trailing spaces is lo
 | `--hold` | 2s | How long the final frame stays |
 | `--min-delay` | 20ms | Shortest frame delay; shorter frames merge into the previous one (0 keeps all) |
 | `--loops` | 0 | Times the animation plays (0 for forever) |
+
+## Scenes and hidden spans
+
+A recording can carry spans, marked by a script run. `export` applies the speed, idle and hold
+hints stored in scenes and cuts hidden spans from the output. A recording without spans exports
+as before.
+
+| Flag | Meaning |
+|---|---|
+| `--no-hints` | Ignore the hints stored in scenes. Hidden spans are still cut |
+| `--show-hidden` | Render hidden spans instead of cutting them |
+
+`--speed`, `--idle-limit` and `--hold`, when given, each apply to the whole recording and replace
+the matching scene hint. An explicit `--hold` also drops scene hold hints. Without `--hold`, a
+scene hold is added to the default 2s final hold where a scene ends. The precedence is flag, then
+scene hint, then default. The script-level `meta` hint is not read yet.
+
+A scene or hidden span that was never closed (the recorder was killed) ends at the last event. A
+malformed span event ends the span list, and export warns on stderr.
