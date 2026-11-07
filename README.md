@@ -81,7 +81,7 @@ events        3
 status        complete
 ```
 
-Every command has `--help`. Themes, fonts, cell size and timing flags for `export` are in
+Every command has `--help`. Output formats (`--format`), themes, fonts, cell size and timing flags for `export` are in
 [docs/export.md](docs/export.md). The file format is in [docs/format.md](docs/format.md).
 
 ## Script

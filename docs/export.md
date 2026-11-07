@@ -5,11 +5,23 @@
 and Discord animate it; at the time of writing, macOS Preview and Quick Look show only the
 first frame. Run `shellshot export --help` for the flag list.
 
+## Output format
+
+`--format NAME` chooses the output format. Without it, the format comes from the extension of
+`-o` (case-insensitive), and is `apng` when there is no `-o` or `-o` has no extension. An
+extension that no format owns, or an unknown `--format` name, fails with the list of supported
+formats (`supported: apng`); `--format` then lets you write any file name.
+
+| Format | `--format` | Extensions | Notes |
+| --- | --- | --- | --- |
+| Animated PNG | `apng` | `.png`, `.apng` | The default. Plays in browsers, GitHub, Slack and Discord. |
+
 ## Output file
 
-- Without `-o`, the output is `FILE` with its extension replaced by `.png`.
-- `-o` is used as typed, whatever its extension. `-o -` writes a file named `-`; export
-  does not write to stdout.
+- Without `-o`, the output is `FILE` with its extension replaced by the first extension of the
+  format (`.png` for `apng`).
+- `-o` is used as typed, whatever its extension, and the extension picks the format unless
+  `--format` is given. `-o -` writes a file named `-`; export does not write to stdout.
 - Export refuses to overwrite the input recording and replaces any other existing file.
 - The file is written atomically: a failed run leaves no partial output.
 - A recording cut short by a crash exports up to the damage, with the same note on stderr as
