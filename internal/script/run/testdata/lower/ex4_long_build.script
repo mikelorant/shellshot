@@ -1,0 +1,30 @@
+size 110x30
+shell /bin/sh
+env CI=1
+env PS1="$ "
+timeout 120s
+typing 30ms
+hold 1s                         # script-wide export default (written to meta)
+
+hidden {
+  run lines {
+    cd ~/src/app
+    make clean > /dev/null 2>&1
+    clear
+  }
+}
+
+scene build {
+  speed 8x                      # export: play the wait at 8x
+  idle 2s
+  settle off                    # make prints for minutes and would never go quiet: no implicit settle
+  run make build; echo BUILD-STATUS=$?
+  wait /^BUILD-STATUS=0$/ 5m    # the explicit wait carries the long timeout; anchored: the echo starts with the prompt
+  mark built
+}
+
+scene check {
+  linger 2s
+  run ./bin/app --version
+  wait /v[0-9]+\.[0-9]+/
+}
