@@ -6,6 +6,7 @@ package snapshot
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -14,7 +15,11 @@ import (
 type Snapshot struct {
 	// Cols and Rows are the screen dimensions in cells.
 	Cols, Rows int
-	// Lines holds exactly Rows entries of plain text, right-trimmed.
+	// Lines holds exactly Rows entries of plain text. Each line is
+	// right-trimmed, except for trailing spaces that carry a visible style (a
+	// background colour, inverse, underline or strikethrough), which are kept
+	// so that Spans can cover them. A line may therefore end in spaces, but
+	// only in spaces that Spans style.
 	Lines []string
 	// Spans holds styling for Lines: either nil/empty (everything unstyled)
 	// or exactly Rows entries, one slice per line. Each line's spans cover
@@ -52,7 +57,9 @@ type Frame struct {
 	Snapshot Snapshot
 }
 
-// Text returns the screen as a single string, lines joined by "\n".
+// Text returns the screen as a single string, lines joined by "\n". Styling
+// is ignored, so trailing spaces of every line are removed, including those
+// Lines keeps because they carry a style.
 func (s Snapshot) Text() string {
 	n := 0
 	for _, l := range s.Lines {
@@ -63,7 +70,7 @@ func (s Snapshot) Text() string {
 		if i > 0 {
 			b = append(b, '\n')
 		}
-		b = append(b, l...)
+		b = append(b, strings.TrimRight(l, " ")...)
 	}
 	return string(b)
 }

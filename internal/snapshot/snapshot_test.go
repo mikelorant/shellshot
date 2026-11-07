@@ -173,3 +173,14 @@ func TestSnapshotColumnsOutOfRange(t *testing.T) {
 		t.Errorf("CellWidth(5, 5) = %d, want 1", got)
 	}
 }
+
+func TestSnapshotTextTrimsStyledTrailingSpaces(t *testing.T) {
+	s := Snapshot{
+		Rows:  3,
+		Lines: []string{"ab   ", "", "c d"},
+		Spans: [][]Span{{{Start: 2, End: 5, Style: Style{Bg: Color{Kind: ColorPalette, Index: 4}}}}, nil, nil},
+	}
+	if got, want := s.Text(), "ab\n\nc d"; got != want {
+		t.Errorf("Text = %q, want %q", got, want)
+	}
+}

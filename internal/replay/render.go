@@ -32,7 +32,8 @@ type RenderOptions struct {
 // s.Cursor (1-based in CSI) and shows or hides it per s.Cursor.Visible.
 //
 // Without o.Clear, the output is the lines each followed by "\n", suitable for
-// pipes and files.
+// pipes and files. Trailing spaces are left out of a line that is written
+// without colour, including those Lines keeps for a background or other style.
 //
 // With o.Color set, each span of s.Spans is written as "ESC[<SGR>m", the
 // span's text and "ESC[0m", so a style never outlives its run, line or frame.
@@ -45,7 +46,8 @@ func Render(s snapshot.Snapshot, o RenderOptions) string {
 		if o.Color && y < len(s.Spans) {
 			writeStyledLine(&b, s.Lines[y], s.Spans[y])
 		} else {
-			b.WriteString(s.Lines[y])
+			// Without colour, spaces that are only there to carry a style show nothing.
+			b.WriteString(strings.TrimRight(s.Lines[y], " "))
 		}
 	}
 	if !o.Clear {
