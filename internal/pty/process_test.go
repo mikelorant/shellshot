@@ -7,6 +7,8 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -251,5 +253,57 @@ func TestDisableEOTEchoAfterCloseFails(t *testing.T) {
 	}
 	if err := p.DisableEOTEcho(); err == nil {
 		t.Fatal("DisableEOTEcho after Close = nil, want error")
+	}
+}
+
+// TestFastChildOutputIsNeverLost starts many short-lived children at once. A
+// child that writes and exits before the master is read must not lose its
+// output: on macOS the child's exit would otherwise flush it.
+func TestFastChildOutputIsNeverLost(t *testing.T) {
+	const workers, runs = 32, 12
+	var wg sync.WaitGroup
+	var lost atomic.Int64
+	for range workers {
+		wg.Go(func() {
+			for range runs {
+				p, err := Start(context.Background(), Config{Command: "echo", Args: []string{"hello"}})
+				if err != nil {
+					t.Errorf("Start: %v", err)
+					return
+				}
+				out, _ := io.ReadAll(p)
+				if _, err := p.Wait(); err != nil {
+					t.Errorf("Wait: %v", err)
+				}
+				_ = p.Close()
+				if strings.TrimSpace(string(out)) != "hello" {
+					lost.Add(1)
+				}
+			}
+		})
+	}
+	wg.Wait()
+	if n := lost.Load(); n > 0 {
+		t.Errorf("%d of %d runs lost the child's output", n, workers*runs)
+	}
+}
+
+// TestCloseWithUnreadOutputReturns checks that Close does not wait for a
+// reader that never comes: the exited child's output stays unread.
+func TestCloseWithUnreadOutputReturns(t *testing.T) {
+	p, err := Start(context.Background(), Config{Command: "echo", Args: []string{"hello"}})
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	closed := make(chan error, 1)
+	go func() { closed <- p.Close() }()
+	select {
+	case err := <-closed:
+		if err != nil {
+			t.Errorf("Close: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close did not return with unread output")
 	}
 }
