@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
+	"math"
 
 	xfont "golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
 
 	"github.com/michaellorant/shellshot/internal/render/font"
 	"github.com/michaellorant/shellshot/internal/render/theme"
@@ -32,8 +34,7 @@ type Fonts interface {
 	// cells (cells wide, cellW x cellH pixels each) r occupies. ok is false
 	// if no font has r.
 	FitFace(r rune, bold, italic bool, sizePx float64, cellW, cellH, cells int) (face xfont.Face, ok bool, err error)
-	// Metrics returns the whole-pixel cell geometry for an em size of
-	// sizePx, and the em size (EmPx) the faces must be created at.
+	// Metrics returns the whole-pixel cell geometry at sizePx.
 	Metrics(sizePx float64) (font.Metrics, error)
 }
 
@@ -41,10 +42,7 @@ type Fonts interface {
 // Theme means theme.Default().
 type Options struct {
 	Theme theme.Theme
-	// FontSize is the requested em size in pixels before Scale is applied.
-	// The size actually drawn is adjusted by up to half a pixel of glyph
-	// advance so the cell width is a whole number of pixels (see
-	// font.Set.Metrics).
+	// FontSize is the em size in pixels before Scale is applied.
 	FontSize float64
 	// Padding is the border around the cell grid in pixels before Scale.
 	Padding int
@@ -52,6 +50,10 @@ type Options struct {
 	Scale int
 	// Cursor selects the cursor shape; the zero value is CursorBlock.
 	Cursor CursorStyle
+	// AdjustCellWidth and AdjustCellHeight change the font-derived cell size
+	// after Scale is applied, like Ghostty's adjust-cell-width and
+	// adjust-cell-height. The zero values change nothing.
+	AdjustCellWidth, AdjustCellHeight font.CellAdjust
 }
 
 // Renderer turns snapshots into images. It is not safe for concurrent use
@@ -59,9 +61,10 @@ type Options struct {
 type Renderer struct {
 	theme   theme.Theme
 	fonts   Fonts
-	sizePx  float64      // em size of the faces: metrics.EmPx
-	pad     int          // Padding * Scale
-	metrics font.Metrics // cell geometry in final pixels (Scale applied)
+	sizePx  float64       // em size of the faces: metrics.EmPx
+	pad     int           // Padding * Scale
+	metrics font.Metrics  // cell geometry in final pixels (Scale and adjustments applied)
+	glyphDX fixed.Int26_6 // glyph offset inside the cell, see font.Metrics.GlyphOffsetX
 	regular xfont.Face
 	faces   [4]xfont.Face // indexed by faceIndex(bold, italic)
 	cursor  CursorStyle
@@ -95,26 +98,19 @@ func New(f Fonts, o Options) (*Renderer, error) {
 		pad:    o.Padding * o.Scale,
 		cursor: o.Cursor,
 	}
-	// Metrics are derived at scale 1 and multiplied, so Scale n is exactly
-	// n times the scale 1 layout.
-	m, err := f.Metrics(o.FontSize)
+	r.sizePx = o.FontSize * float64(o.Scale)
+	m, err := f.Metrics(r.sizePx)
 	if err != nil {
 		return nil, fmt.Errorf("raster: font metrics: %w", err)
 	}
-	if m.CellWidth <= 0 || m.CellHeight <= 0 || !(m.EmPx > 0) {
-		return nil, fmt.Errorf("raster: degenerate cell size %dx%d at em %v", m.CellWidth, m.CellHeight, m.EmPx)
+	if err := m.CheckAdjust(o.AdjustCellWidth, o.AdjustCellHeight); err != nil {
+		return nil, fmt.Errorf("raster: %w", err)
 	}
-	k := o.Scale
-	r.metrics = font.Metrics{
-		CellWidth:  m.CellWidth * k,
-		CellHeight: m.CellHeight * k,
-		Ascent:     m.Ascent * k,
-		Descent:    m.Descent * k,
-		EmPx:       m.EmPx * float64(k),
-
-		UnderlineOffset: m.UnderlineOffset * k,
+	r.metrics = m.Adjust(o.AdjustCellWidth, o.AdjustCellHeight)
+	if r.metrics.CellWidth <= 0 || r.metrics.CellHeight <= 0 {
+		return nil, fmt.Errorf("raster: degenerate cell size %dx%d", r.metrics.CellWidth, r.metrics.CellHeight)
 	}
-	r.sizePx = r.metrics.EmPx
+	r.glyphDX = fixed.Int26_6(math.Round(r.metrics.GlyphOffsetX() * 64))
 	for i := range r.faces {
 		if r.faces[i], err = f.Face(i&1 != 0, i&2 != 0, r.sizePx); err != nil {
 			return nil, fmt.Errorf("raster: face %d: %w", i, err)

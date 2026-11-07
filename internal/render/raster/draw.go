@@ -146,6 +146,7 @@ func (r *Renderer) drawGlyph(img *image.RGBA, d *xfont.Drawer, c cell) {
 	d.Face = r.contrastFace(face, c.st.fg, c.st.bg)
 	d.Src = image.NewUniform(c.st.fg)
 	d.Dot = r.baselineDot(c.col, c.row)
+	d.Dot.X += r.glyphDX
 	if c.mark {
 		d.Dot.X += c.advance
 	}

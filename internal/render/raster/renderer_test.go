@@ -61,7 +61,7 @@ func TestSizeFromMetrics(t *testing.T) {
 		{"scale 2", Options{FontSize: 12, Padding: 5, Scale: 2}, 12, 10, 2, 7, 3},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := set.Metrics(tc.size) // scale 1; Scale multiplies it
+			m, err := set.Metrics(tc.size * float64(tc.scale))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -70,10 +70,10 @@ func TestSizeFromMetrics(t *testing.T) {
 				t.Fatal(err)
 			}
 			w, h := r.Size(tc.cols, tc.rows)
-			if want := tc.cols*m.CellWidth*tc.scale + 2*tc.pad; w != want {
+			if want := tc.cols*m.CellWidth + 2*tc.pad; w != want {
 				t.Errorf("width = %d, want %d", w, want)
 			}
-			if want := tc.rows*m.CellHeight*tc.scale + 2*tc.pad; h != want {
+			if want := tc.rows*m.CellHeight + 2*tc.pad; h != want {
 				t.Errorf("height = %d, want %d", h, want)
 			}
 			img, err := r.Render(plainSnapshot(tc.cols, make([]string, tc.rows)...))
@@ -233,5 +233,57 @@ func TestRenderDeterministicAndFresh(t *testing.T) {
 	c, _ := r2.Render(s)
 	if !bytes.Equal(a.Pix, c.Pix) {
 		t.Error("renders differ across independent Renderers")
+	}
+}
+
+// Adjustments apply to the font-derived cell after Scale, like Ghostty's
+// adjust-cell-width and adjust-cell-height.
+func TestAdjustCellSize(t *testing.T) {
+	set, err := font.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	width, _ := font.ParseCellAdjust("-7%")
+	height, _ := font.ParseCellAdjust("3")
+	plain, err := New(set, Options{FontSize: 12, Scale: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	adj, err := New(set, Options{FontSize: 12, Scale: 2, AdjustCellWidth: width, AdjustCellHeight: height})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 12 px at scale 2 is 24 px: 14.4 x 31.68 rounds to 14x32; -7% gives 13,
+	// and 3 more rows give 35.
+	if m := plain.metrics; m.CellWidth != 14 || m.CellHeight != 32 {
+		t.Fatalf("plain cell %dx%d, want 14x32", m.CellWidth, m.CellHeight)
+	}
+	if m := adj.metrics; m.CellWidth != 13 || m.CellHeight != 35 || m.Ascent+m.Descent != 35 {
+		t.Errorf("adjusted cell %+v, want 13x35", m)
+	}
+	if w, h := adj.Size(80, 24); w != 80*13+2*16 || h != 24*35+2*16 {
+		t.Errorf("Size(80, 24) = %dx%d", w, h)
+	}
+}
+
+// Adjustments that leave a cell under 1 px or over ten times the font's size
+// are errors, not silently clamped.
+func TestAdjustCellSizeRejectsNonsense(t *testing.T) {
+	set, err := font.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ name, width, height string }{
+		{"width -100%", "-100%", "0"},
+		{"width below one pixel", "-20", "0"},
+		{"width over 10x", "1000%", "0"},
+		{"height over 10x", "0", "5000"},
+		{"height -100%", "0", "-100%"},
+	} {
+		w, _ := font.ParseCellAdjust(tc.width)
+		h, _ := font.ParseCellAdjust(tc.height)
+		if _, err := New(set, Options{FontSize: 12, AdjustCellWidth: w, AdjustCellHeight: h}); err == nil {
+			t.Errorf("%s: New succeeded, want an error", tc.name)
+		}
 	}
 }

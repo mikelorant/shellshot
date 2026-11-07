@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	xfont "golang.org/x/image/font"
+	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -33,44 +34,163 @@ func TestDefaultLoads(t *testing.T) {
 func TestMetricsGolden(t *testing.T) {
 	// JetBrains Mono: advance 0.6 em, ascent 1.02 em, descent 0.3 em, no gap.
 	for _, tc := range []struct {
-		size float64
-		want Metrics
+		size                              float64
+		width, height, ascent, descent, u int
 	}{
-		// 8.4 px advance rounds to 8, so the em shrinks to 8/0.6.
-		{14, Metrics{CellWidth: 8, CellHeight: 18, Ascent: 14, Descent: 4, EmPx: 8 / 0.6}},
-		// 0.6 em is already a whole number of pixels: nothing changes.
-		{15, Metrics{CellWidth: 9, CellHeight: 20, Ascent: 15, Descent: 5, EmPx: 15}},
-		// 9.6 px advance rounds up to 10, so the em grows to 10/0.6.
-		{16, Metrics{CellWidth: 10, CellHeight: 22, Ascent: 17, Descent: 5, EmPx: 10 / 0.6}},
+		{12, 7, 16, 12, 4, 2},  // 7.2 and 15.84 round
+		{14, 8, 18, 14, 4, 2},  // 8.4 rounds down: tighter than design, not looser
+		{15, 9, 20, 16, 4, 2},  // exact advance
+		{16, 10, 21, 16, 5, 2}, // 9.6 rounds up
+		{24, 14, 32, 25, 7, 4}, // 12pt on a 2x display in Ghostty
 	} {
 		m, err := mustDefault(t).Metrics(tc.size)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if m.CellWidth != tc.want.CellWidth || m.CellHeight != tc.want.CellHeight ||
-			m.Ascent != tc.want.Ascent || m.Descent != tc.want.Descent || math.Abs(m.EmPx-tc.want.EmPx) > 1e-9 {
-			t.Errorf("Metrics(%v) = %+v, want %+v", tc.size, m, tc.want)
+		if m.CellWidth != tc.width || m.CellHeight != tc.height || m.Ascent != tc.ascent || m.Descent != tc.descent || m.UnderlineOffset != tc.u {
+			t.Errorf("Metrics(%v) = %+v, want %dx%d ascent %d descent %d underline %d", tc.size, m, tc.width, tc.height, tc.ascent, tc.descent, tc.u)
+		}
+		if math.Abs(m.FaceWidth-0.6*tc.size) > 1e-9 {
+			t.Errorf("Metrics(%v).FaceWidth = %v, want %v", tc.size, m.FaceWidth, 0.6*tc.size)
 		}
 	}
 }
 
-// The cell width is the glyph advance: at EmPx an 'M' advances CellWidth to
-// within the 1/64 px resolution of face advances, and EmPx stays within half
-// a pixel of advance of the requested size.
-func TestMetricsPitchMatchesAdvance(t *testing.T) {
+func TestParseCellAdjust(t *testing.T) {
+	for _, tc := range []struct {
+		in         string
+		v, want    int
+		wantString string
+	}{
+		{"2", 14, 16, "2"},
+		{"-1", 14, 13, "-1"},
+		{"+3", 14, 17, "3"},
+		{"-100", 14, 0, "-100"},   // pixels: not below zero
+		{"-7%", 14, 13, "-7%"},    // 13.02
+		{"-7%", 7, 7, "-7%"},      // 6.51 rounds up
+		{"20%", 10, 12, "20%"},    // a percentage of the size, not of 100
+		{"-150%", 10, 0, "-150%"}, // multiplier clamped at 0
+		{"0%", 10, 10, "0%"},
+	} {
+		a, err := ParseCellAdjust(tc.in)
+		if err != nil {
+			t.Errorf("ParseCellAdjust(%q): %v", tc.in, err)
+			continue
+		}
+		if got := a.apply(tc.v); got != tc.want {
+			t.Errorf("%q applied to %d = %d, want %d", tc.in, tc.v, got, tc.want)
+		}
+		if a.String() != tc.wantString {
+			t.Errorf("%q formats as %q, want %q", tc.in, a.String(), tc.wantString)
+		}
+	}
+	for _, bad := range []string{"", "%", "x", "1.5", "5px", "--2", "NaN%", "1e999%"} {
+		if _, err := ParseCellAdjust(bad); err == nil {
+			t.Errorf("ParseCellAdjust(%q) succeeded, want error", bad)
+		}
+	}
+	var zero CellAdjust
+	if zero.apply(9) != 9 || zero.String() != "0" {
+		t.Error("zero CellAdjust changes the size")
+	}
+}
+
+// ghosttyCell transcribes Metrics.calc and the cell_width/cell_height
+// modifiers of Ghostty (third_party/ghostty/src/font/Metrics.zig, pinned
+// commit) from raw font numbers in pixels, with its own bottom-up baseline,
+// so the arithmetic is independent of Set.Metrics. Returns cell width,
+// height, baseline distance from the top.
+func ghosttyCell(advance, ascent, descent, gap float64, wPct, hPct *float64, wPx, hPx int) (w, h, baselineFromTop int) {
+	faceHeight := ascent + descent + gap
+	cellW, cellH := math.Round(advance), math.Round(faceHeight)
+	faceBaseline := gap/2 + descent // descent as a positive depth
+	cellBaseline := math.Round(faceBaseline - (cellH-faceHeight)/2)
+	faceY := cellBaseline - faceBaseline
+	mod := func(v float64, pct *float64, px int) float64 {
+		switch {
+		case pct != nil:
+			return math.Max(1, math.Round(v*math.Max(0, 1+*pct/100)))
+		default:
+			return math.Max(1, v+float64(px))
+		}
+	}
+	newW, newH := mod(cellW, wPct, wPx), mod(cellH, hPct, hPx)
+	if newH != cellH {
+		diff := newH - cellH
+		half := diff / 2
+		var diffTop, diffBottom float64
+		if faceY-(cellH-faceHeight)/2 > 0 {
+			diffTop, diffBottom = math.Ceil(half), math.Floor(half)
+		} else {
+			diffTop, diffBottom = math.Floor(half), math.Ceil(half)
+		}
+		_ = diffTop
+		cellBaseline += diffBottom
+		cellH = newH
+	}
+	return int(newW), int(cellH), int(cellH - cellBaseline)
+}
+
+// Cell geometry must equal Ghostty's for the same font size, including the
+// user's 12pt font with adjust-cell-width = -7% on a 1x and 2x display.
+func TestCellGeometryMatchesGhostty(t *testing.T) {
 	s := mustDefault(t)
-	for size := 6.0; size <= 48; size += 0.5 {
-		m, err := s.Metrics(size)
+	f := s.fonts[styleRegular]
+	var buf sfnt.Buffer
+	upm := fixed.I(int(f.UnitsPerEm()))
+	m, err := f.Metrics(&buf, upm, xfont.HintingNone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, _ := f.GlyphIndex(&buf, 'M')
+	advUnits, _ := f.GlyphAdvance(&buf, g, upm, xfont.HintingNone)
+	pct := func(v float64) *float64 { return &v }
+	type adj struct {
+		spec string
+		pct  *float64
+		px   int
+	}
+	adjusts := []adj{{"0", nil, 0}, {"-7%", pct(-7), 0}, {"2", nil, 2}, {"-1", nil, -1}, {"10%", pct(10), 0}, {"-20%", pct(-20), 0}}
+	for _, size := range []float64{11, 12, 14, 15, 16, 20, 24, 28, 33.5} {
+		scale := size / float64(upm>>6)
+		advance := float64(advUnits>>6) * scale
+		ascent, descent, height := float64(m.Ascent>>6)*scale, float64(m.Descent>>6)*scale, float64(m.Height>>6)*scale
+		base, err := s.Metrics(size)
 		if err != nil {
 			t.Fatal(err)
 		}
-		face, _ := s.Face(false, false, m.EmPx)
-		adv, _ := face.GlyphAdvance('M')
-		if d := math.Abs(float64(adv)/64 - float64(m.CellWidth)); d > 0.05 {
-			t.Errorf("Metrics(%v): advance %.3f px, cell width %d", size, float64(adv)/64, m.CellWidth)
+		for _, w := range adjusts {
+			for _, h := range adjusts {
+				wa, _ := ParseCellAdjust(w.spec)
+				ha, _ := ParseCellAdjust(h.spec)
+				got := base.Adjust(wa, ha)
+				wantW, wantH, wantBase := ghosttyCell(advance, ascent, descent, height-ascent-descent, w.pct, h.pct, w.px, h.px)
+				if got.CellWidth != wantW || got.CellHeight != wantH || got.Ascent != wantBase {
+					t.Errorf("size %v width %s height %s: got %dx%d baseline %d, Ghostty %dx%d baseline %d",
+						size, w.spec, h.spec, got.CellWidth, got.CellHeight, got.Ascent, wantW, wantH, wantBase)
+				}
+			}
 		}
-		if d := math.Abs(m.EmPx-size) * 0.6; d > 0.5+1e-9 && m.CellWidth > 1 {
-			t.Errorf("Metrics(%v): EmPx %.3f moves the advance by %.2f px", size, m.EmPx, d)
+	}
+}
+
+func TestGlyphOffsetX(t *testing.T) {
+	for _, tc := range []struct {
+		cell int
+		face float64
+		want float64
+	}{
+		{9, 9, 0},
+		{10, 9.6, 0.2},   // wider cell: centre
+		{12, 9.6, 1.2},   // much wider: centre
+		{8, 8.4, -0.2},   // narrower by under a pixel: shift by the fraction
+		{13, 14.4, -0.7}, // narrower by 1.4: the integer part is dropped, left-anchored
+		{7, 14.4, -0.7},  // dx = -3.7 -> -0.7
+		{14, 14.4, -0.2}, // 12pt on a 2x display
+	} {
+		m := Metrics{CellWidth: tc.cell, FaceWidth: tc.face}
+		if got := m.GlyphOffsetX(); math.Abs(got-tc.want) > 1e-9 {
+			t.Errorf("cell %d face %v: offset %v, want %v", tc.cell, tc.face, got, tc.want)
 		}
 	}
 }
