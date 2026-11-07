@@ -1,0 +1,235 @@
+package cli
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/michaellorant/shellshot/internal/export/pipeline"
+	"github.com/michaellorant/shellshot/internal/export/timeline"
+	"github.com/michaellorant/shellshot/internal/recording"
+	"github.com/michaellorant/shellshot/internal/render/font"
+	"github.com/michaellorant/shellshot/internal/render/raster"
+	"github.com/michaellorant/shellshot/internal/render/theme"
+)
+
+// exportFlags holds the values of the export command's flags.
+type exportFlags struct {
+	output    string
+	theme     string
+	fontSize  float64
+	scale     int
+	padding   int
+	speed     float64
+	idleLimit time.Duration
+	hold      time.Duration
+	loops     int
+	minDelay  time.Duration
+	cursor    string
+}
+
+// newExportCmd builds "shellshot export", which renders a recording as an
+// animated PNG.
+func newExportCmd() *cobra.Command {
+	var f exportFlags
+	cmd := &cobra.Command{
+		Use:   "export FILE [-o OUT.apng] [flags]",
+		Short: "Render a recording as an animated PNG (APNG)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runExport(cmd, args[0], f)
+		},
+	}
+	fl := cmd.Flags()
+	fl.StringVarP(&f.output, "output", "o", "", "output file (default: FILE with the extension .apng)")
+	fl.StringVar(&f.theme, "theme", "", "built-in theme name ("+strings.Join(theme.Names(), ", ")+") or a theme JSON file (default: "+theme.Default().Name+")")
+	fl.Float64Var(&f.fontSize, "font-size", raster.DefaultFontSize, "font size in pixels, before --scale")
+	fl.IntVar(&f.scale, "scale", raster.DefaultScale, "integer scale factor for font size and padding")
+	fl.IntVar(&f.padding, "padding", raster.DefaultPadding, "border around the screen in pixels (at least 1), before --scale")
+	fl.Float64Var(&f.speed, "speed", 1, "playback speed multiplier (2 plays twice as fast)")
+	fl.DurationVar(&f.idleLimit, "idle-limit", 2*time.Second, "longest pause between frames, before --speed (0 for no limit)")
+	fl.DurationVar(&f.hold, "hold", 2*time.Second, "how long the final frame stays on screen")
+	fl.IntVar(&f.loops, "loops", 0, "number of times the animation plays (0 for forever)")
+	fl.DurationVar(&f.minDelay, "min-delay", 20*time.Millisecond, "shortest frame delay; shorter frames are merged into the previous one (0 to keep all)")
+	fl.StringVar(&f.cursor, "cursor", "block", "cursor shape: block, bar, underline or none")
+	return cmd
+}
+
+// cursorStyles maps the --cursor values to raster cursor styles.
+var cursorStyles = map[string]raster.CursorStyle{
+	"block":     raster.CursorBlock,
+	"bar":       raster.CursorBar,
+	"underline": raster.CursorUnderline,
+	"none":      raster.CursorNone,
+}
+
+// validate checks the flag values and returns the cursor style.
+func (f exportFlags) validate() (raster.CursorStyle, error) {
+	cursor, ok := cursorStyles[f.cursor]
+	switch {
+	case !ok:
+		return 0, fmt.Errorf("invalid --cursor %q (want block, bar, underline or none)", f.cursor)
+	case !(f.fontSize > 0):
+		return 0, fmt.Errorf("invalid --font-size %v (must be greater than zero)", f.fontSize)
+	case f.scale < 1:
+		return 0, fmt.Errorf("invalid --scale %d (must be at least 1)", f.scale)
+	case f.padding < 1:
+		return 0, fmt.Errorf("invalid --padding %d (must be at least 1)", f.padding)
+	case !(f.speed > 0):
+		return 0, fmt.Errorf("invalid --speed %v (must be greater than zero)", f.speed)
+	case f.idleLimit < 0:
+		return 0, fmt.Errorf("invalid --idle-limit %v (must not be negative)", f.idleLimit)
+	case f.hold < 0:
+		return 0, fmt.Errorf("invalid --hold %v (must not be negative)", f.hold)
+	case f.loops < 0:
+		return 0, fmt.Errorf("invalid --loops %d (must not be negative)", f.loops)
+	case f.minDelay < 0:
+		return 0, fmt.Errorf("invalid --min-delay %v (must not be negative)", f.minDelay)
+	}
+	return cursor, nil
+}
+
+// resolveTheme returns the theme named by value: empty for the default, a
+// built-in theme name, or otherwise the path of a theme JSON file.
+func resolveTheme(value string) (theme.Theme, error) {
+	if value == "" {
+		return theme.Default(), nil
+	}
+	if t, ok := theme.Lookup(value); ok {
+		return t, nil
+	}
+	f, err := os.Open(value)
+	if err != nil {
+		return theme.Theme{}, fmt.Errorf("unknown --theme %q: not a built-in theme (%s) and cannot be read as a file: %w",
+			value, strings.Join(theme.Names(), ", "), err)
+	}
+	defer f.Close()
+	t, err := theme.Load(f)
+	if err != nil {
+		return theme.Theme{}, fmt.Errorf("--theme %s: %w", value, err)
+	}
+	return t, nil
+}
+
+// defaultExportPath returns path with its extension replaced by ".apng".
+func defaultExportPath(path string) string {
+	return strings.TrimSuffix(path, filepath.Ext(path)) + ".apng"
+}
+
+// runExport renders the recording at input to flags.output, or to input with
+// the extension .apng.
+func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
+	cursor, err := flags.validate()
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+	th, err := resolveTheme(flags.theme)
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+	output := flags.output
+	if output == "" {
+		output = defaultExportPath(input)
+	}
+	if sameFile(input, output) {
+		return fmt.Errorf("export: output %s would overwrite the input recording", output)
+	}
+	fonts, err := font.Default()
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+	renderer, err := raster.New(fonts, raster.Options{
+		Theme:    th,
+		FontSize: flags.fontSize,
+		Padding:  flags.padding,
+		Scale:    flags.scale,
+		Cursor:   cursor,
+	})
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+
+	in, err := os.Open(input)
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+	defer in.Close()
+	rec, err := recording.NewReader(in)
+	if err != nil {
+		return fmt.Errorf("export: %s: %w", input, err)
+	}
+	hdr := rec.Header()
+
+	var frames int
+	opts := pipeline.Options{
+		Timeline: timeline.Options{
+			Speed:     flags.speed,
+			IdleLimit: flags.idleLimit,
+			Hold:      flags.hold,
+			MinDelay:  flags.minDelay,
+		},
+		Loops:    flags.loops,
+		Progress: func(_, total int) { frames = total },
+	}
+	size, err := writeFileAtomic(output, func(f *os.File) error {
+		return pipeline.Export(cmd.Context(), rec, hdr.Cols, hdr.Rows, renderer, f, opts)
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d frames (%.1f KB) to %s\n", frames, float64(size)/1024, output)
+	return nil
+}
+
+// sameFile reports whether a and b name the same existing file, or the same
+// cleaned path.
+func sameFile(a, b string) bool {
+	if filepath.Clean(a) == filepath.Clean(b) {
+		return true
+	}
+	ai, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	bi, err := os.Stat(b)
+	return err == nil && os.SameFile(ai, bi)
+}
+
+// writeFileAtomic runs write on a temporary file next to path and renames it
+// to path when write and the close succeed, so a failed run leaves no
+// partial output (and keeps any existing file). It returns the size written.
+// An error from write is returned unchanged; file-system errors are wrapped
+// with the output path.
+func writeFileAtomic(path string, write func(*os.File) error) (size int64, err error) {
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return 0, fmt.Errorf("export: create output: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			tmp.Close()
+			os.Remove(tmp.Name())
+		}
+	}()
+	if err = write(tmp); err != nil {
+		return 0, err
+	}
+	if err = tmp.Chmod(0o644); err != nil {
+		return 0, fmt.Errorf("export: write %s: %w", path, err)
+	}
+	info, err := tmp.Stat()
+	if err != nil {
+		return 0, fmt.Errorf("export: write %s: %w", path, err)
+	}
+	if err = tmp.Close(); err != nil {
+		return 0, fmt.Errorf("export: write %s: %w", path, err)
+	}
+	if err = os.Rename(tmp.Name(), path); err != nil {
+		return 0, fmt.Errorf("export: write %s: %w", path, err)
+	}
+	return info.Size(), nil
+}
