@@ -13,6 +13,7 @@ import (
 const sec = time.Second
 
 func TestBuildSegments(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		frames []snapshot.Frame
@@ -290,6 +291,7 @@ func TestBuildSegments(t *testing.T) {
 }
 
 func TestBuildSegmentsDoNotMutateInput(t *testing.T) {
+	t.Parallel()
 	frames := mk(fr{"a", 0}, fr{"x", sec}, fr{"b", 3 * sec})
 	segs := []Segment{{From: sec, To: 2 * sec, Skip: true, Hold: sec}}
 	beforeFrames, beforeSegs := slices.Clone(frames), slices.Clone(segs)
@@ -307,6 +309,7 @@ func TestBuildSegmentsDoNotMutateInput(t *testing.T) {
 }
 
 func TestBuildSegmentsDeterministic(t *testing.T) {
+	t.Parallel()
 	frames := mk(fr{"a", 0}, fr{"b", sec}, fr{"x", 2 * sec}, fr{"c", 5 * sec}, fr{"c", 6 * sec}, fr{"d", 9 * sec})
 	o := Options{Speed: 1.5, IdleLimit: 2 * sec, Hold: sec, MinDelay: 30 * ms, Segments: []Segment{
 		{From: 0, To: 1500 * ms, Speed: 3, Hold: sec},
@@ -331,6 +334,7 @@ func TestBuildSegmentsDeterministic(t *testing.T) {
 }
 
 func TestBuildSegmentValidation(t *testing.T) {
+	t.Parallel()
 	f := mk(fr{"a", 0}, fr{"b", sec})
 	tests := []struct {
 		name string
@@ -444,6 +448,7 @@ func sameSteps(a, b []Step) bool {
 // old algorithm, for nil segments, empty segments and segments that change
 // nothing (zero fields, no skip, no hold) however they split the timeline.
 func TestBuildWithoutSegmentsMatchesReference(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewPCG(1, 2))
 	for iter := range 400 {
 		frames := randomFrames(r, 1+r.IntN(30), 1+r.IntN(5))
@@ -564,6 +569,7 @@ func oracleTotal(frames []snapshot.Frame, o Options) time.Duration {
 // duration matches the oracle whatever dedup and min-delay folding do, that
 // and that results are stable.
 func TestBuildSegmentsRandomTotals(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewPCG(3, 4))
 	for iter := range 500 {
 		frames := randomFrames(r, 2+r.IntN(30), 1+r.IntN(6))
@@ -615,6 +621,7 @@ func TestBuildSegmentsRandomTotals(t *testing.T) {
 }
 
 func TestFlattenSegments(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		in   []Segment
@@ -786,6 +793,7 @@ func TestFlattenSegments(t *testing.T) {
 }
 
 func TestFlattenSegmentsErrors(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		in   []Segment
@@ -830,6 +838,7 @@ func randomNested(r *rand.Rand, from, to time.Duration, depth int, out *[]Segmen
 }
 
 func TestFlattenSegmentsRandomNesting(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewPCG(5, 6))
 	for iter := range 300 {
 		var in []Segment
@@ -903,6 +912,7 @@ func TestFlattenSegmentsRandomNesting(t *testing.T) {
 
 // TestFlattenedSegmentsBuild runs a scene with a hidden span end to end.
 func TestFlattenedSegmentsBuild(t *testing.T) {
+	t.Parallel()
 	segs, err := FlattenSegments([]Segment{
 		{From: 0, To: 10 * sec, Speed: 2, Hold: sec},
 		{From: 2 * sec, To: 6 * sec, Skip: true},

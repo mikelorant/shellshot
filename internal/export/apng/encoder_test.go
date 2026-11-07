@@ -107,6 +107,7 @@ func encode(t *testing.T, w, h int, opts apng.Options, frames []image.Image, del
 }
 
 func TestSingleFrameDecodesAsPNG(t *testing.T) {
+	t.Parallel()
 	src := noisy(17, 9, 1)
 	out := encode(t, 17, 9, apng.Options{}, []image.Image{src}, []time.Duration{100 * time.Millisecond})
 
@@ -118,6 +119,7 @@ func TestSingleFrameDecodesAsPNG(t *testing.T) {
 }
 
 func TestThreeFramesRoundTrip(t *testing.T) {
+	t.Parallel()
 	const w, h = 300, 200 // noisy frames are large enough to span several IDAT chunks
 	frames := []image.Image{
 		noisy(w, h, 1),
@@ -197,6 +199,7 @@ func TestThreeFramesRoundTrip(t *testing.T) {
 }
 
 func TestInfiniteLoopByDefault(t *testing.T) {
+	t.Parallel()
 	out := encode(t, 2, 2, apng.Options{}, []image.Image{solid(2, 2, color.NRGBA{A: 255})}, []time.Duration{0})
 	for _, c := range walkChunks(t, out) {
 		if c.typ == "acTL" {
@@ -210,6 +213,7 @@ func TestInfiniteLoopByDefault(t *testing.T) {
 }
 
 func TestAcceptsNonNRGBAAndOffsetImages(t *testing.T) {
+	t.Parallel()
 	big := image.NewRGBA(image.Rect(0, 0, 20, 20))
 	for i := range big.Pix {
 		big.Pix[i] = byte(i * 7)
@@ -234,6 +238,7 @@ func TestAcceptsNonNRGBAAndOffsetImages(t *testing.T) {
 }
 
 func TestDelayRounding(t *testing.T) {
+	t.Parallel()
 	out := encode(t, 1, 1, apng.Options{}, []image.Image{solid(1, 1, color.NRGBA{A: 255}), solid(1, 1, color.NRGBA{A: 255})},
 		[]time.Duration{1499 * time.Microsecond, 1500 * time.Microsecond})
 	var nums []uint16
@@ -248,6 +253,7 @@ func TestDelayRounding(t *testing.T) {
 }
 
 func TestZeroFramesError(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	enc, err := apng.NewEncoder(&buf, 4, 4, apng.Options{})
 	if err != nil {
@@ -262,6 +268,7 @@ func TestZeroFramesError(t *testing.T) {
 }
 
 func TestWrongSizeFrameError(t *testing.T) {
+	t.Parallel()
 	enc, err := apng.NewEncoder(&bytes.Buffer{}, 4, 4, apng.Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -278,6 +285,7 @@ func TestWrongSizeFrameError(t *testing.T) {
 }
 
 func TestDelayOutOfRange(t *testing.T) {
+	t.Parallel()
 	enc, err := apng.NewEncoder(&bytes.Buffer{}, 2, 2, apng.Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -294,6 +302,7 @@ func TestDelayOutOfRange(t *testing.T) {
 }
 
 func TestCloseIdempotent(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	enc, err := apng.NewEncoder(&buf, 2, 2, apng.Options{})
 	if err != nil {
@@ -318,6 +327,7 @@ func TestCloseIdempotent(t *testing.T) {
 }
 
 func TestNewEncoderValidation(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		w, h, loops int
 	}{{0, 1, 0}, {1, 0, 0}, {-1, 1, 0}, {1, 1, -1}} {
@@ -338,6 +348,7 @@ func (f *failWriter) Write(p []byte) (int, error) {
 }
 
 func TestCloseReportsWriteError(t *testing.T) {
+	t.Parallel()
 	enc, err := apng.NewEncoder(&failWriter{}, 2, 2, apng.Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -400,6 +411,7 @@ func fcTLs(t *testing.T, out []byte) []chunk {
 }
 
 func TestFrameOpValues(t *testing.T) {
+	t.Parallel()
 	if apng.BlendSource != 0 || apng.BlendOver != 1 {
 		t.Errorf("BlendSource/BlendOver = %d/%d, want 0/1", apng.BlendSource, apng.BlendOver)
 	}
@@ -409,6 +421,7 @@ func TestFrameOpValues(t *testing.T) {
 }
 
 func TestAddFrameRectWritesOffsetsAndOps(t *testing.T) {
+	t.Parallel()
 	const w, h = 40, 30
 	first := noisy(w, h, 1)
 	second := noisy(w, h, 2)
@@ -463,6 +476,7 @@ func TestAddFrameRectWritesOffsetsAndOps(t *testing.T) {
 }
 
 func TestAddFrameRectErrors(t *testing.T) {
+	t.Parallel()
 	const w, h = 10, 8
 	img := solid(w, h, color.NRGBA{A: 255})
 	full := image.Rect(0, 0, w, h)
@@ -540,6 +554,7 @@ func mutate(r *rand.Rand, img *image.NRGBA) *image.NRGBA {
 }
 
 func TestAddFrameAutoRecomposesExactly(t *testing.T) {
+	t.Parallel()
 	for seed := int64(1); seed <= 8; seed++ {
 		r := rand.New(rand.NewSource(seed))
 		w, h := 20+r.Intn(40), 15+r.Intn(30)
@@ -588,6 +603,7 @@ func TestAddFrameAutoRecomposesExactly(t *testing.T) {
 }
 
 func TestAddFrameAutoMergesIdenticalFrames(t *testing.T) {
+	t.Parallel()
 	const w, h = 16, 16
 	a, b := noisy(w, h, 1), noisy(w, h, 2)
 	var buf bytes.Buffer
@@ -623,6 +639,7 @@ func TestAddFrameAutoMergesIdenticalFrames(t *testing.T) {
 }
 
 func TestAddFrameAutoMergeOverflowAddsFrame(t *testing.T) {
+	t.Parallel()
 	const w, h = 8, 8
 	img := noisy(w, h, 1)
 	var buf bytes.Buffer
@@ -651,6 +668,7 @@ func TestAddFrameAutoMergeOverflowAddsFrame(t *testing.T) {
 }
 
 func TestAddFrameAutoDeltaRectIsMinimal(t *testing.T) {
+	t.Parallel()
 	const w, h = 64, 48
 	base := noisy(w, h, 5)
 	// A known two-pixel change.
@@ -686,6 +704,7 @@ func TestAddFrameAutoDeltaRectIsMinimal(t *testing.T) {
 }
 
 func TestAddFrameAutoFullChangeUsesFullRect(t *testing.T) {
+	t.Parallel()
 	const w, h = 24, 18
 	var buf bytes.Buffer
 	enc, _ := apng.NewEncoder(&buf, w, h, apng.Options{})
@@ -708,6 +727,7 @@ func TestAddFrameAutoFullChangeUsesFullRect(t *testing.T) {
 }
 
 func TestAddFrameAutoSmallerThanFullFrames(t *testing.T) {
+	t.Parallel()
 	const w, h, n = 200, 120, 20
 	r := rand.New(rand.NewSource(3))
 	frames := []*image.NRGBA{noisy(w, h, 9)}
@@ -746,6 +766,7 @@ func TestAddFrameAutoSmallerThanFullFrames(t *testing.T) {
 }
 
 func TestAddFrameAutoAfterDisposeOps(t *testing.T) {
+	t.Parallel()
 	const w, h = 12, 10
 	red := solid(w, h, color.NRGBA{R: 255, A: 255})
 	var buf bytes.Buffer

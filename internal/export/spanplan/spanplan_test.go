@@ -27,6 +27,7 @@ func hidden(id, parent uint64, from, to time.Duration) spans.Span {
 var allHints = event.SpanHints{Speed: 8000, Idle: 500 * time.Millisecond, Hold: sec}
 
 func TestBuildNoSpansIsEmpty(t *testing.T) {
+	t.Parallel()
 	for _, in := range [][]spans.Span{nil, {}} {
 		p, err := Build(in, Options{})
 		if err != nil {
@@ -39,6 +40,7 @@ func TestBuildNoSpansIsEmpty(t *testing.T) {
 }
 
 func TestBuildSceneHints(t *testing.T) {
+	t.Parallel()
 	p, err := Build([]spans.Span{scene(1, 2*sec, 5*sec, allHints)}, Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -53,6 +55,7 @@ func TestBuildSceneHints(t *testing.T) {
 }
 
 func TestBuildSpeedMilliX(t *testing.T) {
+	t.Parallel()
 	p, err := Build([]spans.Span{scene(1, 0, sec, event.SpanHints{Speed: 1500})}, Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -63,6 +66,7 @@ func TestBuildSpeedMilliX(t *testing.T) {
 }
 
 func TestBuildHiddenIsSkipWithBoundaries(t *testing.T) {
+	t.Parallel()
 	p, err := Build([]spans.Span{hidden(1, 0, sec, 3*sec)}, Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -77,6 +81,7 @@ func TestBuildHiddenIsSkipWithBoundaries(t *testing.T) {
 }
 
 func TestBuildHiddenInsideSceneIsFlattened(t *testing.T) {
+	t.Parallel()
 	in := []spans.Span{
 		scene(1, 0, 10*sec, event.SpanHints{Speed: 4000, Hold: sec}),
 		hidden(2, 1, 3*sec, 5*sec),
@@ -101,6 +106,7 @@ func TestBuildHiddenInsideSceneIsFlattened(t *testing.T) {
 // A hidden span that ends together with its scene (the scene's end closed
 // it) shares the end boundary.
 func TestBuildSharedBoundariesAreListedOnce(t *testing.T) {
+	t.Parallel()
 	in := []spans.Span{
 		scene(1, sec, 4*sec, event.SpanHints{Speed: 2000}),
 		hidden(2, 1, 2*sec, 4*sec),
@@ -115,6 +121,7 @@ func TestBuildSharedBoundariesAreListedOnce(t *testing.T) {
 }
 
 func TestBuildExplicitFlagsDropTheirHint(t *testing.T) {
+	t.Parallel()
 	in := []spans.Span{scene(1, 0, 4*sec, allHints)}
 	tests := []struct {
 		name string
@@ -139,6 +146,7 @@ func TestBuildExplicitFlagsDropTheirHint(t *testing.T) {
 // With every flag explicit a scene has nothing left to say, and neither the
 // segment nor the forced frames are planned. A hidden span still is.
 func TestBuildSceneWithNoEffectIsDropped(t *testing.T) {
+	t.Parallel()
 	in := []spans.Span{scene(1, 0, 4*sec, allHints), hidden(2, 1, sec, 2*sec)}
 	p, err := Build(in, Options{FlagSpeed: true, FlagIdleLimit: true, FlagHold: true})
 	if err != nil {
@@ -154,6 +162,7 @@ func TestBuildSceneWithNoEffectIsDropped(t *testing.T) {
 }
 
 func TestBuildNoHintsKeepsHidden(t *testing.T) {
+	t.Parallel()
 	in := []spans.Span{scene(1, 0, 6*sec, allHints), hidden(2, 1, 2*sec, 3*sec)}
 	p, err := Build(in, Options{IgnoreHints: true})
 	if err != nil {
@@ -166,6 +175,7 @@ func TestBuildNoHintsKeepsHidden(t *testing.T) {
 }
 
 func TestBuildShowHiddenKeepsHints(t *testing.T) {
+	t.Parallel()
 	in := []spans.Span{scene(1, 0, 6*sec, event.SpanHints{Speed: 2000}), hidden(2, 1, 2*sec, 3*sec)}
 	p, err := Build(in, Options{ShowHidden: true})
 	if err != nil {
@@ -181,6 +191,7 @@ func TestBuildShowHiddenKeepsHints(t *testing.T) {
 }
 
 func TestBuildNoHintsAndShowHiddenPlanNothing(t *testing.T) {
+	t.Parallel()
 	in := []spans.Span{scene(1, 0, 6*sec, allHints), hidden(2, 1, 2*sec, 3*sec)}
 	p, err := Build(in, Options{IgnoreHints: true, ShowHidden: true})
 	if err != nil {
@@ -192,6 +203,7 @@ func TestBuildNoHintsAndShowHiddenPlanNothing(t *testing.T) {
 }
 
 func TestBuildSkipsEmptySpansAndKeepsOpenOnes(t *testing.T) {
+	t.Parallel()
 	open := scene(2, 3*sec, 5*sec, event.SpanHints{Speed: 2000})
 	open.Open = true
 	in := []spans.Span{scene(1, sec, sec, allHints), open}
@@ -209,6 +221,7 @@ func TestBuildSkipsEmptySpansAndKeepsOpenOnes(t *testing.T) {
 }
 
 func TestBuildTwoScenesAndHiddenBetween(t *testing.T) {
+	t.Parallel()
 	in := []spans.Span{
 		scene(1, 0, 2*sec, event.SpanHints{Speed: 2000}),
 		hidden(2, 0, 2*sec, 3*sec),

@@ -29,6 +29,7 @@ func featureScreen(t testing.TB) snapshot.Snapshot {
 }
 
 func TestStaticTextGolden(t *testing.T) {
+	t.Parallel()
 	g := testGeometry(t, raster.Options{})
 	s := withCursor(featureScreen(t), 3, 0)
 	doc := write(t, Options{Geometry: g, Frame: Frame{Kind: FrameLast}}, s.Cols, s.Rows, step(s, time.Second))
@@ -36,6 +37,7 @@ func TestStaticTextGolden(t *testing.T) {
 }
 
 func TestStaticPathsGolden(t *testing.T) {
+	t.Parallel()
 	g := testGeometry(t, raster.Options{})
 	s := withCursor(screen(t, 12, "Hi "+esc+"1mBold"+reset, "世 e\u0301 ┌─", esc+"4munder"+reset), 2, 2)
 	doc := write(t, Options{Geometry: g, Text: TextPaths, Frame: Frame{Kind: FrameFirst}}, s.Cols, s.Rows, step(s, time.Second))
@@ -43,6 +45,7 @@ func TestStaticPathsGolden(t *testing.T) {
 }
 
 func TestStaticDocumentShape(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{FontSize: 14, Scale: 2, Padding: 4})
 	lay := r.Layout()
 	s := screen(t, 10, "hello")
@@ -67,6 +70,7 @@ func TestStaticDocumentShape(t *testing.T) {
 func itoaT(n int) string { return num(float64(n)) }
 
 func TestTextRunsPlaceEveryCharacterOnItsCell(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{})
 	lay := r.Layout()
 	s := screen(t, 20, "ab "+esc+"31mcd"+reset+"  e")
@@ -84,6 +88,7 @@ func TestTextRunsPlaceEveryCharacterOnItsCell(t *testing.T) {
 }
 
 func TestInnerSpacesJoinARunUpToTheLimit(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
 	for _, tc := range []struct {
 		line     string
@@ -102,6 +107,7 @@ func TestInnerSpacesJoinARunUpToTheLimit(t *testing.T) {
 }
 
 func TestWideAndCombinedClustersAreCentredOrAnchoredAlone(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{})
 	lay := r.Layout()
 	s := screen(t, 20, "世a\u0301b")
@@ -117,6 +123,7 @@ func TestWideAndCombinedClustersAreCentredOrAnchoredAlone(t *testing.T) {
 }
 
 func TestBackgroundRunsMergeAdjacentCells(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{})
 	lay := r.Layout()
 	s := screen(t, 20, esc+"44m  "+esc+"42m "+reset+esc+"44m "+reset+" "+esc+"48;2;30;30;30m"+reset+esc+"41m世")
@@ -137,6 +144,7 @@ func TestBackgroundRunsMergeAdjacentCells(t *testing.T) {
 }
 
 func TestDecorationsAreRectanglesFromTheLayout(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{})
 	lay := r.Layout()
 	s := screen(t, 20, esc+"4;31mab"+esc+"9;32mcd"+reset)
@@ -153,6 +161,7 @@ func TestDecorationsAreRectanglesFromTheLayout(t *testing.T) {
 }
 
 func TestColoursAreResolvedLikeTheRaster(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{Theme: theme.Default()})
 	lay := r.Layout()
 	for name, sgr := range map[string]string{"faint": "2", "inverse": "7", "faint inverse": "2;7", "bright": "91", "256": "38;5;202", "rgb": "38;2;1;2;3", "invisible": "8"} {
@@ -179,6 +188,7 @@ func TestColoursAreResolvedLikeTheRaster(t *testing.T) {
 }
 
 func TestBoldAndItalicAreFontAttributes(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
 	s := screen(t, 20, esc+"1mb"+reset+esc+"3mi"+reset+esc+"1;3mx"+reset)
 	doc := write(t, Options{Geometry: g, Frame: Frame{Kind: FrameLast}}, 20, 1, step(s, time.Second))
@@ -190,6 +200,7 @@ func TestBoldAndItalicAreFontAttributes(t *testing.T) {
 }
 
 func TestCursorShapes(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name   string
 		style  raster.CursorStyle
@@ -242,6 +253,7 @@ func TestCursorShapes(t *testing.T) {
 }
 
 func TestBlockCursorRedrawsTheGlyphInTheBackgroundColour(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{})
 	lay := r.Layout()
 	s := withCursor(screen(t, 20, "abc"), 1, 0)
@@ -253,6 +265,7 @@ func TestBlockCursorRedrawsTheGlyphInTheBackgroundColour(t *testing.T) {
 }
 
 func TestSpritesAreSharedShapes(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{})
 	lay := r.Layout()
 	s := screen(t, 20, "██ ▄ ░")
@@ -273,6 +286,7 @@ func TestSpritesAreSharedShapes(t *testing.T) {
 }
 
 func TestEmojiImagesAreDefinedOnce(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{})
 	lay := r.Layout()
 	s := screen(t, 20, "😀😀 ❤\ufe0f")
@@ -293,6 +307,7 @@ func TestEmojiImagesAreDefinedOnce(t *testing.T) {
 }
 
 func TestSpecialCharactersAreEscaped(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
 	s := screen(t, 20, `<a href="x">&amp; 'q'</a>`)
 	doc := write(t, Options{Geometry: g, Frame: Frame{Kind: FrameLast}}, 20, 1, step(s, time.Second))
@@ -302,6 +317,7 @@ func TestSpecialCharactersAreEscaped(t *testing.T) {
 }
 
 func TestFrameSelection(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
 	steps := []timelineStep{
 		{"one", 100 * time.Millisecond}, {"two", 200 * time.Millisecond}, {"three", 300 * time.Millisecond},
@@ -332,6 +348,7 @@ func TestFrameSelection(t *testing.T) {
 // A bar of styled blanks at the end of a line (a status line, an erase with a
 // background colour) is one background rectangle over all of its cells.
 func TestBackgroundRunCoversTrailingStyledBlanks(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{})
 	lay := r.Layout()
 	blue := snapshot.Style{Bg: snapshot.Color{Kind: snapshot.ColorPalette, Index: 4}}

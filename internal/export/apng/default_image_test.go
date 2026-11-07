@@ -49,6 +49,7 @@ func encodeWithDefault(t *testing.T, w, h int, img image.Image, frames []image.I
 // A walk of the chunk sequence as the APNG specification fixes it for a file
 // whose default image is not part of the animation.
 func TestDefaultImageChunkSequence(t *testing.T) {
+	t.Parallel()
 	poster := noisy(20, 10, 99)
 	var frames []image.Image
 	for i := range 4 {
@@ -93,6 +94,7 @@ func TestDefaultImageChunkSequence(t *testing.T) {
 }
 
 func TestDefaultImageDecodesAsPNGAndAnimates(t *testing.T) {
+	t.Parallel()
 	poster := solid(20, 10, color.NRGBA{R: 200, A: 255})
 	f0, f1 := noisy(20, 10, 1), noisy(20, 10, 2)
 	out := encodeWithDefault(t, 20, 10, poster, []image.Image{f0, f1}, false)
@@ -122,6 +124,7 @@ func TestDefaultImageDecodesAsPNGAndAnimates(t *testing.T) {
 // Without a default image the file is as before: the first frame is the IDAT
 // image, with its fcTL in front.
 func TestNoDefaultImageKeepsFirstFrameAsIDAT(t *testing.T) {
+	t.Parallel()
 	out := encode(t, 8, 8, apng.Options{}, []image.Image{noisy(8, 8, 1), noisy(8, 8, 2)}, []time.Duration{time.Second, time.Second})
 	var types []string
 	for _, c := range walkChunks(t, out) {
@@ -139,6 +142,7 @@ func TestNoDefaultImageKeepsFirstFrameAsIDAT(t *testing.T) {
 }
 
 func TestSetDefaultImageErrors(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	enc, err := apng.NewEncoder(&buf, 8, 8, apng.Options{})
 	if err != nil {
@@ -160,6 +164,7 @@ func TestSetDefaultImageErrors(t *testing.T) {
 }
 
 func TestSetDefaultImageTwiceReplaces(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	enc, err := apng.NewEncoder(&buf, 8, 8, apng.Options{})
 	if err != nil {
@@ -185,6 +190,7 @@ func TestSetDefaultImageTwiceReplaces(t *testing.T) {
 }
 
 func TestFramesCountsTheFramesWritten(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	enc, err := apng.NewEncoder(&buf, 8, 8, apng.Options{})
 	if err != nil {

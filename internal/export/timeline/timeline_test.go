@@ -36,6 +36,7 @@ type want struct {
 }
 
 func TestBuild(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		frames []snapshot.Frame
@@ -199,6 +200,7 @@ func describe(steps []Step) []want {
 }
 
 func TestBuildErrors(t *testing.T) {
+	t.Parallel()
 	f := mk(fr{"a", 0}, fr{"b", 10 * ms})
 	tests := []struct {
 		name string
@@ -230,6 +232,7 @@ func TestBuildErrors(t *testing.T) {
 // TestBuildTotalDuration checks that dedup and min-delay folding preserve
 // the total: it equals the sum of capped and sped gaps plus the hold.
 func TestBuildTotalDuration(t *testing.T) {
+	t.Parallel()
 	ats := []time.Duration{0, 3 * ms, 8 * ms, 5 * ms, 400 * ms, 405 * ms, 9 * time.Second, 9*time.Second + 7*ms, 9*time.Second + 500*ms}
 	labels := []string{"a", "a", "b", "c", "c", "d", "e", "f", "f"}
 	var fs []fr
@@ -281,6 +284,7 @@ func TestBuildTotalDuration(t *testing.T) {
 }
 
 func TestBuildDoesNotMutateInput(t *testing.T) {
+	t.Parallel()
 	frames := mk(fr{"a", 0}, fr{"a", 5 * ms}, fr{"b", 10 * ms})
 	before := slices.Clone(frames)
 	if _, err := Build(frames, Options{MinDelay: time.Second}); err != nil {

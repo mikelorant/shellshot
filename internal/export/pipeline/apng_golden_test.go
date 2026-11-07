@@ -62,6 +62,7 @@ func goldenExport(t *testing.T) []byte {
 // The default APNG output must stay byte-identical to what Export wrote
 // before the sink refactor (testdata/apng_golden.apng, produced from it).
 func TestExportAPNGBytesMatchGolden(t *testing.T) {
+	t.Parallel()
 	want, err := os.ReadFile("testdata/apng_golden.apng")
 	if err != nil {
 		t.Fatal(err)

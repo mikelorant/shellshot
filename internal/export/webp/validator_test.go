@@ -13,6 +13,7 @@ import (
 // TestWebpinfoAcceptsOutput checks a file with libwebp's webpinfo, an
 // independent parser. It is skipped when webpinfo is not installed.
 func TestWebpinfoAcceptsOutput(t *testing.T) {
+	t.Parallel()
 	tool, err := exec.LookPath("webpinfo")
 	if err != nil {
 		t.Skip("webpinfo not installed")

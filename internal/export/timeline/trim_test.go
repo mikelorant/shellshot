@@ -16,6 +16,7 @@ func styledBlank(at time.Duration) snapshot.Frame {
 }
 
 func TestBuildTrimLeadingBlank(t *testing.T) {
+	t.Parallel()
 	// "" is the label of a blank screen (see snap).
 	tests := []struct {
 		name   string
@@ -154,6 +155,7 @@ func TestBuildTrimLeadingBlank(t *testing.T) {
 }
 
 func TestBuildTrimLeadingBlankKeepsStyledBlank(t *testing.T) {
+	t.Parallel()
 	frames := []snapshot.Frame{styledBlank(0), {At: 100 * ms, Snapshot: snap("a")}}
 	got, err := Build(frames, Options{TrimLeadingBlank: 250 * ms, Hold: sec})
 	if err != nil {
@@ -165,6 +167,7 @@ func TestBuildTrimLeadingBlankKeepsStyledBlank(t *testing.T) {
 }
 
 func TestBuildTrimLeadingBlankNegative(t *testing.T) {
+	t.Parallel()
 	if _, err := Build(mk(fr{"a", 0}), Options{TrimLeadingBlank: -1}); err == nil {
 		t.Error("Build with a negative TrimLeadingBlank succeeded, want an error")
 	}
