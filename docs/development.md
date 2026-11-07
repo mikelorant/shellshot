@@ -219,3 +219,5 @@ Commit the submodule pointer and `go.mod`/`go.sum` together. The key-encoder tes
 - `third_party/ghostty` is empty: `git submodule update --init --depth 1 third_party/ghostty`.
 - No colour in `replay` output: `--color auto` disables colour when stdout is not a terminal or
   `NO_COLOR` is set. Pass `--color always`.
+- `replay` flickers or scrolls: the recording is probably larger than the terminal. `replay` crops
+  to the terminal size; enlarge the terminal or record with `--cols` and `--rows` that fit it.

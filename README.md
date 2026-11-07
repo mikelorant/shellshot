@@ -62,6 +62,11 @@ Play it back in the terminal, at any speed:
 shellshot replay demo.shot --speed 2
 ```
 
+On a terminal, each frame is drawn in place as one synchronized update (DEC mode 2026), without
+clearing the screen first, so supporting terminals do not flicker. A recording larger than the
+terminal is cropped to it, keeping the newest rows in view, with a note on stderr; `--no-crop`
+turns that off. Resizing the terminal during playback is not followed.
+
 Export it as an animated image:
 
 ```console
@@ -165,6 +170,8 @@ Reserved, not built: `fresh`, `cleanup`, `caption`, `require` and `export --scen
   pattern (`/^text$/`).
 - No colour in `replay` output: `--color auto` disables colour when stdout is not a terminal or
   `NO_COLOR` is set. Pass `--color always`.
+- `replay` flickers or scrolls: the recording is probably larger than the terminal. `replay` crops
+  to the terminal size; enlarge the terminal or record with `--cols` and `--rows` that fit it.
 - Build errors about missing libghostty headers after switching worktrees or moving the checkout:
   `go clean -cache`, then `make deps build`.
 

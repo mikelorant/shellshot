@@ -7,6 +7,10 @@ import (
 	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
+// frameHead starts every frame rendered with Clear: a synchronized update that
+// hides the cursor and homes it.
+const frameHead = ansiSyncBegin + ansiHideCursor + ansiHome
+
 func TestRenderColor(t *testing.T) {
 	red := snapshot.Style{Fg: snapshot.Color{Kind: snapshot.ColorPalette, Index: 1}}
 	green := snapshot.Style{Fg: snapshot.Color{Kind: snapshot.ColorPalette, Index: 2}}
@@ -116,13 +120,13 @@ func TestRenderColor(t *testing.T) {
 				return s
 			}(),
 			opts: RenderOptions{Clear: true, Color: true},
-			want: "\x1b[H\x1b[2J\x1b[31ma\x1b[0mb\r\nc\x1b[32md\x1b[0m\x1b[2;3H\x1b[?25h",
+			want: frameHead + "\x1b[31ma\x1b[0mb\x1b[K\r\n\x1b[Jc\x1b[32md\x1b[0m\x1b[2;3H\x1b[?25h" + ansiSyncEnd,
 		},
 		{
 			name: "clear mode without colour ignores spans",
 			snap: spans([]string{"ab"}, []snapshot.Span{{Start: 0, End: 1, Style: red}}),
 			opts: RenderOptions{Clear: true},
-			want: "\x1b[H\x1b[2Jab\x1b[1;1H\x1b[?25l",
+			want: frameHead + "\x1b[Jab\x1b[1;1H" + ansiSyncEnd,
 		},
 		{
 			name: "span end beyond line is clamped",
@@ -206,14 +210,14 @@ func TestRenderStyledTrailingBlanks(t *testing.T) {
 		t.Errorf("colour = %q, want %q", got, want)
 	}
 	if got, want := Render(s, RenderOptions{Color: true, Clear: true}),
-		ansiHomeClear+"ab\x1b[44m   \x1b[0m\r\ncd\x1b[1;1H"+ansiHideCursor; got != want {
+		frameHead+"ab\x1b[44m   \x1b[0m\x1b[K\r\n\x1b[Jcd\x1b[1;1H"+ansiSyncEnd; got != want {
 		t.Errorf("colour with clear = %q, want %q", got, want)
 	}
 	// Without colour the blanks show nothing, so they are not written.
 	if got, want := Render(s, RenderOptions{}), "ab\ncd\n"; got != want {
 		t.Errorf("plain = %q, want %q", got, want)
 	}
-	if got, want := Render(s, RenderOptions{Clear: true}), ansiHomeClear+"ab\r\ncd\x1b[1;1H"+ansiHideCursor; got != want {
+	if got, want := Render(s, RenderOptions{Clear: true}), frameHead+"ab\x1b[K\r\n\x1b[Jcd\x1b[1;1H"+ansiSyncEnd; got != want {
 		t.Errorf("plain with clear = %q, want %q", got, want)
 	}
 }

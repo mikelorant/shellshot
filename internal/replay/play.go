@@ -28,9 +28,14 @@ type Options struct {
 	// Speed scales playback: 2 plays twice as fast. Zero means 1; negative,
 	// NaN and infinite values are rejected with ErrInvalidSpeed.
 	Speed float64
-	// Clear clears the screen and homes the cursor before each frame; use it
-	// when w is a terminal. See Render.
+	// Clear draws each frame over the previous one from the top-left corner
+	// instead of appending lines; use it when w is a terminal. See Render.
 	Clear bool
+	// Cols and Rows, when positive, are the size of the terminal behind w.
+	// Frames larger than that are cropped to fit (see Crop); a frame taller or
+	// wider than the terminal would scroll or wrap on every redraw. Only used
+	// with Clear.
+	Cols, Rows int
 	// Color renders style spans as SGR escapes; when false, output is plain
 	// text. See Render.
 	Color bool
@@ -76,7 +81,12 @@ func Play(ctx context.Context, src Source, w io.Writer, opts Options) error {
 			}
 		}
 		prev = f.At
-		if _, err := io.WriteString(w, Render(f.Snapshot, RenderOptions{Clear: opts.Clear, Color: opts.Color})); err != nil {
+		snap := f.Snapshot
+		if opts.Clear {
+			snap = Crop(snap, opts.Cols, opts.Rows)
+		}
+		// One write per frame, so the terminal receives it in one piece.
+		if _, err := io.WriteString(w, Render(snap, RenderOptions{Clear: opts.Clear, Color: opts.Color})); err != nil {
 			return fmt.Errorf("replay: write frame: %w", err)
 		}
 	}
