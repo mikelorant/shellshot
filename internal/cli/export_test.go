@@ -89,7 +89,7 @@ func runExportCmd(t *testing.T, args ...string) (code int, stderr string) {
 
 func TestExportWritesStyledAPNG(t *testing.T) {
 	in := writeExportFixture(t)
-	out := filepath.Join(t.TempDir(), "out.apng")
+	out := filepath.Join(t.TempDir(), "out.png")
 
 	code, stderr := runExportCmd(t, in, "-o", out, "--hold", "1s")
 	if code != 0 {
@@ -186,13 +186,70 @@ func TestExportDefaultOutputPath(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
-	want := strings.TrimSuffix(in, ".shot") + ".apng"
+	want := strings.TrimSuffix(in, ".shot") + ".png"
 	if _, err := os.Stat(want); err != nil {
 		t.Errorf("default output missing: %v", err)
 	}
 	if !strings.HasSuffix(stderr, " to "+want+"\n") {
 		t.Errorf("stderr = %q, want it to end with the output path %s", stderr, want)
 	}
+}
+
+// The default output is "<input without extension>.png": an APNG is a valid
+// PNG and the extension operating systems recognise. Only the output file
+// remains next to the input (the atomic temporary file is gone).
+func TestExportDefaultsToPNGExtension(t *testing.T) {
+	in := writeFile(t, "x.shot", mustRead(t, writeExportFixture(t)))
+	if code, stderr := runExportCmd(t, in); code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	dir := filepath.Dir(in)
+	want := filepath.Join(dir, "x.png")
+	if a := decodeAPNG(t, want); len(a.Frames) < 2 {
+		t.Errorf("%s has %d frames, want an animation", want, len(a.Frames))
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name() != "x.shot" && e.Name() != "x.png" {
+			t.Errorf("unexpected file %s next to the output", e.Name())
+		}
+	}
+}
+
+// -o is used as typed: an ".apng" name is neither rewritten nor given a
+// second extension, and the bytes equal those written to a ".png" name.
+func TestExportOutputExtensionIsNotRewritten(t *testing.T) {
+	in := writeExportFixture(t)
+	dir := t.TempDir()
+	apngOut := filepath.Join(dir, "out.apng")
+	pngOut := filepath.Join(dir, "out.png")
+	for _, out := range []string{apngOut, pngOut} {
+		if code, stderr := runExportCmd(t, in, "-o", out); code != 0 {
+			t.Fatalf("exit %d, stderr %q", code, stderr)
+		}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Errorf("got %d files in the output directory, want exactly out.apng and out.png", len(entries))
+	}
+	if !bytes.Equal(mustRead(t, apngOut), mustRead(t, pngOut)) {
+		t.Error("out.apng and out.png differ")
+	}
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
 
 func TestExportOptionsChangeOutput(t *testing.T) {
@@ -205,7 +262,7 @@ func TestExportOptionsChangeOutput(t *testing.T) {
 
 	decodeSize := func(t *testing.T, args ...string) (image.Rectangle, color.Color, uint32) {
 		t.Helper()
-		out := filepath.Join(dir, "o.apng")
+		out := filepath.Join(dir, "o.png")
 		if code, stderr := runExportCmd(t, append([]string{in, "-o", out}, args...)...); code != 0 {
 			t.Fatalf("exit %d, stderr %q", code, stderr)
 		}
@@ -298,7 +355,7 @@ func TestExportRejectsBadValues(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out := filepath.Join(t.TempDir(), "out.apng")
+			out := filepath.Join(t.TempDir(), "out.png")
 			input := in
 			if tt.name == "missing input" {
 				input = filepath.Join(t.TempDir(), "missing.shot")
@@ -347,7 +404,7 @@ func TestExportFailureLeavesNoPartialOutput(t *testing.T) {
 	data[firstEnd-10] ^= 0xff // corrupt the first block, which is followed by more data
 	in := writeFile(t, "broken.shot", data)
 	dir := filepath.Dir(in)
-	out := filepath.Join(dir, "out.apng")
+	out := filepath.Join(dir, "out.png")
 
 	code, stderr := runExportCmd(t, in, "-o", out)
 	if code != 1 || !strings.Contains(stderr, "read frame 1") || !strings.Contains(stderr, "corrupt") {
@@ -382,7 +439,7 @@ func TestExportRejectsNonRecordings(t *testing.T) {
 	for name, data := range tests {
 		t.Run(name, func(t *testing.T) {
 			in := writeFile(t, name+".shot", data)
-			out := filepath.Join(t.TempDir(), "out.apng")
+			out := filepath.Join(t.TempDir(), "out.png")
 			code, stderr := runExportCmd(t, in, "-o", out)
 			if code != 1 || !strings.Contains(stderr, "not a shellshot recording (bad magic)") {
 				t.Errorf("exit %d, stderr %q, want a bad magic error", code, stderr)
@@ -398,7 +455,7 @@ func TestExportRejectsNonRecordings(t *testing.T) {
 // cannot be exported yet.
 func TestExportRejectsResizingRecording(t *testing.T) {
 	in := writeFile(t, "resize.shot", resizingRecording(t))
-	out := filepath.Join(t.TempDir(), "out.apng")
+	out := filepath.Join(t.TempDir(), "out.png")
 	code, stderr := runExportCmd(t, in, "-o", out)
 	want := "recording changes size mid-way (10x2 -> 14x3); export does not support resizes yet"
 	if code != 1 || !strings.Contains(stderr, want) {
@@ -413,7 +470,7 @@ func TestExportRejectsResizingRecording(t *testing.T) {
 func TestExportTruncatedExportsValidPrefix(t *testing.T) {
 	data, firstEnd := twoBlockRecording(t)
 	in := writeFile(t, "torn.shot", data[:len(data)-3])
-	out := filepath.Join(t.TempDir(), "out.apng")
+	out := filepath.Join(t.TempDir(), "out.png")
 	code, stderr := runExportCmd(t, in, "-o", out)
 	if code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
@@ -430,7 +487,7 @@ func TestExportTruncatedExportsValidPrefix(t *testing.T) {
 // interrupted.
 func TestExportInterruptedWarns(t *testing.T) {
 	in := writeFile(t, "killed.shot", interruptedRecording(t))
-	out := filepath.Join(t.TempDir(), "out.apng")
+	out := filepath.Join(t.TempDir(), "out.png")
 	code, stderr := runExportCmd(t, in, "-o", out)
 	if code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
@@ -447,7 +504,7 @@ func TestExportInterruptedWarns(t *testing.T) {
 // and the pause is capped by --idle-limit.
 func TestExportIdleGap(t *testing.T) {
 	in := writeFile(t, "idle.shot", idleGapRecording(t))
-	out := filepath.Join(t.TempDir(), "out.apng")
+	out := filepath.Join(t.TempDir(), "out.png")
 	start := time.Now()
 	code, stderr := runExportCmd(t, in, "-o", out)
 	if code != 0 {
@@ -479,7 +536,7 @@ func TestExportFPSChangesFrameCount(t *testing.T) {
 	})
 	in := writeFile(t, "fps.shot", data)
 	for fps, want := range map[string]string{"10": "wrote 2 frames", "1000": "wrote 3 frames"} {
-		out := filepath.Join(t.TempDir(), "out.apng")
+		out := filepath.Join(t.TempDir(), "out.png")
 		code, stderr := runExportCmd(t, in, "-o", out, "--fps", fps, "--min-delay", "0")
 		if code != 0 || !strings.HasPrefix(stderr, want) {
 			t.Errorf("--fps %s: exit %d, stderr %q, want %q", fps, code, stderr, want)
@@ -497,7 +554,7 @@ func TestExportDrawsColourEmojiSequences(t *testing.T) {
 		must(t, w.Exit(200*time.Millisecond, 0))
 	})
 	in := writeFile(t, "emoji.shot", data)
-	out := filepath.Join(t.TempDir(), "emoji.apng")
+	out := filepath.Join(t.TempDir(), "emoji.png")
 	if code, stderr := runExportCmd(t, in, "-o", out, "--hold", "1s", "--cursor", "none"); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
@@ -569,7 +626,7 @@ func TestExportFallbackFontErrors(t *testing.T) {
 		{"missing", missing, missing},
 		{"invalid", bad, bad + " is not a valid font"},
 	} {
-		out := filepath.Join(dir, tc.name+".apng")
+		out := filepath.Join(dir, tc.name+".png")
 		code, stderr := runExportCmd(t, in, "-o", out, "--fallback-font", tc.font)
 		if code == 0 || !strings.Contains(stderr, tc.want) || !strings.Contains(stderr, "--fallback-font") {
 			t.Errorf("%s: exit %d, stderr %q; want a failure naming --fallback-font and %q", tc.name, code, stderr, tc.want)
@@ -589,7 +646,7 @@ func TestExportFallbackFontAndSystemFontsAreAccepted(t *testing.T) {
 		{"--fallback-font", font, "--fallback-font", font},
 		{"--system-fonts"},
 	} {
-		out := filepath.Join(dir, "out.apng")
+		out := filepath.Join(dir, "out.png")
 		code, stderr := runExportCmd(t, append([]string{in, "-o", out}, args...)...)
 		if code != 0 {
 			t.Errorf("%v: exit %d, stderr %q", args, code, stderr)

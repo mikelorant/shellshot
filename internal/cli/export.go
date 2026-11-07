@@ -44,7 +44,7 @@ type exportFlags struct {
 func newExportCmd() *cobra.Command {
 	var f exportFlags
 	cmd := &cobra.Command{
-		Use:   "export FILE [-o OUT.apng] [flags]",
+		Use:   "export FILE [-o OUT.png] [flags]",
 		Short: "Render a recording as an animated PNG (APNG)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,7 +52,7 @@ func newExportCmd() *cobra.Command {
 		},
 	}
 	fl := cmd.Flags()
-	fl.StringVarP(&f.output, "output", "o", "", "output file (default: FILE with the extension .apng)")
+	fl.StringVarP(&f.output, "output", "o", "", "output file, written as-is whatever its extension (default: FILE with the extension .png)")
 	fl.StringVar(&f.theme, "theme", "", "built-in theme name ("+strings.Join(theme.Names(), ", ")+") or a theme JSON file (default: "+theme.Default().Name+")")
 	fl.Float64Var(&f.fontSize, "font-size", raster.DefaultFontSize, "font size in pixels, before --scale (12 matches Ghostty font-size = 12 on a 2x display with --scale 2)")
 	fl.IntVar(&f.scale, "scale", raster.DefaultScale, "integer scale factor for font size and padding")
@@ -130,13 +130,15 @@ func resolveTheme(value string) (theme.Theme, error) {
 	return t, nil
 }
 
-// defaultExportPath returns path with its extension replaced by ".apng".
+// defaultExportPath returns path with its extension replaced by ".png". An
+// APNG is a valid PNG, and ".png" is the extension operating systems,
+// previews and upload dialogs recognise.
 func defaultExportPath(path string) string {
-	return strings.TrimSuffix(path, filepath.Ext(path)) + ".apng"
+	return strings.TrimSuffix(path, filepath.Ext(path)) + ".png"
 }
 
 // runExport renders the recording at input to flags.output, or to input with
-// the extension .apng.
+// the extension .png. An explicit output path is used as typed.
 func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	cursor, err := flags.validate()
 	if err != nil {
