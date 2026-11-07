@@ -41,6 +41,7 @@ func newRootCmd() *cobra.Command {
 		SilenceErrors: true,
 	}
 	root.AddCommand(
+		newExportCmd(),
 		newRecordCmd(),
 		newReplayCmd(),
 		newSnapCmd(),
