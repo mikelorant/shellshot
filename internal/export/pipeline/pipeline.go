@@ -99,28 +99,10 @@ type Options struct {
 // frames; errors name the frame or step that failed. Nothing is written to w
 // unless the whole animation encodes.
 func Export(ctx context.Context, src Source, cols, rows int, r Renderer, w io.Writer, o Options) error {
-	var frames []snapshot.Frame
-	for i := 0; ; i++ {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("export: read frame %d: %w", i, err)
-		}
-		f, err := src.Next()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("export: read frame %d: %w", i, err)
-		}
-		frames = append(frames, f)
-	}
-	steps, err := timeline.Build(frames, o.Timeline)
+	steps, err := ReadSteps(ctx, src, o.Timeline)
 	if err != nil {
-		return fmt.Errorf("export: %w", err)
+		return err
 	}
-	if len(steps) == 0 {
-		return errors.New("export: recording has no frames")
-	}
-	frames = nil // free the raw frames; steps hold what is needed
 
 	width, height := r.Size(cols, rows)
 	newSink := o.NewSink
@@ -141,6 +123,36 @@ func Export(ctx context.Context, src Source, cols, rows int, r Renderer, w io.Wr
 		return fmt.Errorf("export: write: %w", err)
 	}
 	return nil
+}
+
+// ReadSteps reads all frames from src and applies the timeline policy to
+// them: the front half of Export, shared with exporters that write the
+// steps themselves instead of rendering them (SVG). It fails if the
+// recording has no frames. Cancelling ctx stops it between frames; errors
+// name the frame that failed.
+func ReadSteps(ctx context.Context, src Source, o timeline.Options) ([]timeline.Step, error) {
+	var frames []snapshot.Frame
+	for i := 0; ; i++ {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("export: read frame %d: %w", i, err)
+		}
+		f, err := src.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("export: read frame %d: %w", i, err)
+		}
+		frames = append(frames, f)
+	}
+	steps, err := timeline.Build(frames, o)
+	if err != nil {
+		return nil, fmt.Errorf("export: %w", err)
+	}
+	if len(steps) == 0 {
+		return nil, errors.New("export: recording has no frames")
+	}
+	return steps, nil
 }
 
 // gatedWriter passes writes through to w until silence is called, then
