@@ -115,7 +115,7 @@ $ shellshot export demo.shot        # writes demo.apng next to the input
 |---|---|---|
 | `-o` | input with `.apng` | output file (never overwrites the input) |
 | `--theme` | `dark` | built-in (`dark`, `light`) or a theme JSON file |
-| `--font-size`, `--scale`, `--padding` | 14, 1, 8 | pixel size, integer scale, border (≥1) |
+| `--font-size`, `--scale`, `--padding` | 15, 1, 8 | pixel size (nudged so the cell is a whole number of pixels wide), integer scale (2 = exactly twice the layout, for sharp retina embeds), border (≥1) |
 | `--speed` | 1 | playback speed multiplier |
 | `--idle-limit` | 2s | longest pause between frames (0 = no limit) |
 | `--hold` | 2s | how long the last frame stays |

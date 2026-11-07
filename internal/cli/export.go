@@ -48,7 +48,7 @@ func newExportCmd() *cobra.Command {
 	fl := cmd.Flags()
 	fl.StringVarP(&f.output, "output", "o", "", "output file (default: FILE with the extension .apng)")
 	fl.StringVar(&f.theme, "theme", "", "built-in theme name ("+strings.Join(theme.Names(), ", ")+") or a theme JSON file (default: "+theme.Default().Name+")")
-	fl.Float64Var(&f.fontSize, "font-size", raster.DefaultFontSize, "font size in pixels, before --scale")
+	fl.Float64Var(&f.fontSize, "font-size", raster.DefaultFontSize, "font size in pixels, before --scale; adjusted slightly so a character cell is a whole number of pixels wide")
 	fl.IntVar(&f.scale, "scale", raster.DefaultScale, "integer scale factor for font size and padding")
 	fl.IntVar(&f.padding, "padding", raster.DefaultPadding, "border around the screen in pixels (at least 1), before --scale")
 	fl.Float64Var(&f.speed, "speed", 1, "playback speed multiplier (2 plays twice as fast)")
