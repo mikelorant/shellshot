@@ -60,13 +60,14 @@ func (w *Writer) WriteFrame(f snapshot.Frame) error {
 		return fmt.Errorf("%w: %w", ErrMalformed, err)
 	}
 	err := w.enc.Encode(frameLine{
-		T:     f.At.Milliseconds(),
-		Lines: lines,
-		CX:    f.Snapshot.Cursor.X,
-		CY:    f.Snapshot.Cursor.Y,
-		CV:    f.Snapshot.Cursor.Visible,
-		Title: f.Snapshot.Title,
-		Spans: encodeSpans(f.Snapshot.Spans),
+		T:      f.At.Milliseconds(),
+		Lines:  lines,
+		CX:     f.Snapshot.Cursor.X,
+		CY:     f.Snapshot.Cursor.Y,
+		CV:     f.Snapshot.Cursor.Visible,
+		Title:  f.Snapshot.Title,
+		Spans:  encodeSpans(f.Snapshot.Spans),
+		Widths: encodeWidths(f.Snapshot.Widths),
 	})
 	if err != nil {
 		return fmt.Errorf("recording: write frame: %w", err)
