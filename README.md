@@ -4,7 +4,6 @@ Proof of concept. `shellshot` runs a command in a PTY and feeds its output into
 a headless terminal ([libghostty-vt](https://github.com/ghostty-org/ghostty)).
 It captures the screen as timed snapshot frames, so it can:
 
-- **snap**: print the final screen of a command as text;
 - **record**: record an interactive session (asciicast-style) to a `.shot` file;
 - **replay**: play a recording back in a terminal with its original timing;
 - **export**: render a recording as an animated PNG (APNG).
@@ -47,27 +46,6 @@ dev
 
 The value can be set with `-ldflags "-X github.com/michaellorant/shellshot/internal/cli.Version=1.2.3"`.
 
-### `snap`: final screen of a command
-
-```console
-$ shellshot snap -- ls /usr
-X11        bin        libexec    sbin       standalone
-X11R6      lib        local      share
-```
-
-Flags: `--cols N` (80), `--rows N` (24), `--interval d` (100ms),
-`--color auto|always|never`. Trailing blank rows are trimmed. `auto` emits SGR
-colour codes only when stdout is a terminal and `NO_COLOR` is unset.
-
-```console
-$ shellshot snap --color always -- printf '\033[31mred\033[0m plain\n' | cat -v
-^[[31mred^[[0m plain
-```
-
-If the command exits non-zero, `snap` prints the screen and a note on stderr
-(`shellshot: command exited with 3`), then exits with the command's status.
-Pass `--ignore-exit-status` to exit 0 regardless.
-
 ### `record`: interactive recording
 
 ```console
@@ -99,7 +77,8 @@ green done
 `--speed f` multiplies the speed. `--clear` redraws from the top of the screen
 for every frame; it defaults to on only when stdout is a terminal (piped output
 prints each full frame in sequence, so the output above is the final one).
-`--color auto|always|never` behaves as for `snap`; with `--color always` the second line is
+`--color auto|always|never`: `auto` (default) emits SGR colour codes only when stdout is a
+terminal and `NO_COLOR` is unset. With `--color always` the second line is
 `^[[32mgreen^[[0m done`.
 
 ### `export`: animated PNG
@@ -172,7 +151,7 @@ against your zig. Commit the submodule pointer and `go.mod`/`go.sum` together.
 
 ```
 cmd/shellshot          main: one line, no logic
-internal/cli           cobra commands and flags (version, record, snap, replay, export)
+internal/cli           cobra commands and flags (version, record, replay, export)
 internal/snapshot      pure data: Snapshot, Cursor, Frame, Style (no deps)
 internal/vt            Terminal interface + Factory (no cgo)
 internal/vt/ghostty    the only cgo package: libghostty adapter
@@ -210,8 +189,8 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
 - **CJK, emoji and other glyphs missing from JetBrains Mono are not drawn.** Wide
   characters are recorded and keep their two-cell column positions, but the only
   fallback font bundled is Symbols Nerd Font Mono (icons and Powerline/Nerd Font
-  symbols), so CJK and emoji cells render blank in `export`. (`snap` and `replay`
-  print them as text.)
+  symbols), so CJK and emoji cells render blank in `export`. (`replay`
+  prints them as text.)
 - **Nerd Font icons are clipped to their cell.** Icons from the fallback font are
   not yet scaled to fit, so oversized ones are cut off at the cell edge.
 - JSON recordings are large and store full-screen text per frame; there is no compression yet.
@@ -247,5 +226,5 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
 - **`zig not found` / zig version errors**: `brew install zig` and check that
   `zig version` is 0.17.x.
 - **Empty `third_party/ghostty`**: `git submodule update --init --depth 1 third_party/ghostty`.
-- **Colours missing in `snap`/`replay` output**: `auto` disables colour when piped or
+- **Colours missing in `replay` output**: `auto` disables colour when piped or
   when `NO_COLOR` is set; pass `--color always`.

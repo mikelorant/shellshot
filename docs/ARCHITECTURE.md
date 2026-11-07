@@ -10,7 +10,6 @@ that can be replayed.
 | Command | Purpose |
 |---|---|
 | `shellshot record [-o file] [-c "cmd"] [--cols N --rows N] [--interval d] [--ignore-exit-status] [-- cmd args...]` | Interactive recorder (asciicast-style): runs $SHELL (or the given command) on a live passthrough terminal and records snapshot frames. Exits with the child's exit code (128+sig for signal deaths) after writing the recording, unless `--ignore-exit-status` |
-| `shellshot snap [--cols --rows] [--color auto\|always\|never] [--ignore-exit-status] -- cmd args...` | Run cmd, print the final screen (trailing blank rows trimmed); `--color always` emits SGR, `auto` (default) only on a terminal with `NO_COLOR` unset. Exits with cmd's exit code (128+sig for signal deaths) after printing, unless `--ignore-exit-status`; `shellshot: command exited with N` goes to stderr either way |
 | `shellshot replay file [--speed f] [--clear] [--color auto\|always\|never]` | Play recording frames to stdout with original timing; `--clear` defaults to on for a terminal; `--color auto` (default) emits SGR only on a terminal with `NO_COLOR` unset |
 | `shellshot version` | Print version |
 

@@ -36,7 +36,7 @@ func newRecordCmd() *cobra.Command {
 			return runRecord(cmd, opts, output, ignoreExit)
 		},
 	}
-	addCaptureFlagsWithSize(cmd, &opts, 0, 0)
+	addCaptureFlags(cmd, &opts, 0, 0)
 	cmd.Flags().StringVarP(&output, "output", "o", defaultRecordingFile, "recording file to write")
 	addIgnoreExitStatusFlag(cmd, &ignoreExit)
 	cmd.Flags().StringVarP(&script, "command", "c", "", "shell command string to run with $SHELL -c")
