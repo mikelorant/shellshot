@@ -2,3 +2,4 @@
 /build/
 /.worktrees/
 *.shot
+!internal/recording/bin/testdata/*.shot
