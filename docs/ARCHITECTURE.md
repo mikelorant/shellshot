@@ -27,12 +27,13 @@ internal/tty              // IsTerminal, Size, MakeRaw; wraps golang.org/x/term 
 internal/live             // stdin -> process pump + output tee; depends only on io interfaces
 internal/session          // orchestrates pty + vt + sampler -> emits snapshot.Frame to a Sink
 internal/recording/bin    // binary format: container (chunk, varint, codec, head, event), Writer, Reader (written by record; read by replay, export, info)
+internal/recording/spans  // SPAN events -> list of scenes / hidden spans (Scan); imports recording/bin
 internal/recording/frames // binary event log -> snapshot frames through a vt.Factory (Options.FPS)
 internal/replay           // plays frames to an io.Writer with timing
 scripts/build-libghostty.sh, Makefile   // dependency + build tooling
 ```
 Dependency rules (enforced in review): `snapshot` imports nothing; `vt`,
-`replay` import only `snapshot`; `recording/bin` imports only its own subpackages; `recording/frames` imports `snapshot`, `vt` and `recording/bin`; `session` imports `snapshot`, `vt`, `pty` (via small
+`replay` import only `snapshot`; `recording/bin` imports only its own subpackages; `recording/frames` imports `snapshot`, `vt` and `recording/bin`; `recording/spans` imports `recording/bin`; `session` imports `snapshot`, `vt`, `pty` (via small
 interfaces it declares itself); only `vt/ghostty` imports cgo/libghostty; only `cli`
 imports cobra and wires concrete types. Define interfaces at the consumer.
 
