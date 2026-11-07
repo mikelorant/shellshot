@@ -16,7 +16,7 @@ import (
 
 	kettek "github.com/kettek/apng"
 
-	"github.com/michaellorant/shellshot/internal/export/apng"
+	"github.com/mikelorant/shellshot/internal/export/apng"
 )
 
 type chunk struct {

@@ -14,7 +14,7 @@ import (
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 
-	"github.com/michaellorant/shellshot/internal/render/emoji"
+	"github.com/mikelorant/shellshot/internal/render/emoji"
 )
 
 func mustDefault(t *testing.T) *Set {

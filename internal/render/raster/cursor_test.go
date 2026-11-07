@@ -4,7 +4,7 @@ import (
 	"image"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 func withCursor(s snapshot.Snapshot, x, y int, visible bool) snapshot.Snapshot {

@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/script"
-	"github.com/michaellorant/shellshot/internal/script/run"
+	"github.com/mikelorant/shellshot/internal/script"
+	"github.com/mikelorant/shellshot/internal/script/run"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -115,11 +115,11 @@ func TestRecordScriptMissingFile(t *testing.T) {
 }
 
 // listCases returns the scripts whose --list output is a golden file: the
-// five examples of the design and the scripts in examples/scripts.
+// five examples of the design and the scripts in contrib/examples/scripts.
 func listCases(t *testing.T) []string {
 	t.Helper()
 	var files []string
-	for _, pattern := range []string{"../script/testdata/ex*.script", "../../examples/scripts/*.script"} {
+	for _, pattern := range []string{"../script/testdata/ex*.script", "../../contrib/examples/scripts/*.script"} {
 		m, err := filepath.Glob(pattern)
 		if err != nil || len(m) == 0 {
 			t.Fatalf("no scripts match %s (err %v)", pattern, err)

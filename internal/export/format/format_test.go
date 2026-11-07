@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/export/pipeline"
+	"github.com/mikelorant/shellshot/internal/export/pipeline"
 )
 
 func TestDefaultRegistersAPNGAndSVG(t *testing.T) {

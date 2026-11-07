@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
-	"github.com/michaellorant/shellshot/internal/script/keys"
-	"github.com/michaellorant/shellshot/internal/script/run"
-	"github.com/michaellorant/shellshot/internal/vt/ghostty"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/script/run"
+	"github.com/mikelorant/shellshot/internal/vt/ghostty"
 )
 
 // fakeExecutor returns canned steps and records what it was given.

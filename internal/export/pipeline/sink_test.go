@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/export/timeline"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // recordedFrame is one AddFrame or AddFrameAuto call on a fakeSink.

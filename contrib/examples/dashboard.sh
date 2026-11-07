@@ -3,8 +3,8 @@
 # dashboard.sh: a small TUI-like dashboard drawn in the alternate screen: title bar,
 # tabs, boxes, gauges, sparklines, a process table with a moving selection and a
 # scrolling log. All numbers are simulated and no key is read (use --pause to hold
-# the last frame until Enter). See examples/README.md.
-#   sh examples/dashboard.sh [--force] [--pause]      about 11 s
+# the last frame until Enter). See contrib/examples/README.md.
+#   sh contrib/examples/dashboard.sh [--force] [--pause]      about 11 s
 
 case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 EX_NAME=${0##*/}

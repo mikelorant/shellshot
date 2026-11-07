@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/chunk"
-	"github.com/michaellorant/shellshot/internal/recording/bin/codec"
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
-	"github.com/michaellorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/recording/bin/chunk"
+	"github.com/mikelorant/shellshot/internal/recording/bin/codec"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/recording/bin/head"
 )
 
 // openers run each reader test over both constructors.

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/codec"
-	"github.com/michaellorant/shellshot/internal/recording/bin/varint"
+	"github.com/mikelorant/shellshot/internal/recording/bin/codec"
+	"github.com/mikelorant/shellshot/internal/recording/bin/varint"
 )
 
 // Block is the decoded content of one EVNT chunk.

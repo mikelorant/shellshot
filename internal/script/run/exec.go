@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
 )
 
 // Executor runs a Plan as a non-blocking state machine

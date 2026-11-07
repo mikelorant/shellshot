@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/script"
+	"github.com/mikelorant/shellshot/internal/script"
 )
 
 // ErrorKind classifies why the Executor stopped the script.

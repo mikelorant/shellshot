@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/michaellorant/shellshot/internal/render/raster"
-	"github.com/michaellorant/shellshot/internal/render/sprite"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/render/raster"
+	"github.com/mikelorant/shellshot/internal/render/sprite"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // maxInnerSpaces is the longest stretch of blank cells a run of text spans

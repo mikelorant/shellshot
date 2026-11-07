@@ -4,7 +4,7 @@ import (
 	"image/color"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 func pal(i uint8) snapshot.Color { return snapshot.Color{Kind: snapshot.ColorPalette, Index: i} }

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
-	"github.com/michaellorant/shellshot/internal/script"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/script"
 )
 
 // defaultSettings are the behaviour settings before any script line.

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/script/keys"
-	"github.com/michaellorant/shellshot/internal/vt"
+	"github.com/mikelorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/vt"
 )
 
 // newTerminalAndEncoder returns a terminal after feeding it setup, and the key

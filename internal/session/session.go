@@ -10,8 +10,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
-	"github.com/michaellorant/shellshot/internal/vt"
+	"github.com/mikelorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/vt"
 )
 
 // readBufferSize is the size of the buffer used for each read from the process.

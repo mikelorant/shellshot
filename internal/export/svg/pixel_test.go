@@ -11,7 +11,7 @@ import (
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
 
-	"github.com/michaellorant/shellshot/internal/render/raster"
+	"github.com/mikelorant/shellshot/internal/render/raster"
 )
 
 // rasteriseSVG draws doc at its viewBox size with oksvg, a small pure-Go SVG

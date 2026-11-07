@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
-	"github.com/michaellorant/shellshot/internal/vt"
+	"github.com/mikelorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/vt"
 )
 
 const testTimeout = time.Second

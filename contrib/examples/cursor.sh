@@ -2,8 +2,8 @@
 # shellcheck disable=SC1091,SC2034
 # cursor.sh: cursor movement and screen control: absolute and relative addressing,
 # save/restore, erase, insert/delete, a scroll region and the alternate screen.
-# Safe: prints escape sequences only. See examples/README.md.
-#   sh examples/cursor.sh [--force] [--pause]
+# Safe: prints escape sequences only. See contrib/examples/README.md.
+#   sh contrib/examples/cursor.sh [--force] [--pause]
 
 case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 EX_NAME=${0##*/}

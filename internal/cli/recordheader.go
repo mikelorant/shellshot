@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/recording/bin/codec"
-	"github.com/michaellorant/shellshot/internal/recording/bin/head"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin/codec"
+	"github.com/mikelorant/shellshot/internal/recording/bin/head"
 )
 
 // The terminal engine recorded in the HEAD chunk: libghostty-vt as built from

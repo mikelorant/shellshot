@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/live"
-	"github.com/michaellorant/shellshot/internal/recording/bin"
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
-	"github.com/michaellorant/shellshot/internal/session"
+	"github.com/mikelorant/shellshot/internal/live"
+	"github.com/mikelorant/shellshot/internal/recording/bin"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/session"
 )
 
 // binSink adapts a *bin.Writer to session.EventSink and also records the

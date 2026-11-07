@@ -18,10 +18,10 @@ vet:
 fmt:
 	gofmt -w .
 
-# Records and exports every examples/*.sh into build/examples/ (fast speed, 80x24).
+# Records and exports every contrib/examples/*.sh into build/examples/ (fast speed, 80x24).
 examples: build
 	@set -e; mkdir -p build/examples; \
-	for f in examples/*.sh; do \
+	for f in contrib/examples/*.sh; do \
 		n=$${f##*/}; n=$${n%.sh}; \
 		[ "$$n" = lib ] && continue; \
 		echo "== $$n"; \
@@ -34,7 +34,7 @@ examples: build
 test-examples:
 	./scripts/test-examples.sh
 
-# Runs every examples/scripts/*.script with --list and for real (about a minute).
+# Runs every contrib/examples/scripts/*.script with --list and for real (about a minute).
 test-scripts: build
 	./scripts/test-scripts.sh
 

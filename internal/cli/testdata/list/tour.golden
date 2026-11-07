@@ -6,13 +6,13 @@ process
   output  tour.shot
   seed    1
 estimate
-  total   24.7s to 2m8s, 3 waits, 3 scenes
-  scene   #1 start: 2.5s to 12.5s
+  total   25.1s to 2m8.4s, 3 waits, 3 scenes
+  scene   #1 start: 2.9s to 12.9s
   scene   #2 watch: 20.5s to 50.5s
   scene   #3 quit: 1.5s to 1m1s
 ops
    1  13:1    start            span-begin #1 scene "start"
-   2  14:3    start            type "./examples/showcase.sh --pause" typing=50ms
+   2  14:3    start            type "./contrib/examples/showcase.sh --pause" typing=50ms
    3  14:3    start            press enter after-gap typing=50ms
    4  14:3    start            settle off
    5  14:3    start            linger 500ms

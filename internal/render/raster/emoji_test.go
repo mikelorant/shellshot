@@ -8,8 +8,8 @@ import (
 
 	xfont "golang.org/x/image/font"
 
-	"github.com/michaellorant/shellshot/internal/render/font"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/render/font"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 const (

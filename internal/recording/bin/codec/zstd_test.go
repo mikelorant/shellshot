@@ -39,7 +39,7 @@ func terminalBlocks(seed int64, n, size int) [][]byte {
 		case 4:
 			fmt.Fprintf(b, "\x1b[%d;%dH\x1b[2K\x1b[38;5;%dm%s\x1b[0m", 1+rng.Intn(24), 1+rng.Intn(80), rng.Intn(256), name())
 		default:
-			fmt.Fprintf(b, "ok  \tgithub.com/michaellorant/shellshot/internal/%s\t%d.%03ds\r\n",
+			fmt.Fprintf(b, "ok  \tgithub.com/mikelorant/shellshot/internal/%s\t%d.%03ds\r\n",
 				words[rng.Intn(len(words))], rng.Intn(5), rng.Intn(1000))
 		}
 	}

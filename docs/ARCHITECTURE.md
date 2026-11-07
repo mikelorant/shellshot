@@ -27,7 +27,7 @@ speed are export-time choices.
 
 ## Packages
 
-Module `github.com/michaellorant/shellshot`.
+Module `github.com/mikelorant/shellshot`.
 
 ```
 cmd/shellshot               main: one line, no logic

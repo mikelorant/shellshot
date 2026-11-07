@@ -1,6 +1,6 @@
 # Types a few harmless commands at a prompt, the way a person would.
 # Run from the repository root:
-#   shellshot record --script examples/scripts/interactive.script
+#   shellshot record --script contrib/examples/scripts/interactive.script
 size 80x24
 shell /bin/sh
 env PS1="$ "
@@ -30,10 +30,10 @@ scene colours {
 
 scene tour {
   typing 30ms
-  run sh examples/colors.sh
+  run sh contrib/examples/colors.sh
   wait "truecolour" 20s
   press ctrl+l
-  run sh examples/unicode.sh
+  run sh contrib/examples/unicode.sh
   wait idle 1s
 }
 

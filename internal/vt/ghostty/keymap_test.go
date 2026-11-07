@@ -3,7 +3,7 @@ package ghostty
 import (
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/script/keys"
 )
 
 // Every key name the script grammar accepts must have an encoder entry, and

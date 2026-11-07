@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/script/keys"
+	"github.com/mikelorant/shellshot/internal/script/keys"
 )
 
 const (

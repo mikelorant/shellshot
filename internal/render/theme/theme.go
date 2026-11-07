@@ -5,7 +5,7 @@ package theme
 import (
 	"image/color"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // Role says whether a colour is used as a foreground or a background, which

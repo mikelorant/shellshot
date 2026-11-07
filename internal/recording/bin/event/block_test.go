@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/codec"
-	"github.com/michaellorant/shellshot/internal/recording/bin/varint"
+	"github.com/mikelorant/shellshot/internal/recording/bin/codec"
+	"github.com/mikelorant/shellshot/internal/recording/bin/varint"
 )
 
 func mustCodec(t testing.TB, id codec.ID) codec.Codec {

@@ -17,7 +17,7 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/varint"
+	"github.com/mikelorant/shellshot/internal/recording/bin/varint"
 )
 
 // Limits applied by both encoders and decoders.

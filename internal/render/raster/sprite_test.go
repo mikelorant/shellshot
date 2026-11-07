@@ -3,7 +3,7 @@ package raster
 import (
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // A box-drawing rune is drawn by the sprite package: a solid foreground

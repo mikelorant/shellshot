@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs every examples/*.sh under several shells on a pty (via script(1)) with
+# Runs every contrib/examples/*.sh under several shells on a pty (via script(1)) with
 # EXAMPLES_SPEED=fast and checks: exit 0, output ends with the terminal reset
 # (cursor shown), SIGINT restores the terminal, and non-tty stdout is refused
 # unless --force. Usage: scripts/test-examples.sh [shell...]   (run from the repo root)
@@ -50,7 +50,7 @@ for sh_name in $SHELLS; do
         continue
     fi
     cmd=$(shell_cmd "$sh_name")
-    for ex in examples/*.sh; do
+    for ex in contrib/examples/*.sh; do
         case $ex in */lib.sh) continue ;; esac
         RUNS=$((RUNS + 1))
         label="$sh_name $ex"
@@ -68,7 +68,7 @@ for sh_name in $SHELLS; do
 done
 
 # SIGINT in the middle of a run: exit 130 and the terminal is restored.
-for ex in examples/dashboard.sh examples/animations.sh; do
+for ex in contrib/examples/dashboard.sh contrib/examples/animations.sh; do
     RUNS=$((RUNS + 1))
     EXAMPLES_SPEED=normal perl -e 'alarm 40; exec @ARGV' script -q /dev/null \
         perl -e '$p = fork; if (!$p) { exec @ARGV } select(undef, undef, undef, 2); kill "INT", $p; waitpid($p, 0); exit($? >> 8)' \
@@ -84,7 +84,7 @@ for ex in examples/dashboard.sh examples/animations.sh; do
 done
 
 # Non-tty stdout: refuse with exactly one line, unless --force.
-for ex in examples/*.sh; do
+for ex in contrib/examples/*.sh; do
     case $ex in */lib.sh) continue ;; esac
     RUNS=$((RUNS + 1))
     sh "$ex" >"$TMP/out" 2>"$TMP/err" </dev/null

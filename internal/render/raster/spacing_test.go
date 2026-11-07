@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/render/font"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/render/font"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // spacingGlyphs are the glyphs whose ink is measured for centring.

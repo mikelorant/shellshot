@@ -5,7 +5,7 @@ import (
 
 	xfont "golang.org/x/image/font"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // cellStyle is the resolved appearance of one cell: concrete colours (after

@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/michaellorant/shellshot/internal/cli"
+	"github.com/mikelorant/shellshot/internal/cli"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/recording/bin/event"
 )
 
 func spanOf(t *testing.T, e Event) event.Span {

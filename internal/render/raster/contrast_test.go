@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/render/theme"
+	"github.com/mikelorant/shellshot/internal/render/theme"
 )
 
 func TestCoverageLUT(t *testing.T) {

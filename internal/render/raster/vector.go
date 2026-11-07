@@ -3,8 +3,8 @@ package raster
 import (
 	"image/color"
 
-	"github.com/michaellorant/shellshot/internal/render/theme"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/render/theme"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 // Layout is the cell geometry and colours of a Renderer, in final pixels

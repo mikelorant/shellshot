@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
-	"github.com/michaellorant/shellshot/internal/vt"
-	"github.com/michaellorant/shellshot/internal/vt/ghostty"
+	"github.com/mikelorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/vt"
+	"github.com/mikelorant/shellshot/internal/vt/ghostty"
 )
 
 func newTerminal(t *testing.T, cols, rows int) vt.Terminal {

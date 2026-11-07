@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/render/raster"
-	"github.com/michaellorant/shellshot/internal/render/theme"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/render/raster"
+	"github.com/mikelorant/shellshot/internal/render/theme"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 const (

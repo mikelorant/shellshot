@@ -3,7 +3,7 @@ package raster
 import (
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 func TestLayoutMatchesTheRenderer(t *testing.T) {

@@ -2,8 +2,8 @@
 # shellcheck disable=SC1091,SC2034,SC1003
 # showcase.sh: a curated tour of the other demos, nine short scenes with a title
 # each (about 30 s). Safe: prints text and escape sequences only.
-# See examples/README.md.
-#   sh examples/showcase.sh [--force] [--pause]      EXAMPLES_SPEED=fast: about 8 s
+# See contrib/examples/README.md.
+#   sh contrib/examples/showcase.sh [--force] [--pause]      EXAMPLES_SPEED=fast: about 8 s
 
 case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 EX_NAME=${0##*/}
@@ -270,6 +270,6 @@ done
 nap 500
 ex_alt_off
 
-card 'That was shellshot' 'run: sh examples/NAME.sh   (see examples/README.md)'
+card 'That was shellshot' 'run: sh contrib/examples/NAME.sh   (see contrib/examples/README.md)'
 ex_cup "$R" 1
 ex_finish

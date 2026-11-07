@@ -6,7 +6,7 @@ import (
 
 	libghostty "go.mitchellh.com/libghostty"
 
-	"github.com/michaellorant/shellshot/internal/vt"
+	"github.com/mikelorant/shellshot/internal/vt"
 )
 
 // ErrClosed is returned by every Terminal method called after Close.

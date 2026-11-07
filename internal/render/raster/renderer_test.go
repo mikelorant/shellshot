@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/render/font"
-	"github.com/michaellorant/shellshot/internal/render/theme"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/render/font"
+	"github.com/mikelorant/shellshot/internal/render/theme"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 func newTestRenderer(t *testing.T, o Options) (*Renderer, font.Metrics) {

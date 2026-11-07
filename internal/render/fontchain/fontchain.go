@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/michaellorant/shellshot/internal/render/emoji"
-	"github.com/michaellorant/shellshot/internal/render/font"
+	"github.com/mikelorant/shellshot/internal/render/emoji"
+	"github.com/mikelorant/shellshot/internal/render/font"
 )
 
 // Options selects the fonts added to the embedded chain.

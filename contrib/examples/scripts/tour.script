@@ -1,6 +1,6 @@
-# Plays examples/showcase.sh as three scenes and leaves it with Enter (--pause).
+# Plays contrib/examples/showcase.sh as three scenes and leaves it with Enter (--pause).
 # Run from the repository root:
-#   shellshot record --script examples/scripts/tour.script
+#   shellshot record --script contrib/examples/scripts/tour.script
 size 80x24
 shell /bin/sh
 env PS1="$ "
@@ -11,7 +11,7 @@ linger 500ms
 output tour.shot
 
 scene start {
-  run ./examples/showcase.sh --pause
+  run ./contrib/examples/showcase.sh --pause
   wait "shellshot" 10s
 }
 

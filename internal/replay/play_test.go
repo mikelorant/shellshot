@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 type sliceSource struct {

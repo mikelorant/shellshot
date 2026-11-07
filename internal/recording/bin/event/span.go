@@ -6,7 +6,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/michaellorant/shellshot/internal/recording/bin/varint"
+	"github.com/mikelorant/shellshot/internal/recording/bin/varint"
 )
 
 // KindSpan marks the beginning or end of a span of the recording: a scene or a

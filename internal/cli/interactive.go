@@ -6,8 +6,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/michaellorant/shellshot/internal/session"
-	"github.com/michaellorant/shellshot/internal/tty"
+	"github.com/mikelorant/shellshot/internal/session"
+	"github.com/mikelorant/shellshot/internal/tty"
 )
 
 // fallbackShell runs when no command is given and $SHELL is unset.

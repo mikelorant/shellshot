@@ -10,7 +10,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/michaellorant/shellshot/internal/render/emoji"
+	"github.com/mikelorant/shellshot/internal/render/emoji"
 )
 
 // colourEmojiFont writes the embedded Noto Color Emoji font to a temporary

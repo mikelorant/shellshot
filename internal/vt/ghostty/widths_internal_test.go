@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
 func TestAppendWidesClipsAtLimit(t *testing.T) {
