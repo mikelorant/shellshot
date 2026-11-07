@@ -1,7 +1,7 @@
 export PKG_CONFIG_PATH := $(CURDIR)/build/libghostty/lib/pkgconfig
 export CGO_ENABLED := 1
 
-.PHONY: deps build test vet fmt noto-asset emoji-asset examples showcase check-showcase test-examples test-scripts clean distclean
+.PHONY: deps build test vet fmt noto-asset emoji-asset examples showcase check-showcase test-examples test-scripts check-examples clean distclean
 
 deps:
 	./scripts/build-libghostty.sh
@@ -47,6 +47,11 @@ test-examples:
 # Runs every contrib/examples/scripts/*.script with --list and for real (about a minute).
 test-scripts: build
 	./scripts/test-scripts.sh
+
+# Renders every example for real and fails on lines that wrap past column 80 and on characters no
+# embedded font has (needs bin/shellshot, libghostty and uv; takes a minute or two; not part of make test).
+check-examples: build
+	./scripts/check-examples-render.sh
 
 # Re-fetches the pinned Noto Color Emoji font and checks its sha256 (no-op when
 # the committed assets already match).
