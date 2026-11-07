@@ -71,7 +71,7 @@ type Options struct {
 	// changed rectangles bigger and the file larger.
 	Dither bool
 	// Loops is the number of times the animation plays; 0 means forever, 1
-	// plays once. It is the same as the APNG option. GIF stores repeats, so
+	// plays once. It is the same as the PNG option. GIF stores repeats, so
 	// the file's loop count is Loops-1 (no loop extension for 1).
 	Loops int
 }

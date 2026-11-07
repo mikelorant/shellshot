@@ -68,7 +68,7 @@ func newExportCmd() *cobra.Command {
 	var f exportFlags
 	cmd := &cobra.Command{
 		Use:   "export FILE [-o OUT.png] [flags]",
-		Short: "Render a recording as an animated PNG (APNG)",
+		Short: "Render a recording as an animated PNG",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fl := cmd.Flags()
@@ -77,8 +77,8 @@ func newExportCmd() *cobra.Command {
 		},
 	}
 	fl := cmd.Flags()
-	fl.StringVarP(&f.output, "output", "o", "", "output file, written as-is (default: FILE with the extension of the format, .png for apng)")
-	fl.StringVar(&f.format, "format", "", "output format: "+strings.Join(format.Default().Names(), ", ")+" (default: from the extension of -o, else apng)")
+	fl.StringVarP(&f.output, "output", "o", "", "output file, written as-is (default: FILE with the extension of the format, .png for png)")
+	fl.StringVar(&f.format, "format", "", "output format: "+strings.Join(format.Default().Names(), ", ")+" (default: from the extension of -o, else png)")
 	fl.StringVar(&f.theme, "theme", "", "built-in theme name ("+strings.Join(theme.Names(), ", ")+") or a theme JSON file (default: "+theme.Default().Name+")")
 	fl.Float64Var(&f.fontSize, "font-size", raster.DefaultFontSize, "font size in pixels, before --scale (12 matches Ghostty font-size = 12 on a 2x display with --scale 2)")
 	fl.IntVar(&f.scale, "scale", raster.DefaultScale, "integer scale factor for font size and padding")
@@ -91,7 +91,7 @@ func newExportCmd() *cobra.Command {
 	fl.IntVar(&f.loops, "loops", 0, "number of times the animation plays (0 for forever)")
 	fl.DurationVar(&f.minDelay, "min-delay", 20*time.Millisecond, "shortest frame delay; shorter frames are merged into the previous one (0 to keep all)")
 	fl.BoolVar(&f.keepLeadingBlank, "keep-leading-blank", false, "keep a blank first frame; without it a blank screen shown for at most "+defaultLeadingBlank.String()+" at the start is dropped, so viewers that show only the first frame do not show an empty terminal")
-	fl.StringVar(&f.poster, "poster", defaultPoster, "apng only: the frame viewers without animation support show (Preview, Quick Look, chat previews): first, last, none or a time such as 12s on the output clock. A poster other than the first frame adds one full frame to the file")
+	fl.StringVar(&f.poster, "poster", defaultPoster, "png only: the frame viewers without animation support show (Preview, Quick Look, chat previews): first, last, none or a time such as 12s on the output clock. A poster other than the first frame adds one full frame to the file")
 	addFPSFlag(cmd, &f.fps)
 	fl.StringVar(&f.cursor, "cursor", "block", "cursor shape: block, bar, underline or none")
 	fl.StringArrayVar(&f.fallbackFonts, "fallback-font", nil, "TTF/OTF/TTC `file` for glyphs the built-in fonts lack (repeatable; tried in order, after the built-in fonts)")
@@ -173,7 +173,7 @@ func resolveTheme(value string) (theme.Theme, error) {
 
 // defaultFormat is the format used when --format and the extension of -o do
 // not choose one.
-const defaultFormat = "apng"
+const defaultFormat = "png"
 
 // resolveFormat returns the output format: the one named by name, else the
 // one that owns the extension of output, else (no -o, or -o without an
@@ -200,7 +200,7 @@ func resolveFormat(reg *format.Registry, name, output string) (format.Format, er
 }
 
 // defaultExportPath returns path with its extension replaced by the first
-// extension of f (".png" for apng). An APNG is a valid PNG, and ".png" is the
+// extension of f (".png" for png). The ".png" extension is the one
 // extension operating systems, previews and upload dialogs recognise.
 func defaultExportPath(path string, f format.Format) string {
 	return strings.TrimSuffix(path, filepath.Ext(path)) + f.Extensions[0]
@@ -418,7 +418,7 @@ func writeFileAtomic(path string, write func(*os.File) error) (size int64, err e
 }
 
 // fixedSize passes frames through and fails on the first one whose size
-// differs from the recording's initial size: the APNG canvas has a fixed
+// differs from the recording's initial size: the PNG canvas has a fixed
 // size, so export does not support recordings that resize yet.
 type fixedSize struct {
 	src        pipeline.Source

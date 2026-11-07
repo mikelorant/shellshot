@@ -1,6 +1,6 @@
 // Package pipeline turns a stream of timestamped snapshot frames into an
 // animation: it reads every frame, applies the timeline policy, renders each
-// distinct screen and feeds the result to a Sink (an APNG encoder unless
+// distinct screen and feeds the result to a Sink (a PNG encoder unless
 // Options.NewSink says otherwise). It is pure Go (no cgo, no cobra); the
 // frame source, the renderer and the sink are small interfaces defined here,
 // so any recording format, renderer or raster output format can plug in.
@@ -69,14 +69,14 @@ type DelayLimiter interface {
 }
 
 // AutoFrame is implemented by a Sink that can store only what changed
-// between frames (the APNG sink). Export calls AddFrameAuto instead of
+// between frames (the PNG sink). Export calls AddFrameAuto instead of
 // AddFrame on such a sink; the contract of AddFrame applies.
 type AutoFrame interface {
 	AddFrameAuto(img image.Image, delay time.Duration) error
 }
 
 // PosterSetter is implemented by a Sink whose format has a still image apart
-// from the animation, for viewers that cannot animate (the APNG sink's
+// from the animation, for viewers that cannot animate (the PNG sink's
 // default image). Export calls SetPoster once, before the first AddFrame,
 // when Options.Poster asks for a poster.
 type PosterSetter interface {
@@ -99,14 +99,14 @@ type Options struct {
 	// value, PosterNone, writes none. Export fails if it asks for a poster
 	// and the sink is not a PosterSetter.
 	Poster Poster
-	// Loops is the APNG play count; 0 means forever. It only applies when
+	// Loops is the PNG play count; 0 means forever. It only applies when
 	// NewSink is nil.
 	Loops int
-	// Compression is the PNG compression level for every APNG frame. It only
+	// Compression is the PNG compression level for every PNG frame. It only
 	// applies when NewSink is nil.
 	Compression png.CompressionLevel
 	// NewSink creates the output format's Sink. If nil, Export writes an
-	// APNG built from Loops and Compression.
+	// PNG built from Loops and Compression.
 	NewSink SinkFactory
 	// Progress, if not nil, is called after each timeline step has been
 	// encoded, with the number of steps done and the total number of steps.
@@ -115,7 +115,7 @@ type Options struct {
 
 // Export reads all frames from src, renders them with r at the cols x rows
 // screen size and writes the animation to w through the Options.NewSink sink
-// (an APNG by default). Consecutive equal screens are rendered once and
+// (a PNG by default). Consecutive equal screens are rendered once and
 // merged into one longer frame. Cancelling ctx stops the export between
 // frames; errors name the frame or step that failed. Nothing is written to w
 // unless the whole animation encodes.
@@ -128,7 +128,7 @@ func Export(ctx context.Context, src Source, cols, rows int, r Renderer, w io.Wr
 	width, height := r.Size(cols, rows)
 	newSink := o.NewSink
 	if newSink == nil {
-		newSink = APNGSinkFactory(o.Loops, o.Compression)
+		newSink = PNGSinkFactory(o.Loops, o.Compression)
 	}
 	out := &gatedWriter{w: w}
 	sink, err := newSink(out, width, height)
@@ -253,7 +253,7 @@ func encodeSteps(ctx context.Context, steps []timeline.Step, r Renderer, sink Si
 }
 
 // addFrame adds img for delay, splitting a delay longer than the sink's
-// MaxDelay into repeats of the same image (which the APNG sink merges where
+// MaxDelay into repeats of the same image (which the PNG sink merges where
 // it can). It prefers AddFrameAuto when the sink has it.
 func addFrame(sink Sink, img *image.RGBA, delay time.Duration) error {
 	var limit time.Duration

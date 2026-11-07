@@ -58,16 +58,16 @@ func compose(t *testing.T, a kettek.APNG, n int) *image.RGBA {
 	return canvas
 }
 
-// decodeAPNG decodes the animation in the file at path. An APNG's default
+// decodeAnimatedPNG decodes the animation in the file at path. A PNG's default
 // image (the default --poster) is not part of the animation and is left out;
 // the poster tests look at it.
-func decodeAPNG(t *testing.T, path string) kettek.APNG {
+func decodeAnimatedPNG(t *testing.T, path string) kettek.APNG {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, _ := animationOf(decodeAPNGBytes(t, data))
+	a, _ := animationOf(decodeAnimatedPNGBytes(t, data))
 	return a
 }
 
@@ -87,7 +87,7 @@ func runExportCmd(t *testing.T, args ...string) (code int, stderr string) {
 	return code, errBuf.String()
 }
 
-func TestExportWritesStyledAPNG(t *testing.T) {
+func TestExportWritesStyledPNG(t *testing.T) {
 	t.Parallel()
 	in := writeExportFixture(t)
 	out := filepath.Join(t.TempDir(), "out.png")
@@ -100,7 +100,7 @@ func TestExportWritesStyledAPNG(t *testing.T) {
 	if !strings.HasPrefix(stderr, "wrote 3 frames (") || !strings.HasSuffix(stderr, " KB) to "+out+"\n") {
 		t.Errorf("stderr = %q, want a 'wrote 3 frames (N KB) to %s' line", stderr, out)
 	}
-	a := decodeAPNG(t, out)
+	a := decodeAnimatedPNG(t, out)
 
 	// Expected geometry from the same renderer the command builds.
 	fonts, err := font.Default()
@@ -197,7 +197,7 @@ func TestExportDefaultOutputPath(t *testing.T) {
 	}
 }
 
-// The default output is "<input without extension>.png": an APNG is a valid
+// The default output is "<input without extension>.png": a PNG is a valid
 // PNG and the extension operating systems recognise. Only the output file
 // remains next to the input (the atomic temporary file is gone).
 func TestExportDefaultsToPNGExtension(t *testing.T) {
@@ -208,7 +208,7 @@ func TestExportDefaultsToPNGExtension(t *testing.T) {
 	}
 	dir := filepath.Dir(in)
 	want := filepath.Join(dir, "x.png")
-	if a := decodeAPNG(t, want); len(a.Frames) < 2 {
+	if a := decodeAnimatedPNG(t, want); len(a.Frames) < 2 {
 		t.Errorf("%s has %d frames, want an animation", want, len(a.Frames))
 	}
 	entries, err := os.ReadDir(dir)
@@ -461,7 +461,7 @@ func TestExportRejectsNonRecordings(t *testing.T) {
 	}
 }
 
-// Known limitation: the APNG canvas is fixed, so a recording that resizes
+// Known limitation: the PNG canvas is fixed, so a recording that resizes
 // cannot be exported yet.
 func TestExportRejectsResizingRecording(t *testing.T) {
 	t.Parallel()
@@ -490,7 +490,7 @@ func TestExportTruncatedExportsValidPrefix(t *testing.T) {
 	if want := fmt.Sprintf("shellshot: recording is truncated (%d bytes valid)\n", firstEnd); !strings.HasPrefix(stderr, want) {
 		t.Errorf("stderr = %q, want it to start with %q", stderr, want)
 	}
-	if a := decodeAPNG(t, out); len(a.Frames) == 0 {
+	if a := decodeAnimatedPNG(t, out); len(a.Frames) == 0 {
 		t.Error("no frames exported")
 	}
 }
@@ -508,7 +508,7 @@ func TestExportInterruptedWarns(t *testing.T) {
 	if want := "shellshot: recording is incomplete (no exit event; recorder was interrupted)\n"; !strings.HasPrefix(stderr, want) {
 		t.Errorf("stderr = %q, want it to start with %q", stderr, want)
 	}
-	if a := decodeAPNG(t, out); len(a.Frames) < 2 {
+	if a := decodeAnimatedPNG(t, out); len(a.Frames) < 2 {
 		t.Errorf("%d frames exported, want both blocks", len(a.Frames))
 	}
 }
@@ -527,7 +527,7 @@ func TestExportIdleGap(t *testing.T) {
 	if elapsed := time.Since(start); elapsed > 5*time.Second {
 		t.Errorf("export took %v", elapsed)
 	}
-	a := decodeAPNG(t, out)
+	a := decodeAnimatedPNG(t, out)
 	if n := len(a.Frames); n < 2 || n > 5 {
 		t.Errorf("%d frames for a recording with two bursts, want 2 to 5", n)
 	}
@@ -574,7 +574,7 @@ func TestExportDrawsColourEmojiSequences(t *testing.T) {
 	if code, stderr := runExportCmd(t, in, "-o", out, "--hold", "1s", "--cursor", "none"); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
-	a := decodeAPNG(t, out)
+	a := decodeAnimatedPNG(t, out)
 	final := compose(t, a, len(a.Frames)-1)
 
 	fonts, err := font.Default()
@@ -690,7 +690,7 @@ func TestExportDropsLeadingBlankFrame(t *testing.T) {
 	if !strings.HasPrefix(stderr, "wrote 2 frames (") {
 		t.Errorf("stderr = %q, want a 'wrote 2 frames' line", stderr)
 	}
-	k, d := decodeAPNG(t, kept), decodeAPNG(t, dropped)
+	k, d := decodeAnimatedPNG(t, kept), decodeAnimatedPNG(t, dropped)
 	if len(k.Frames) != 3 || len(d.Frames) != 2 {
 		t.Fatalf("frames: kept %d, dropped %d, want 3 and 2", len(k.Frames), len(d.Frames))
 	}

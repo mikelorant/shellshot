@@ -9,21 +9,21 @@ import (
 	"github.com/mikelorant/shellshot/internal/export/pipeline"
 )
 
-func TestDefaultRegistersAPNGAndSVG(t *testing.T) {
+func TestDefaultRegistersPNGAndSVG(t *testing.T) {
 	t.Parallel()
 	r := Default()
-	if got := r.Names(); !slices.Equal(got, []string{"apng", "gif", "svg", "webp"}) {
-		t.Errorf("Names = %v, want [apng gif svg webp]", got)
+	if got := r.Names(); !slices.Equal(got, []string{"png", "gif", "svg", "webp"}) {
+		t.Errorf("Names = %v, want [png gif svg webp]", got)
 	}
 	if f, ok := r.ByExtension("shot.SVG"); !ok || f.Name != "svg" || f.New != nil || f.NewSteps == nil {
 		t.Errorf("ByExtension(shot.SVG) = %+v, %v; want the steps format svg", f, ok)
 	}
-	if f, _ := r.Lookup("apng"); f.NewSteps != nil || f.New == nil {
-		t.Error("apng must be a sink format")
+	if f, _ := r.Lookup("png"); f.NewSteps != nil || f.New == nil {
+		t.Error("png must be a sink format")
 	}
-	f, ok := r.Lookup("apng")
-	if !ok || f.Name != "apng" {
-		t.Fatalf("Lookup(apng) = %+v, %v", f, ok)
+	f, ok := r.Lookup("png")
+	if !ok || f.Name != "png" {
+		t.Fatalf("Lookup(png) = %+v, %v", f, ok)
 	}
 	if !slices.Equal(f.Extensions, []string{".png", ".apng"}) {
 		t.Errorf("Extensions = %v, want [.png .apng]", f.Extensions)
@@ -37,7 +37,7 @@ func TestDefaultReturnsIndependentRegistries(t *testing.T) {
 		t.Error("Default returned the same registry twice")
 	}
 	a.formats[0].Name = "changed"
-	if _, ok := b.Lookup("apng"); !ok {
+	if _, ok := b.Lookup("png"); !ok {
 		t.Error("changing one registry changed another")
 	}
 }
@@ -45,10 +45,10 @@ func TestDefaultReturnsIndependentRegistries(t *testing.T) {
 func TestLookupIgnoresCaseAndRejectsUnknown(t *testing.T) {
 	t.Parallel()
 	r := Default()
-	if _, ok := r.Lookup("APNG"); !ok {
-		t.Error("Lookup(APNG) not found")
+	if _, ok := r.Lookup("PNG"); !ok {
+		t.Error("Lookup(PNG) not found")
 	}
-	for _, name := range []string{"", "tiff", "png", "apng "} {
+	for _, name := range []string{"", "tiff", "apng", "apng "} {
 		if _, ok := r.Lookup(name); ok {
 			t.Errorf("Lookup(%q) found a format", name)
 		}
@@ -59,8 +59,8 @@ func TestByExtension(t *testing.T) {
 	t.Parallel()
 	r := Default()
 	for _, path := range []string{"a.png", "a.apng", "dir/a.PNG", "A.ApNg", "x.y.png", "/t/.png"} {
-		if f, ok := r.ByExtension(path); !ok || f.Name != "apng" {
-			t.Errorf("ByExtension(%q) = %q, %v; want apng", path, f.Name, ok)
+		if f, ok := r.ByExtension(path); !ok || f.Name != "png" {
+			t.Errorf("ByExtension(%q) = %q, %v; want png", path, f.Name, ok)
 		}
 	}
 	for _, path := range []string{"", "a", "a.tiff", "a.png.bak", "png", "dir.png/a", "-"} {
@@ -83,15 +83,15 @@ func TestNewRegistryKeepsOrderAndCopiesInput(t *testing.T) {
 	}
 }
 
-func TestAPNGFactoryBuildsAPNGSink(t *testing.T) {
+func TestPNGFactoryBuildsPNGSink(t *testing.T) {
 	t.Parallel()
-	f, _ := Default().Lookup("apng")
+	f, _ := Default().Lookup("png")
 	sink, err := f.New(Settings{Loops: 2})(io.Discard, 4, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := sink.(*pipeline.APNGSink); !ok {
-		t.Errorf("sink is %T, want *pipeline.APNGSink", sink)
+	if _, ok := sink.(*pipeline.PNGSink); !ok {
+		t.Errorf("sink is %T, want *pipeline.PNGSink", sink)
 	}
 	var buf bytes.Buffer
 	if _, err := f.New(Settings{})(&buf, 0, 0); err == nil {

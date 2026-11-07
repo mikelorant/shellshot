@@ -294,9 +294,9 @@ func TestExportReportsSinkFactoryError(t *testing.T) {
 	}
 }
 
-func TestAPNGSinkLimitsDelayTo65535Milliseconds(t *testing.T) {
+func TestPNGSinkLimitsDelayTo65535Milliseconds(t *testing.T) {
 	t.Parallel()
-	s, err := APNGSinkFactory(0, 0)(io.Discard, 1, 1)
+	s, err := PNGSinkFactory(0, 0)(io.Discard, 1, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,6 +304,6 @@ func TestAPNGSinkLimitsDelayTo65535Milliseconds(t *testing.T) {
 		t.Errorf("MaxDelay = %v, want 65.535s", got)
 	}
 	if _, ok := s.(AutoFrame); !ok {
-		t.Error("APNG sink should implement AutoFrame")
+		t.Error("PNG sink should implement AutoFrame")
 	}
 }

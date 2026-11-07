@@ -47,7 +47,7 @@ func exportLastFrame(t *testing.T, in string, flags ...string) *image.RGBA {
 	if code, stderr := runExportCmd(t, args...); code != 0 {
 		t.Fatalf("export %v: exit %d, stderr %q", flags, code, stderr)
 	}
-	a := decodeAPNG(t, out)
+	a := decodeAnimatedPNG(t, out)
 	return compose(t, a, len(a.Frames)-1)
 }
 
