@@ -115,7 +115,8 @@ $ shellshot export demo.shot        # writes demo.apng next to the input
 |---|---|---|
 | `-o` | input with `.apng` | output file (never overwrites the input) |
 | `--theme` | `dark` | built-in (`dark`, `light`) or a theme JSON file |
-| `--font-size`, `--scale`, `--padding` | 14, 1, 8 | pixel size, integer scale, border (≥1) |
+| `--font-size`, `--scale`, `--padding` | 15, 1, 8 | em size in pixels, integer scale of font size and padding (2 = native 2x glyphs, for sharp retina embeds), border (≥1) |
+| `--adjust-cell-width`, `--adjust-cell-height` | 0, 0 | change the cell size after `--scale`, in pixels (`-1`, `2`) or percent (`-7%`), like Ghostty's options of the same name |
 | `--speed` | 1 | playback speed multiplier |
 | `--idle-limit` | 2s | longest pause between frames (0 = no limit) |
 | `--hold` | 2s | how long the last frame stays |
@@ -125,6 +126,13 @@ $ shellshot export demo.shot        # writes demo.apng next to the input
 | `--fps` | 60 | frame sampling rate in frames per second (1 to 1000) |
 | `--fallback-font FILE` | none | extra TTF/OTF/TTC for glyphs the built-in fonts lack; repeatable, tried in order after the built-in fonts; an unreadable or invalid file is an error |
 | `--system-fonts` | off | also use installed CJK and symbol fonts (macOS and Linux font folders). **The output then depends on this machine's fonts**, so exports differ between machines |
+
+Cell size follows Ghostty: the cell is the font's advance and line height
+rounded to whole pixels, and `--adjust-cell-*` applies to those pixels. A glyph
+is centred in a wider cell; in a narrower one it stays anchored at the left edge
+and overflows to the right. For a Ghostty config of `font-size = 12` and
+`adjust-cell-width = -7%` on a 2x (retina) display use
+`--font-size 12 --scale 2 --adjust-cell-width -7%` (13x32 pixel cells, as there).
 
 A theme file is JSON with all fields required:
 `{"name":"x","foreground":"#rrggbb","background":"#rrggbb","cursor":"#rrggbb","palette":[16 × "#rrggbb"]}`.

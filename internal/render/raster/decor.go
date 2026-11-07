@@ -12,10 +12,10 @@ func (r *Renderer) thickness() int {
 }
 
 // underlineTop is the offset from the cell top of the underline's first
-// pixel row. It leaves one stroke of space above the cell bottom, where the
-// underline cursor is drawn.
+// pixel row: where the font puts it below the baseline, but at least one
+// stroke above the cell bottom, where the underline cursor is drawn.
 func (r *Renderer) underlineTop() int {
-	return r.metrics.CellHeight - 3*r.thickness()
+	return min(r.metrics.Ascent+max(1, r.metrics.UnderlineOffset), r.metrics.CellHeight-2*r.thickness())
 }
 
 // strikeTop is the offset from the cell top of the strikethrough's first

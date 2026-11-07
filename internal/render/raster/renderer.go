@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
+	"math"
 
 	xfont "golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
 
 	"github.com/michaellorant/shellshot/internal/render/font"
 	"github.com/michaellorant/shellshot/internal/render/theme"
@@ -17,7 +19,7 @@ import (
 
 // Defaults applied by New to zero Options fields.
 const (
-	DefaultFontSize = 14.0
+	DefaultFontSize = 15.0
 	DefaultPadding  = 8
 	DefaultScale    = 1
 )
@@ -52,6 +54,10 @@ type Options struct {
 	Scale int
 	// Cursor selects the cursor shape; the zero value is CursorBlock.
 	Cursor CursorStyle
+	// AdjustCellWidth and AdjustCellHeight change the font-derived cell size
+	// after Scale is applied, like Ghostty's adjust-cell-width and
+	// adjust-cell-height. The zero values change nothing.
+	AdjustCellWidth, AdjustCellHeight font.CellAdjust
 }
 
 // Renderer turns snapshots into images. It is not safe for concurrent use
@@ -59,12 +65,15 @@ type Options struct {
 type Renderer struct {
 	theme   theme.Theme
 	fonts   Fonts
-	sizePx  float64 // FontSize * Scale
-	pad     int     // Padding * Scale
-	metrics font.Metrics
+	sizePx  float64       // em size of the faces: FontSize * Scale, exactly
+	pad     int           // Padding * Scale
+	metrics font.Metrics  // cell geometry in final pixels (Scale and adjustments applied)
+	glyphDX fixed.Int26_6 // glyph offset inside the cell, see font.Metrics.GlyphOffsetX
 	regular xfont.Face
 	faces   [4]xfont.Face // indexed by faceIndex(bold, italic)
 	cursor  CursorStyle
+
+	maskScratch image.Alpha // reused by contrastFace
 }
 
 // New validates o, applies defaults and resolves the cell metrics from f.
@@ -90,18 +99,22 @@ func New(f Fonts, o Options) (*Renderer, error) {
 	r := &Renderer{
 		theme:  o.Theme,
 		fonts:  f,
-		sizePx: o.FontSize * float64(o.Scale),
 		pad:    o.Padding * o.Scale,
 		cursor: o.Cursor,
 	}
+	r.sizePx = o.FontSize * float64(o.Scale)
 	m, err := f.Metrics(r.sizePx)
 	if err != nil {
 		return nil, fmt.Errorf("raster: font metrics: %w", err)
 	}
-	if m.CellWidth <= 0 || m.CellHeight <= 0 {
-		return nil, fmt.Errorf("raster: degenerate cell size %dx%d", m.CellWidth, m.CellHeight)
+	if err := m.CheckAdjust(o.AdjustCellWidth, o.AdjustCellHeight); err != nil {
+		return nil, fmt.Errorf("raster: %w", err)
 	}
-	r.metrics = m
+	r.metrics = m.Adjust(o.AdjustCellWidth, o.AdjustCellHeight)
+	if r.metrics.CellWidth <= 0 || r.metrics.CellHeight <= 0 {
+		return nil, fmt.Errorf("raster: degenerate cell size %dx%d", r.metrics.CellWidth, r.metrics.CellHeight)
+	}
+	r.glyphDX = fixed.Int26_6(math.Round(r.metrics.GlyphOffsetX() * 64))
 	for i := range r.faces {
 		if r.faces[i], err = f.Face(i&1 != 0, i&2 != 0, r.sizePx); err != nil {
 			return nil, fmt.Errorf("raster: face %d: %w", i, err)

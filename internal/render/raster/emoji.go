@@ -8,6 +8,11 @@ import (
 // drawEmoji draws the colour emoji for c's whole cluster, scaled to fit the
 // cells c spans and centred in them on whole pixels. It reports whether the
 // emoji font had a glyph. Colour emoji ignore the foreground colour.
+//
+// The span is that of the adjusted cell (--adjust-cell-width/-height
+// included): the emoji is a square of min(span width, cell height) pixels, so
+// narrowing the cell shrinks the emoji and it never overflows into the next
+// cell; widening the cell leaves it at the cell height, centred.
 func (r *Renderer) drawEmoji(img *image.RGBA, c cell) bool {
 	w, h := c.width*r.metrics.CellWidth, r.metrics.CellHeight
 	side := min(w, h)

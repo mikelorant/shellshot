@@ -56,7 +56,7 @@ func (r *Renderer) fallback(img *image.RGBA, c cell) bool {
 	d := &xfont.Drawer{
 		Dst:  img.SubImage(cellRect).(*image.RGBA),
 		Src:  image.NewUniform(c.st.fg),
-		Face: face,
+		Face: r.contrastFace(face, c.st.fg, c.st.bg),
 		Dot:  dot,
 	}
 	d.DrawString(string(c.c))
@@ -159,9 +159,10 @@ func (r *Renderer) drawGlyph(img *image.RGBA, d *xfont.Drawer, c cell) {
 	}
 	if hasInk(c.c) {
 		if _, ok := r.face(c.st).GlyphAdvance(c.c); ok {
-			d.Face = r.face(c.st)
+			d.Face = r.contrastFace(r.face(c.st), c.st.fg, c.st.bg)
 			d.Src = image.NewUniform(c.st.fg)
 			d.Dot = r.baselineDot(c.col, c.row)
+			d.Dot.X += r.glyphDX
 			d.DrawString(string(c.c))
 		} else if !r.fallback(img, c) && !r.drawEmoji(img, c) {
 			return // no font has the base rune: leave the cell blank
@@ -187,10 +188,10 @@ func (r *Renderer) drawMark(img *image.RGBA, d *xfont.Drawer, c cell, m rune) {
 		r.fallback(img, mc)
 		return
 	}
-	d.Face = face
+	d.Face = r.contrastFace(face, c.st.fg, c.st.bg)
 	d.Src = image.NewUniform(c.st.fg)
 	d.Dot = r.baselineDot(c.col, c.row)
-	d.Dot.X += c.advance
+	d.Dot.X += r.glyphDX + c.advance
 	d.DrawString(string(m))
 }
 

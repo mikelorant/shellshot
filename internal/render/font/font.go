@@ -72,6 +72,8 @@ type Set struct {
 
 	mu    sync.Mutex
 	faces map[faceKey]xfont.Face
+	// gridOff disables grid fitting of primary-family faces (see gridFace).
+	gridOff bool
 }
 
 // Default returns a new Set backed by the embedded JetBrains Mono fonts. Its
@@ -228,8 +230,20 @@ func (s *Set) face(font int, sizePx float64) (xfont.Face, error) {
 	if err != nil {
 		return nil, fmt.Errorf("font: new %s face at %vpx: %w", name, sizePx, err)
 	}
+	if font < int(styleCount) && !s.gridOff {
+		f = newGridFace(f, parsed, sizePx)
+	}
 	s.faces[k] = f
 	return f, nil
+}
+
+// SetGridFit turns grid fitting of the primary family's glyph heights on or
+// off (on by default) and drops cached faces. It exists to compare renderings.
+func (s *Set) SetGridFit(on bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.gridOff = !on
+	s.faces = make(map[faceKey]xfont.Face)
 }
 
 // fallbackOrPrimary returns the parsed font and display name for a faceKey

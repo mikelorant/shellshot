@@ -6,8 +6,11 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"math"
 	"testing"
 
+	xfont "golang.org/x/image/font"
+	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -29,14 +32,167 @@ func TestDefaultLoads(t *testing.T) {
 	}
 }
 
-func TestMetricsGolden14px(t *testing.T) {
-	m, err := mustDefault(t).Metrics(14)
+func TestMetricsGolden(t *testing.T) {
+	// JetBrains Mono: advance 0.6 em, ascent 1.02 em, descent 0.3 em, no gap.
+	for _, tc := range []struct {
+		size                              float64
+		width, height, ascent, descent, u int
+	}{
+		{12, 7, 16, 12, 4, 2},  // 7.2 and 15.84 round
+		{14, 8, 18, 14, 4, 2},  // 8.4 rounds down: tighter than design, not looser
+		{15, 9, 20, 16, 4, 2},  // exact advance
+		{16, 10, 21, 16, 5, 2}, // 9.6 rounds up
+		{24, 14, 32, 25, 7, 4}, // 12pt on a 2x display in Ghostty
+	} {
+		m, err := mustDefault(t).Metrics(tc.size)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m.CellWidth != tc.width || m.CellHeight != tc.height || m.Ascent != tc.ascent || m.Descent != tc.descent || m.UnderlineOffset != tc.u {
+			t.Errorf("Metrics(%v) = %+v, want %dx%d ascent %d descent %d underline %d", tc.size, m, tc.width, tc.height, tc.ascent, tc.descent, tc.u)
+		}
+		if math.Abs(m.FaceWidth-0.6*tc.size) > 1e-9 {
+			t.Errorf("Metrics(%v).FaceWidth = %v, want %v", tc.size, m.FaceWidth, 0.6*tc.size)
+		}
+	}
+}
+
+func TestParseCellAdjust(t *testing.T) {
+	for _, tc := range []struct {
+		in         string
+		v, want    int
+		wantString string
+	}{
+		{"2", 14, 16, "2"},
+		{"-1", 14, 13, "-1"},
+		{"+3", 14, 17, "3"},
+		{"-100", 14, 0, "-100"},   // pixels: not below zero
+		{"-7%", 14, 13, "-7%"},    // 13.02
+		{"-7%", 7, 7, "-7%"},      // 6.51 rounds up
+		{"20%", 10, 12, "20%"},    // a percentage of the size, not of 100
+		{"-150%", 10, 0, "-150%"}, // multiplier clamped at 0
+		{"0%", 10, 10, "0%"},
+	} {
+		a, err := ParseCellAdjust(tc.in)
+		if err != nil {
+			t.Errorf("ParseCellAdjust(%q): %v", tc.in, err)
+			continue
+		}
+		if got := a.apply(tc.v); got != tc.want {
+			t.Errorf("%q applied to %d = %d, want %d", tc.in, tc.v, got, tc.want)
+		}
+		if a.String() != tc.wantString {
+			t.Errorf("%q formats as %q, want %q", tc.in, a.String(), tc.wantString)
+		}
+	}
+	for _, bad := range []string{"", "%", "x", "1.5", "5px", "--2", "NaN%", "1e999%"} {
+		if _, err := ParseCellAdjust(bad); err == nil {
+			t.Errorf("ParseCellAdjust(%q) succeeded, want error", bad)
+		}
+	}
+	var zero CellAdjust
+	if zero.apply(9) != 9 || zero.String() != "0" {
+		t.Error("zero CellAdjust changes the size")
+	}
+}
+
+// ghosttyCell transcribes Metrics.calc and the cell_width/cell_height
+// modifiers of Ghostty (third_party/ghostty/src/font/Metrics.zig, pinned
+// commit) from raw font numbers in pixels, with its own bottom-up baseline,
+// so the arithmetic is independent of Set.Metrics. Returns cell width,
+// height, baseline distance from the top.
+func ghosttyCell(advance, ascent, descent, gap float64, wPct, hPct *float64, wPx, hPx int) (w, h, baselineFromTop int) {
+	faceHeight := ascent + descent + gap
+	cellW, cellH := math.Round(advance), math.Round(faceHeight)
+	faceBaseline := gap/2 + descent // descent as a positive depth
+	cellBaseline := math.Round(faceBaseline - (cellH-faceHeight)/2)
+	faceY := cellBaseline - faceBaseline
+	mod := func(v float64, pct *float64, px int) float64 {
+		switch {
+		case pct != nil:
+			return math.Max(1, math.Round(v*math.Max(0, 1+*pct/100)))
+		default:
+			return math.Max(1, v+float64(px))
+		}
+	}
+	newW, newH := mod(cellW, wPct, wPx), mod(cellH, hPct, hPx)
+	if newH != cellH {
+		diff := newH - cellH
+		half := diff / 2
+		var diffTop, diffBottom float64
+		if faceY-(cellH-faceHeight)/2 > 0 {
+			diffTop, diffBottom = math.Ceil(half), math.Floor(half)
+		} else {
+			diffTop, diffBottom = math.Floor(half), math.Ceil(half)
+		}
+		_ = diffTop
+		cellBaseline += diffBottom
+		cellH = newH
+	}
+	return int(newW), int(cellH), int(cellH - cellBaseline)
+}
+
+// Cell geometry must equal Ghostty's for the same font size, including the
+// user's 12pt font with adjust-cell-width = -7% on a 1x and 2x display.
+func TestCellGeometryMatchesGhostty(t *testing.T) {
+	s := mustDefault(t)
+	f := s.fonts[styleRegular]
+	var buf sfnt.Buffer
+	upm := fixed.I(int(f.UnitsPerEm()))
+	m, err := f.Metrics(&buf, upm, xfont.HintingNone)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Metrics{CellWidth: 9, CellHeight: 20, Ascent: 15, Descent: 5}
-	if m != want {
-		t.Errorf("Metrics(14) = %+v, want %+v", m, want)
+	g, _ := f.GlyphIndex(&buf, 'M')
+	advUnits, _ := f.GlyphAdvance(&buf, g, upm, xfont.HintingNone)
+	pct := func(v float64) *float64 { return &v }
+	type adj struct {
+		spec string
+		pct  *float64
+		px   int
+	}
+	adjusts := []adj{{"0", nil, 0}, {"-7%", pct(-7), 0}, {"2", nil, 2}, {"-1", nil, -1}, {"10%", pct(10), 0}, {"-20%", pct(-20), 0}}
+	for _, size := range []float64{11, 12, 14, 15, 16, 20, 24, 28, 33.5} {
+		scale := size / float64(upm>>6)
+		advance := float64(advUnits>>6) * scale
+		ascent, descent, height := float64(m.Ascent>>6)*scale, float64(m.Descent>>6)*scale, float64(m.Height>>6)*scale
+		base, err := s.Metrics(size)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, w := range adjusts {
+			for _, h := range adjusts {
+				wa, _ := ParseCellAdjust(w.spec)
+				ha, _ := ParseCellAdjust(h.spec)
+				got := base.Adjust(wa, ha)
+				wantW, wantH, wantBase := ghosttyCell(advance, ascent, descent, height-ascent-descent, w.pct, h.pct, w.px, h.px)
+				if got.CellWidth != wantW || got.CellHeight != wantH || got.Ascent != wantBase {
+					t.Errorf("size %v width %s height %s: got %dx%d baseline %d, Ghostty %dx%d baseline %d",
+						size, w.spec, h.spec, got.CellWidth, got.CellHeight, got.Ascent, wantW, wantH, wantBase)
+				}
+			}
+		}
+	}
+}
+
+func TestGlyphOffsetX(t *testing.T) {
+	for _, tc := range []struct {
+		cell int
+		face float64
+		want float64
+	}{
+		{9, 9, 0},
+		{10, 9.6, 0.2},   // wider cell: centre
+		{12, 9.6, 1.2},   // much wider: centre
+		{8, 8.4, -0.2},   // narrower by under a pixel: shift by the fraction
+		{13, 14.4, -0.7}, // narrower by 1.4: the integer part is dropped, left-anchored
+		{7, 14.4, -0.7},  // dx = -3.7 -> -0.7
+		{14, 14.4, -0.2}, // 12pt on a 2x display
+	} {
+		m := Metrics{CellWidth: tc.cell, FaceWidth: tc.face}
+		if got := m.GlyphOffsetX(); math.Abs(got-tc.want) > 1e-9 {
+			t.Errorf("cell %d face %v: offset %v, want %v", tc.cell, tc.face, got, tc.want)
+		}
 	}
 }
 
@@ -475,4 +631,110 @@ func TestFitFaceMissingAndInvalid(t *testing.T) {
 			t.Errorf("FitFace(%v): no error", c)
 		}
 	}
+}
+
+// Mixed regular/bold/italic text shares one cell grid, so every style of the
+// family must advance the same for every printable ASCII glyph.
+func TestStylesShareAdvance(t *testing.T) {
+	s := mustDefault(t)
+	for _, size := range []float64{14, 20} {
+		ref, _ := s.Face(false, false, size)
+		for _, st := range []struct{ bold, italic bool }{{true, false}, {false, true}, {true, true}} {
+			f, err := s.Face(st.bold, st.italic, size)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for r := rune('!'); r <= '~'; r++ {
+				want, _ := ref.GlyphAdvance(r)
+				if got, _ := f.GlyphAdvance(r); got != want {
+					t.Fatalf("size %v bold=%v italic=%v: advance of %q = %v, regular %v", size, st.bold, st.italic, r, got, want)
+				}
+			}
+		}
+	}
+}
+
+// gridFit tests: the fitted outline has its x-height, cap height, baseline
+// and descender edges on whole pixel rows, round overshoot flattened.
+
+func TestGridFitSnapsHeights(t *testing.T) {
+	s := mustDefault(t)
+	for _, size := range []float64{11, 13.333, 15, 16.667, 20, 26.667} {
+		f, err := s.Face(false, false, size)
+		if err != nil {
+			t.Fatal(err)
+		}
+		whole := func(name string, v fixed.Int26_6) {
+			if v&63 != 0 {
+				t.Errorf("size %v: %s = %v px, want a whole pixel", size, name, float64(v)/64)
+			}
+		}
+		top := func(r rune) fixed.Int26_6 { b, _, _ := f.GlyphBounds(r); return b.Min.Y }
+		bottom := func(r rune) fixed.Int26_6 { b, _, _ := f.GlyphBounds(r); return b.Max.Y }
+		whole("top of x", top('x'))
+		whole("top of o", top('o'))
+		whole("top of H", top('H'))
+		whole("bottom of x", bottom('x'))
+		whole("bottom of o", bottom('o'))
+		whole("bottom of p", bottom('p'))
+		if top('o') != top('x') {
+			t.Errorf("size %v: o overshoots x-height: %v vs %v", size, top('o'), top('x'))
+		}
+	}
+}
+
+// Grid fitting moves outlines vertically only: advances, and the x extent of
+// a glyph, match the unfitted face.
+func TestGridFitKeepsHorizontalMetrics(t *testing.T) {
+	fitted := mustDefault(t)
+	plain := mustDefault(t)
+	plain.SetGridFit(false)
+	a, _ := fitted.Face(false, false, 15)
+	b, _ := plain.Face(false, false, 15)
+	for r := rune('!'); r <= '~'; r++ {
+		ba, adva, _ := a.GlyphBounds(r)
+		bb, advb, _ := b.GlyphBounds(r)
+		if adva != advb || ba.Min.X != bb.Min.X || ba.Max.X != bb.Max.X {
+			t.Errorf("%q: fitted x extent/advance %v %v, plain %v %v", r, ba, adva, bb, advb)
+		}
+	}
+}
+
+// The fitted mask must not leak between glyphs: drawing the same glyph twice
+// (with another between) yields identical coverage, and the top row of an
+// 'x' is fully covered where the unfitted face leaves a partial row.
+func TestGridFitMask(t *testing.T) {
+	s := mustDefault(t)
+	f, _ := s.Face(false, false, 15)
+	coverage := func(r rune) []uint8 {
+		_, mask, _, _, ok := f.Glyph(fixed.P(0, 20), r)
+		if !ok {
+			t.Fatalf("no glyph for %q", r)
+		}
+		a := mask.(*image.Alpha)
+		return append([]uint8(nil), a.Pix...)
+	}
+	first := coverage('x')
+	coverage('W')
+	second := coverage('x')
+	if !bytes.Equal(first, second) {
+		t.Error("mask of x changed between calls")
+	}
+	dr, mask, _, _, _ := f.Glyph(fixed.P(0, 20), 'x')
+	a := mask.(*image.Alpha)
+	maxTop := uint8(0)
+	for x := 0; x < dr.Dx(); x++ {
+		maxTop = max(maxTop, a.Pix[x])
+	}
+	if maxTop < 200 {
+		t.Errorf("top row of fitted x has max coverage %d, want a crisp edge", maxTop)
+	}
+	if _, ok := mustGlyphOK(f, 0x10FFFF); ok {
+		t.Error("glyph reported for an unmapped rune")
+	}
+}
+
+func mustGlyphOK(f xfont.Face, r rune) (image.Rectangle, bool) {
+	dr, _, _, _, ok := f.Glyph(fixed.P(0, 20), r)
+	return dr, ok
 }

@@ -216,7 +216,7 @@ func TestUnderlineAndStrikeRows(t *testing.T) {
 		attr snapshot.Attr
 		top  int
 	}{
-		{"underline", snapshot.Underline, m.CellHeight - 3*th},
+		{"underline", snapshot.Underline, r.underlineTop()},
 		{"strike", snapshot.Strike, r.strikeTop()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -237,8 +237,8 @@ func TestUnderlineAndStrikeRows(t *testing.T) {
 			}
 		})
 	}
-	if top := m.CellHeight - 3*th; top < m.Ascent {
-		t.Errorf("underline row %d is above the baseline %d", top, m.Ascent)
+	if top := r.underlineTop(); top <= m.Ascent || top+th > m.CellHeight {
+		t.Errorf("underline rows %d..%d not between the baseline %d and the cell bottom %d", top, top+th, m.Ascent, m.CellHeight)
 	}
 	if st := r.strikeTop(); st <= 0 || st >= m.Ascent {
 		t.Errorf("strike row %d not between cell top and baseline %d", st, m.Ascent)
