@@ -1,0 +1,8 @@
+Script
+  Settings
+    shell argv=["/bin/bash" "--noprofile" "--norc"] at=0 raw="/bin/bash --noprofile --norc" @3:1
+    env "PS1=$ " at=0 @4:1
+    size "60x10" at=0 @5:1
+    linger "1s" at=0 @6:1
+  Items
+    Step run raw "echo hello, world" @8:1

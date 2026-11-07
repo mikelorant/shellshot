@@ -1,0 +1,2 @@
+unterminated_block.script:1:1: unterminated scene "outer": expected a line with only "}" before the end of the file
+unterminated_block.script:3:3: unterminated hidden block: expected a line with only "}" before the end of the file

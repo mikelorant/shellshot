@@ -1,0 +1,1 @@
+textblock_unterminated.script:2:1: unterminated text block opened here: expected a line with only "}" at column 1 (found "}" at line 4 with different indentation; that line is literal text)

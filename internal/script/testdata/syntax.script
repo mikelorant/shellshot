@@ -1,0 +1,70 @@
+# every command, setting and text form the parser knows
+size 100x28
+shell /bin/bash --noprofile --norc --rcfile="/my dir/rc" "" -c "echo \"hi\" # not a comment" # trailing comment
+env A=1
+env B="two words"
+env C=
+env D=a=b
+cwd "/tmp/my dir"
+seed 42
+output out.shot
+typing 40ms
+jitter 25%
+timeout 1.5s
+settle off
+linger 800ms
+speed 8x
+idle 2s
+hold 1s
+
+run echo hello # the # is part of the text
+run "echo \"hi\"\n"   # a quoted string and a comment
+type :wq
+type "tab\there \\ \e[0m \x41"
+run ""
+press enter
+press ctrl+c alt+shift+left up x3 f12 x 5 x2
+wait "Usage:"
+wait "Usage:" 0s
+wait /^\$$/ 5s
+wait /a\/b\\/
+wait idle
+wait idle 250ms
+sleep 0.5s
+sleep 2m
+mark done
+mark "two words"
+
+run lines {
+  echo a
+    echo b
+
+  echo c
+}
+type lines {
+  one
+}
+run paragraphs {
+  a long line
+  wrapped
+
+  second   paragraph
+}
+type paragraphs {
+  single
+}
+
+scene intro-1 {
+  typing 10ms
+  hidden {
+    run lines {
+      setup
+    }
+  }
+  press enter
+  linger 1s
+}
+
+hidden {
+  type "x"
+}

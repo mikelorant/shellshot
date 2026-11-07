@@ -1,0 +1,12 @@
+run echo a
+}
+scene a {
+  run x
+}
+}
+run line {
+  echo hi
+}
+scene b {
+  run y
+} extra

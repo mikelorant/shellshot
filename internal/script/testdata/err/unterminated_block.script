@@ -1,0 +1,4 @@
+scene outer {
+  run a
+  hidden {
+    run b

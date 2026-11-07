@@ -1,0 +1,2 @@
+textblock_indent.script:1:1: unterminated scene "a": expected a line with only "}" before the end of the file
+textblock_indent.script:2:2: unterminated text block opened here: expected a line with only "}" at column 2 (found "}" at line 6 with different indentation; that line is literal text)

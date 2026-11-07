@@ -1,0 +1,23 @@
+Script
+  Settings
+    size "abc" at=0 @2:1
+    typing "5" at=0 @3:1
+    jitter "lots" at=0 @4:1
+  Items
+    Block scene "a" @5:1-14:1
+      Settings
+        size "10x10" at=0 @6:3
+        env "X=y" at=1 @13:3
+      Items
+        Block scene "a" @7:3-12:3
+          Items
+            Block hidden "" @8:5-11:5
+              Items
+                Block hidden "" @9:7-10:7
+    Block scene "a" @15:1-16:1
+    Block hidden "" @17:1-21:1
+      Items
+        Block scene "b" @18:3-20:3
+          Items
+            Step run raw "x" @19:5
+    Step wait string "\xff" @22:1

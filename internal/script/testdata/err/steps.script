@@ -1,0 +1,8 @@
+wait
+wait foo
+wait idel
+wait "x" /y/
+mark
+mark a b
+sleep
+run lines { x

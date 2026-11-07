@@ -1,0 +1,27 @@
+size abc
+typing 5
+jitter lots
+
+scene a {
+  size 10x10
+
+  scene a {
+    hidden {
+      hidden {
+      }
+    }
+  }
+
+  env X=y
+}
+
+scene a {
+}
+
+hidden {
+  scene b {
+    run x
+  }
+}
+
+wait "\xff"

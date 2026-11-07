@@ -1,0 +1,8 @@
+reserved.script:1:1: "require" is reserved for future use (to check that a program exists, run it in a hidden block and wait for its output)
+reserved.script:2:1: "expect" is reserved for future use (to assert that text is on the screen, use wait "text" 0s)
+reserved.script:3:1: "if" is reserved for future use
+reserved.script:10:1: "caption" is reserved for future use
+reserved.script:11:1: "cleanup" is reserved for future use
+reserved.script:14:1: "hide" is reserved for future use
+reserved.script:15:1: "export" is reserved for future use
+reserved.script:17:1: "budget" is reserved for future use

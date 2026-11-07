@@ -1,0 +1,5 @@
+mark first
+run lines {
+  echo a
+   }
+  echo b

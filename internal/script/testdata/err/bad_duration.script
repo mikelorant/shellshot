@@ -1,0 +1,10 @@
+sleep 5
+sleep 1h
+sleep 1.2.3s
+sleep "5s"
+sleep
+sleep 1s 2s
+wait "x" 10
+wait idle .5s
+wait /x/ 99999999999999999999s
+wait "x" 1s 2s

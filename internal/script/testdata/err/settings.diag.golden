@@ -1,0 +1,9 @@
+settings.script:1:4: env needs KEY=VALUE (for example env PS1="$ ")
+settings.script:2:5: expected KEY=VALUE, found "FOO" (write KEY=VALUE)
+settings.script:3:5: env needs a variable name before "="
+settings.script:4:5: expected KEY=VALUE, found "A" (write KEY=VALUE without spaces around "=")
+settings.script:5:9: unexpected "c" (write the value directly after "=" and put a value with spaces in quotes)
+settings.script:6:8: unexpected "b" (write the value directly after "=" and put a value with spaces in quotes)
+settings.script:7:6: shell needs the path of a program (for example shell /bin/bash --noprofile --norc)
+settings.script:8:7: unterminated string (add a closing quote)
+settings.script:9:20: unknown escape "\q" (valid escapes are \n \t \" \\ \e \xHH)

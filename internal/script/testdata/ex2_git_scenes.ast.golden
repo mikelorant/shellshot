@@ -1,0 +1,29 @@
+Script
+  Settings
+    size "100x28" at=0 @1:1
+    shell argv=["/bin/sh"] at=0 raw="/bin/sh" @2:1
+    cwd "/tmp/demo-repo" at=0 @3:1
+    env "PS1=\\w $ " at=0 @4:1
+    output "git-demo.shot" at=0 @5:1
+    typing "40ms" at=0 @6:1
+  Items
+    Block hidden "" @8:1-13:1
+      Items
+        Step run lines "rm -rf .git README.md\nclear\n" @9:3
+    Block scene "init" @15:1-19:1
+      Settings
+        linger "800ms" at=0 @16:3
+      Items
+        Step run raw "git init -q" @17:3
+        Step run raw "git status -s" @18:3
+    Block scene "commit" @21:1-33:1
+      Settings
+        typing "70ms" at=0 @22:3
+        linger "1s" at=0 @23:3
+      Items
+        Step run raw "echo 'hi' > README.md" @24:3
+        Step run raw "git add README.md" @25:3
+        Step run lines "git commit -q -F - <<'EOF'\ninitial commit\nEOF\n" @26:3
+        Step run raw "git log --oneline" @31:3
+        Step wait regex "^[0-9a-f]{7,} .*initial commit$" 10s @32:3
+    Step mark "done" @35:1

@@ -1,0 +1,34 @@
+#!/usr/bin/env -S shellshot record --script
+# ci-smoke.script: reproducible smoke-test recording
+size 80x24
+shell /bin/sh
+cwd /tmp/ci-work
+env PS1="$ "
+env TERM=xterm-256color
+env NO_COLOR=1
+env LANG=C.UTF-8
+seed 42
+jitter 25%
+typing 35ms
+timeout 20s
+settle 300ms
+output smoke.shot
+
+scene version {
+  run ./bin/app --version
+  wait /^app v[0-9]+\.[0-9]+\.[0-9]+$/
+}
+
+scene help {
+  run ./bin/app --help | head -n 5
+  wait "Usage:" 0s      # assertion: run has settled, so the text must be on screen now
+  mark help-shown
+}
+
+scene interrupt {
+  run sleep 30
+  sleep 500ms
+  press ctrl+c
+  wait /^\$$/ 5s
+  press up up enter     # recall and run a previous command
+}

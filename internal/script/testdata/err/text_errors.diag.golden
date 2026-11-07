@@ -1,0 +1,6 @@
+text_errors.script:1:10: text after closing quote (to type a leading quote use run "\"hi\" | wc")
+text_errors.script:2:5: unterminated string (add a closing quote)
+text_errors.script:3:11: unknown escape "\q" (valid escapes are \n \t \" \\ \e \xHH)
+text_errors.script:4:11: invalid escape "\x" (\x needs two hex digits, for example \x1b)
+text_errors.script:5:4: run needs text (write the text after the command, for example run echo hello)
+text_errors.script:6:6: unterminated string (add a closing quote)
