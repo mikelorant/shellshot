@@ -15,7 +15,11 @@ import (
 	"github.com/michaellorant/shellshot/internal/vt"
 )
 
-const testTimeout = 5 * time.Second
+const testTimeout = time.Second
+
+// ignoredByte is a byte the fake terminal drops, like a real terminal does
+// with NUL. Writing it changes nothing on the screen.
+const ignoredByte = "\x00"
 
 // fakeTerm records writes and snapshots them as a single line of text.
 type fakeTerm struct {
@@ -35,7 +39,7 @@ func (f *fakeTerm) Write(p []byte) (int, error) {
 		return 0, f.writeErr
 	}
 	f.mu.Lock()
-	f.text.Write(p)
+	f.text.WriteString(strings.ReplaceAll(string(p), ignoredByte, ""))
 	f.mu.Unlock()
 	f.written <- struct{}{}
 	return len(p), nil
@@ -80,16 +84,29 @@ func (p *fakeProc) Read(b []byte) (int, error) {
 	defer p.readers.Add(-1)
 	select {
 	case d, ok := <-p.data:
-		if !ok {
-			if p.readErr != nil {
-				return 0, p.readErr
-			}
-			return 0, io.EOF
-		}
-		return copy(b, d), nil
+		return p.deliver(b, d, ok)
 	case <-p.closedCh:
-		return 0, io.ErrClosedPipe
+		// Like a pty after the child exits, output that is already available
+		// is delivered (or EOF reported) before the close is.
+		select {
+		case d, ok := <-p.data:
+			return p.deliver(b, d, ok)
+		default:
+			return 0, io.ErrClosedPipe
+		}
 	}
+}
+
+// deliver completes a Read with a received chunk, or with the end of output
+// when ok is false.
+func (p *fakeProc) deliver(b, d []byte, ok bool) (int, error) {
+	if !ok {
+		if p.readErr != nil {
+			return 0, p.readErr
+		}
+		return 0, io.EOF
+	}
+	return copy(b, d), nil
 }
 
 func (p *fakeProc) Resize(cols, rows int) error {
@@ -351,10 +368,13 @@ func TestRunEmitsOnlyChangedFrames(t *testing.T) {
 func TestRunDoesNotEmitWhenWriteLeavesScreenUnchanged(t *testing.T) {
 	h := startRun(t, 0, nil, nil)
 	h.nextFrame()
-	h.output("") // a write that does not alter the fake's screen
+	h.output(ignoredByte) // a write that does not alter the fake's screen
 	h.tick()
 	h.settle()
 	h.noFrame()
+	if n := h.term.snapshots.Load(); n != 2 { // initial frame + the sampled tick
+		t.Errorf("snapshots = %d, want 2 (tick must have sampled the screen)", n)
+	}
 	h.cancel()
 	h.wait()
 }
