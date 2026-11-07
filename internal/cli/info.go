@@ -30,7 +30,7 @@ this is fast even for large recordings.
 
 Recordings made from scripts also list their scenes (id, name, start, length,
 export hints; "(open)" for a scene that was never closed) and a summary of
-their hidden spans.
+their hidden spans (named hidden spans are listed with their start and length).
 
 The status line is one of:
   complete      the recording ends at a chunk boundary after the exit event
@@ -193,10 +193,14 @@ func (f tallySource) Next() (bin.Event, error) { return f() }
 //
 //	scenes        2
 //	  1 install    0:02.3 +15.6s  speed 8x idle 2s hold 1s
-//	hidden        1 span, 4.4s
+//	hidden        2 spans, 4.4s
+//	  3 setup  0:01.0 +2.0s
+//
+// Only named hidden spans get a line of their own.
 func writeSpans(w io.Writer, found []spans.Span) {
 	var scenes []spans.Span
 	var hiddenN int
+	var named []spans.Span
 	var hiddenTotal time.Duration
 	for _, s := range found {
 		switch s.Type {
@@ -205,6 +209,9 @@ func writeSpans(w io.Writer, found []spans.Span) {
 		case event.SpanHidden:
 			hiddenN++
 			hiddenTotal += s.Duration()
+			if s.Name != "" {
+				named = append(named, s)
+			}
 		}
 	}
 	if len(scenes) > 0 {
@@ -214,10 +221,7 @@ func writeSpans(w io.Writer, found []spans.Span) {
 			if h := hintsText(s.Hints); h != "" {
 				text += "  " + h
 			}
-			if s.Open {
-				text += "  (open)"
-			}
-			fmt.Fprintln(w, text)
+			fmt.Fprintln(w, spanLine(s, text))
 		}
 	}
 	if hiddenN > 0 {
@@ -226,7 +230,18 @@ func writeSpans(w io.Writer, found []spans.Span) {
 			noun = "span"
 		}
 		fmt.Fprintf(w, "%-14s%d %s, %s\n", "hidden", hiddenN, noun, secondsText(hiddenTotal))
+		for _, s := range named {
+			fmt.Fprintln(w, spanLine(s, fmt.Sprintf("  %d %s  %s +%s", s.ID, s.Name, clockText(s.Start), secondsText(s.Duration()))))
+		}
 	}
+}
+
+// spanLine marks text, the listing of s, as open when s has no end event.
+func spanLine(s spans.Span, text string) string {
+	if s.Open {
+		text += "  (open)"
+	}
+	return text
 }
 
 // clockText formats d as m:ss.t.

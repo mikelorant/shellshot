@@ -103,7 +103,7 @@ type Span struct {
 	Type SpanType
 	// Parent is the ID of the enclosing scene, or 0 (SpanBegin only).
 	Parent uint64
-	// Name is the scene name; empty for hidden spans (SpanBegin only).
+	// Name is the scene name, or the optional name of a hidden span (SpanBegin only).
 	Name  string
 	Hints SpanHints
 }

@@ -178,6 +178,39 @@ hidden {
 	}
 }
 
+func TestRecordScriptNamedHiddenBlock(t *testing.T) {
+	t.Parallel()
+	r := runScriptCLI(t, `
+hidden setup {
+  run echo preparing
+}
+
+scene hello {
+  run echo shown
+}
+`)
+	if r.code != 0 {
+		t.Fatalf("exit code = %d, want 0\nstderr: %s", r.code, r.stderr)
+	}
+	s := readShot(t, r.shot)
+	var named []string
+	for _, sp := range s.spans {
+		if sp.Type == event.SpanHidden && sp.Name != "" {
+			named = append(named, sp.Name)
+		}
+	}
+	if want := []string{"setup"}; !reflect.DeepEqual(named, want) {
+		t.Errorf("named hidden spans = %v, want %v (the implicit exit span has no name)", named, want)
+	}
+	code, stdout, stderr := runCLI(t, "info", r.shot)
+	if code != 0 || stderr != "" {
+		t.Fatalf("info exit code = %d, stderr %q", code, stderr)
+	}
+	if !strings.Contains(stdout, "hidden        2 spans, ") || !strings.Contains(stdout, "\n  1 setup  0:") {
+		t.Errorf("info lacks the hidden span named setup:\n%s", stdout)
+	}
+}
+
 func TestRecordScriptExportsWithSpans(t *testing.T) {
 	t.Parallel()
 	r := runScriptCLI(t, `

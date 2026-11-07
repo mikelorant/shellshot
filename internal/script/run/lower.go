@@ -144,7 +144,7 @@ func (l *lowerer) block(b script.Block, outer Settings, in span) error {
 		}
 		inner.scene, inner.sceneID = b.Name, id
 	case script.BlockHidden:
-		begin.Type = event.SpanHidden
+		begin.Type, begin.Name = event.SpanHidden, b.Name
 		begin.Parent = in.sceneID
 		inner.hidden = true
 	default:
