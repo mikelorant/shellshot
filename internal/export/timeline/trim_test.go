@@ -31,81 +31,93 @@ func TestBuildTrimLeadingBlank(t *testing.T) {
 			want:   []want{{"", 100 * ms}, {"a", sec}},
 		},
 		{
-			name:   "short blank first step is dropped and its time is not given to the next",
+			name:   "blank first step is dropped and its time is not given to the next",
 			frames: mk(fr{"", 0}, fr{"a", 100 * ms}, fr{"b", 400 * ms}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, Hold: sec},
+			opts:   Options{TrimLeadingBlank: true, Hold: sec},
 			want:   []want{{"a", 300 * ms}, {"b", sec}},
 		},
 		{
-			name:   "blank exactly at the limit is dropped",
-			frames: mk(fr{"", 0}, fr{"a", 250 * ms}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, Hold: sec},
-			want:   []want{{"a", sec}},
+			name:   "a blank first step of any length is dropped",
+			frames: mk(fr{"", 0}, fr{"a", 10 * sec}, fr{"b", 11 * sec}),
+			opts:   Options{TrimLeadingBlank: true, Hold: sec},
+			want:   []want{{"a", sec}, {"b", sec}},
 		},
 		{
-			name:   "blank longer than the limit stays",
-			frames: mk(fr{"", 0}, fr{"a", 251 * ms}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, Hold: sec},
-			want:   []want{{"", 251 * ms}, {"a", sec}},
-		},
-		{
-			name:   "the limit applies to the delay after speed",
+			name:   "a long blank is dropped after speed",
 			frames: mk(fr{"", 0}, fr{"a", 400 * ms}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, Speed: 2, Hold: sec},
+			opts:   Options{TrimLeadingBlank: true, Speed: 2, Hold: sec},
 			want:   []want{{"a", sec}},
 		},
 		{
-			name:   "the limit applies to the delay after the idle cap",
+			name:   "a long blank is dropped after the idle cap",
 			frames: mk(fr{"", 0}, fr{"a", 5 * sec}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, IdleLimit: 200 * ms, Hold: sec},
+			opts:   Options{TrimLeadingBlank: true, IdleLimit: 200 * ms, Hold: sec},
 			want:   []want{{"a", sec}},
+		},
+		{
+			name:   "false keeps a long blank first step",
+			frames: mk(fr{"", 0}, fr{"a", 10 * sec}),
+			opts:   Options{TrimLeadingBlank: false, Hold: sec},
+			want:   []want{{"", 10 * sec}, {"a", sec}},
+		},
+		{
+			name:   "a non-blank first step is kept however long",
+			frames: mk(fr{"$", 0}, fr{"a", 10 * sec}),
+			opts:   Options{TrimLeadingBlank: true, Hold: sec},
+			want:   []want{{"$", 10 * sec}, {"a", sec}},
+		},
+		{
+			name:   "a lone long blank step is kept",
+			frames: mk(fr{"", 0}),
+			opts:   Options{TrimLeadingBlank: true, Hold: 30 * sec},
+			want:   []want{{"", 30 * sec}},
 		},
 		{
 			name:   "merged equal blank frames count as one step",
 			frames: mk(fr{"", 0}, fr{"", 100 * ms}, fr{"a", 200 * ms}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, Hold: sec},
+			opts:   Options{TrimLeadingBlank: true, Hold: sec},
 			want:   []want{{"a", sec}},
 		},
 		{
 			name:   "a lone blank step is kept",
 			frames: mk(fr{"", 0}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, Hold: 100 * ms},
+			opts:   Options{TrimLeadingBlank: true, Hold: 100 * ms},
 			want:   []want{{"", 100 * ms}},
 		},
 		{
 			name:   "a lone blank step after merging is kept",
 			frames: mk(fr{"", 0}, fr{"", 50 * ms}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, Hold: 100 * ms},
+			opts:   Options{TrimLeadingBlank: true, Hold: 100 * ms},
 			want:   []want{{"", 150 * ms}},
 		},
 		{
 			name:   "only a leading blank is trimmed",
 			frames: mk(fr{"a", 0}, fr{"", 100 * ms}, fr{"b", 200 * ms}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, Hold: sec},
+			opts:   Options{TrimLeadingBlank: true, Hold: sec},
 			want:   []want{{"a", 100 * ms}, {"", 100 * ms}, {"b", sec}},
 		},
 		{
 			name:   "a second blank step is not trimmed",
 			frames: mk(fr{"", 0}, fr{"a", 100 * ms}, fr{"", 200 * ms}, fr{"b", 300 * ms}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, Hold: sec},
+			opts:   Options{TrimLeadingBlank: true, Hold: sec},
 			want:   []want{{"a", 100 * ms}, {"", 100 * ms}, {"b", sec}},
 		},
 		{
 			name:   "the step after the trim is protected from min-delay folding",
 			frames: mk(fr{"", 0}, fr{"a", 100 * ms}, fr{"b", 105 * ms}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, MinDelay: 20 * ms, Hold: sec},
+			opts:   Options{TrimLeadingBlank: true, MinDelay: 20 * ms, Hold: sec},
 			want:   []want{{"a", 5 * ms}, {"b", sec}},
 		},
 		{
 			name:   "text on the screen is not blank",
 			frames: mk(fr{"$", 0}, fr{"a", 100 * ms}),
-			opts:   Options{TrimLeadingBlank: 250 * ms, Hold: sec},
+			opts:   Options{TrimLeadingBlank: true, Hold: sec},
 			want:   []want{{"$", 100 * ms}, {"a", sec}},
 		},
 		{
 			name:   "a hidden span covering the start trims the blank shown at its end",
 			frames: mk(fr{"x", 0}, fr{"", 2 * sec}, fr{"a", 2*sec + 100*ms}),
-			opts: Options{TrimLeadingBlank: 250 * ms, Hold: sec, Segments: []Segment{
+			opts: Options{TrimLeadingBlank: true, Hold: sec, Segments: []Segment{
 				{From: 0, To: 2 * sec, Skip: true},
 			}},
 			want: []want{{"a", sec}},
@@ -113,7 +125,7 @@ func TestBuildTrimLeadingBlank(t *testing.T) {
 		{
 			name:   "a hidden span covering the start leaves a visible first step alone",
 			frames: mk(fr{"", 0}, fr{"x", 100 * ms}, fr{"a", 2 * sec}, fr{"b", 3 * sec}),
-			opts: Options{TrimLeadingBlank: 250 * ms, Hold: sec, Segments: []Segment{
+			opts: Options{TrimLeadingBlank: true, Hold: sec, Segments: []Segment{
 				{From: 0, To: 2 * sec, Skip: true},
 			}},
 			want: []want{{"a", sec}, {"b", sec}},
@@ -121,18 +133,25 @@ func TestBuildTrimLeadingBlank(t *testing.T) {
 		{
 			name:   "a hidden span after the blank does not stop the trim",
 			frames: mk(fr{"", 0}, fr{"a", 100 * ms}, fr{"x", 200 * ms}, fr{"b", 3 * sec}),
-			opts: Options{TrimLeadingBlank: 250 * ms, Hold: sec, Segments: []Segment{
+			opts: Options{TrimLeadingBlank: true, Hold: sec, Segments: []Segment{
 				{From: 150 * ms, To: 3 * sec, Skip: true},
 			}},
 			want: []want{{"a", 50 * ms}, {"b", sec}},
 		},
 		{
+			name:   "a long blank followed by a hidden span is dropped",
+			frames: mk(fr{"", 0}, fr{"a", 10 * sec}, fr{"x", 11 * sec}, fr{"b", 20 * sec}),
+			opts: Options{TrimLeadingBlank: true, Hold: sec, Segments: []Segment{
+				{From: 10*sec + 500*ms, To: 20 * sec, Skip: true},
+			}},
+			want: []want{{"a", 500 * ms}, {"b", sec}},
+		},
+		{
 			name:   "a segment boundary inside the blank does not change the rule",
 			frames: mk(fr{"", 0}, fr{"a", 400 * ms}),
-			opts: Options{TrimLeadingBlank: 250 * ms, Hold: sec, Segments: []Segment{
+			opts: Options{TrimLeadingBlank: true, Hold: sec, Segments: []Segment{
 				{From: 100 * ms, To: 5 * sec, Speed: 2},
 			}},
-			// 100ms at 1x + 300ms at 2x = 250ms: at the limit.
 			want: []want{{"a", sec}},
 		},
 	}
@@ -157,18 +176,11 @@ func TestBuildTrimLeadingBlank(t *testing.T) {
 func TestBuildTrimLeadingBlankKeepsStyledBlank(t *testing.T) {
 	t.Parallel()
 	frames := []snapshot.Frame{styledBlank(0), {At: 100 * ms, Snapshot: snap("a")}}
-	got, err := Build(frames, Options{TrimLeadingBlank: 250 * ms, Hold: sec})
+	got, err := Build(frames, Options{TrimLeadingBlank: true, Hold: sec})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(got) != 2 {
 		t.Fatalf("got %d steps, want 2: a screen with a styled cell is not blank", len(got))
-	}
-}
-
-func TestBuildTrimLeadingBlankNegative(t *testing.T) {
-	t.Parallel()
-	if _, err := Build(mk(fr{"a", 0}), Options{TrimLeadingBlank: -1}); err == nil {
-		t.Error("Build with a negative TrimLeadingBlank succeeded, want an error")
 	}
 }
