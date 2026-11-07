@@ -1,15 +1,19 @@
-// Package emoji draws colour emoji from a COLR version 0 / CPAL font such as
-// Twemoji Mozilla. It is pure Go (no cgo): golang.org/x/image/font/sfnt
-// supplies the glyph outlines and cmap, and this package reads the colour
-// layers (COLR, CPAL) and the sequence ligatures (GSUB) from the font file
-// itself, because x/image can draw monochrome outlines only.
+// Package emoji draws colour emoji. It is pure Go (no cgo): the sfnt package
+// of golang.org/x/image supplies the cmap and glyph outlines, and this
+// package reads the colour tables and the sequence ligatures (GSUB) from the
+// font file itself.
 //
-// A Font looks up a whole grapheme cluster (a ZWJ family, a flag, a skin
-// tone, a keycap, a variation-selector sequence or a single emoji) and
-// renders it as a square RGBA image of any pixel size, cached per size.
+// A Backend turns a grapheme cluster (a ZWJ family, a flag, a skin tone, a
+// keycap, a variation-selector sequence or a single emoji) into a square
+// RGBA image of any pixel size, cached per size. Font handles COLR v0 + CPAL
+// layered-outline fonts and Bitmap handles CBLC/CBDT PNG fonts such as
+// Apple Color Emoji and Noto Color Emoji; Load picks the backend for a font
+// file.
 //
-// Bitmap handles CBLC/CBDT PNG fonts such as Apple Color Emoji; Load picks
-// the backend for a font file.
+// Chain tries backends in order. Default returns the built-in chains: the
+// embedded Apple Color Emoji derivative with Noto Color Emoji behind it
+// (SetApple), or Noto alone (SetNoto). The embedded fonts are inflated lazily,
+// the first time a cluster needs them.
 package emoji
 
 import (
@@ -69,8 +73,9 @@ func Parse(data []byte) (*Font, error) {
 	return f, nil
 }
 
-// typoAscender returns the OS/2 typographic ascender, which Twemoji sets to
-// the top of its square emoji box, or the em size when the table is absent.
+// typoAscender returns the OS/2 typographic ascender, which COLR emoji fonts
+// set to the top of their square emoji box, or the em size when the table is
+// absent.
 func typoAscender(t tables, unitsPerEm int) int {
 	os2 := reader{b: t["OS/2"]}
 	if asc := int(int16(os2.u16(68))); os2.err == nil {
@@ -84,10 +89,19 @@ func typoAscender(t tables, unitsPerEm int) int {
 // first rune is used. The image is cached and shared: callers must not
 // modify it.
 func (f *Font) Image(cluster string, side int) (*image.RGBA, bool) {
+	return f.image(cluster, side, false)
+}
+
+// imageExact is Image without the first-rune fallback (see wholeSequencer).
+func (f *Font) imageExact(cluster string, side int) (*image.RGBA, bool) {
+	return f.image(cluster, side, true)
+}
+
+func (f *Font) image(cluster string, side int, exact bool) (*image.RGBA, bool) {
 	if side <= 0 {
 		return nil, false
 	}
-	gid, ok := f.glyphFor(cluster)
+	gid, ok := f.glyphFor(cluster, exact)
 	if !ok {
 		return nil, false
 	}
@@ -105,14 +119,19 @@ func (f *Font) Image(cluster string, side int) (*image.RGBA, bool) {
 	return img, true
 }
 
-// glyphFor resolves cluster to a layered glyph.
-func (f *Font) glyphFor(cluster string) (uint16, bool) {
+// glyphFor resolves cluster to a layered glyph; exact refuses the fallback
+// to the first rune.
+func (f *Font) glyphFor(cluster string, exact bool) (uint16, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.resolve(cluster, func(gid uint16) bool {
+	has := func(gid uint16) bool {
 		_, ok := f.layers[gid]
 		return ok
-	})
+	}
+	if exact {
+		return f.resolveExact(cluster, has)
+	}
+	return f.resolve(cluster, has)
 }
 
 // render rasterises the layers of gid into a side x side image. The emoji

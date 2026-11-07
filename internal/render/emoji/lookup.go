@@ -1,6 +1,10 @@
 package emoji
 
-import "golang.org/x/image/font/sfnt"
+import (
+	"unicode/utf8"
+
+	"golang.org/x/image/font/sfnt"
+)
 
 const (
 	variationSelector15 = '\uFE0E' // text presentation
@@ -20,6 +24,19 @@ type glyphMap struct {
 // sequence first (with and without variation selectors, since fonts
 // disagree on whether a sequence includes them), then the first rune alone.
 func (m *glyphMap) resolve(cluster string, has func(gid uint16) bool) (uint16, bool) {
+	if gid, ok := m.resolveExact(cluster, has); ok {
+		return gid, true
+	}
+	if cluster == "" {
+		return 0, false
+	}
+	first, _ := utf8.DecodeRuneInString(cluster)
+	return m.lookup([]rune{first}, has)
+}
+
+// resolveExact is resolve without the final fallback to the first rune: it
+// finds only glyphs that stand for the whole cluster.
+func (m *glyphMap) resolveExact(cluster string, has func(gid uint16) bool) (uint16, bool) {
 	runes := []rune(cluster)
 	if len(runes) == 0 {
 		return 0, false
@@ -29,7 +46,7 @@ func (m *glyphMap) resolve(cluster string, has func(gid uint16) bool) (uint16, b
 			return gid, true
 		}
 	}
-	return m.lookup(runes[:1], has)
+	return 0, false
 }
 
 // lookup maps seq to a glyph through cmap and, for several runes, the GSUB

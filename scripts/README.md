@@ -7,7 +7,7 @@
 
 ## Regenerating the Apple Color Emoji asset
 
-`make emoji-asset` rebuilds `internal/render/emoji/assets/AppleColorEmoji-shellshot.ttf.zst`
+`make emoji-asset` rebuilds `internal/render/emoji/assets/apple-emoji/AppleColorEmoji-shellshot.ttf.zst`
 and its `.sha256` (the hash of the decompressed font) from the font that
 github.com/samuelngs/apple-emoji-ttf publishes in its GitHub Releases, so no
 Mac is needed. It:
@@ -29,5 +29,5 @@ Options (`--ppem`, `--colors`, `--dither`, `--out-dir`, `--asset-dir`,
 `--no-asset`) are listed by `python scripts/build-apple-emoji-asset.py --help`,
 for example `--ppem 64 --no-asset --out-dir /tmp/x` to try a smaller strike.
 
-Apple Inc. owns the artwork; see `internal/render/font/assets/NOTICE.txt` for
+Apple Inc. owns the artwork; see `internal/render/emoji/assets/apple-emoji/NOTICE.txt` for
 provenance and the licence notice.

@@ -6,14 +6,14 @@ import (
 )
 
 func TestLoadDetectsFontFormat(t *testing.T) {
-	b, err := Load(readAsset(t, "TwemojiMozilla.ttf"))
+	b, err := Load(buildColorFont(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if f, ok := b.(*Font); !ok {
-		t.Errorf("Twemoji loaded as %T, want *Font", b)
+		t.Errorf("COLR font loaded as %T, want *Font", b)
 	} else if _, drawn := f.Image(smiley, 16); !drawn {
-		t.Error("Twemoji backend drew nothing")
+		t.Error("COLR backend drew nothing")
 	}
 
 	b, err = Load(buildBitmapFont(t, testEmojiStrikes(t)))
@@ -29,7 +29,7 @@ func TestLoadDetectsFontFormat(t *testing.T) {
 
 func TestLoadRejectsFontsWithoutColourTables(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"monochrome font": readAsset(t, "JetBrainsMono-Regular.ttf"),
+		"monochrome font": readAsset(t, "jetbrains-mono/JetBrainsMono-Regular.ttf"),
 		"empty":           nil,
 		"garbage":         []byte("not a font at all, not even close"),
 	} {
@@ -37,7 +37,7 @@ func TestLoadRejectsFontsWithoutColourTables(t *testing.T) {
 			t.Errorf("%s: Load succeeded", name)
 		}
 	}
-	_, err := Load(readAsset(t, "JetBrainsMono-Regular.ttf"))
+	_, err := Load(readAsset(t, "jetbrains-mono/JetBrainsMono-Regular.ttf"))
 	if err == nil || !strings.Contains(err.Error(), "no colour glyph tables (need COLR/CPAL or CBLC/CBDT)") {
 		t.Errorf("monochrome font: err = %v, want the missing colour tables message", err)
 	}
@@ -48,8 +48,8 @@ func TestLoadPropagatesBackendErrors(t *testing.T) {
 	if _, err := Load(good[:len(good)-10]); err == nil {
 		t.Error("truncated bitmap font loaded")
 	}
-	twemoji := readAsset(t, "TwemojiMozilla.ttf")
-	if _, err := Load(twemoji[:len(twemoji)/2]); err == nil {
+	colr := buildColorFont(t)
+	if _, err := Load(colr[:len(colr)-40]); err == nil {
 		t.Error("truncated COLR font loaded")
 	}
 }

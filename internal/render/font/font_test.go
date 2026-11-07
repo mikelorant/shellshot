@@ -9,9 +9,12 @@ import (
 	"math"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
 	xfont "golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
+
+	"github.com/michaellorant/shellshot/internal/render/emoji"
 )
 
 func mustDefault(t *testing.T) *Set {
@@ -469,9 +472,9 @@ func TestFallbackChainOrder(t *testing.T) {
 // User fonts come after the embedded fonts, so they never change glyphs the
 // embedded chain already draws, but they supply what it lacks.
 func TestDefaultExtraFontsFollowEmbeddedChain(t *testing.T) {
-	// The Twemoji font maps U+1F600 to an (outline-less) glyph, so it stands
+	// Noto Color Emoji maps U+1F600 to an (outline-less) glyph, so it stands
 	// in for a user font that has a rune nothing else has.
-	s, err := Default(FallbackFont{Name: "user", Data: twemojiMozilla})
+	s, err := Default(FallbackFont{Name: "user", Data: notoColorEmoji(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -517,6 +520,21 @@ func wrapInCollection(t *testing.T, font []byte) []byte {
 	return out
 }
 
+// notoColorEmoji returns the decompressed embedded Noto Color Emoji font.
+func notoColorEmoji(t *testing.T) []byte {
+	t.Helper()
+	dec, err := zstd.NewReader(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+	data, err := dec.DecodeAll(emoji.NotoFontZstd(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
 func TestEmoji(t *testing.T) {
 	s := mustDefault(t)
 	for _, c := range []string{"\U0001F600", "\U0001F468\u200d\U0001F469\u200d\U0001F467", "\U0001F1E6\U0001F1FA", "1\ufe0f\u20e3"} {
@@ -528,6 +546,29 @@ func TestEmoji(t *testing.T) {
 	if _, ok := s.Emoji("世", 32); ok {
 		t.Error("Emoji drew a hanzi")
 	}
+}
+
+// SetEmoji swaps the backend; nil removes colour emoji.
+func TestSetEmoji(t *testing.T) {
+	s := mustDefault(t)
+	s.SetEmoji(emoji.Chain{})
+	if _, ok := s.Emoji("\U0001F600", 32); ok {
+		t.Error("empty chain drew an emoji")
+	}
+	s.SetEmoji(nil)
+	if _, ok := s.Emoji("\U0001F600", 32); ok {
+		t.Error("nil backend drew an emoji")
+	}
+	s.SetEmoji(emoji.Chain{stubEmoji{}})
+	if img, ok := s.Emoji("x", 7); !ok || img.Bounds().Dx() != 7 {
+		t.Errorf("stub backend: ok %v", ok)
+	}
+}
+
+type stubEmoji struct{}
+
+func (stubEmoji) Image(_ string, side int) (*image.RGBA, bool) {
+	return image.NewRGBA(image.Rect(0, 0, side, side)), true
 }
 
 func TestEmojiAbsentWithLoad(t *testing.T) {

@@ -117,8 +117,12 @@ but not built: there is no `record --script`. The format is specified in
   not change it; set `--cols` and `--rows` instead.
 - Lines are right-trimmed, so a background colour painted on trailing spaces is lost in replay and
   export.
-- Export draws emoji up to Emoji 14.0 and a subset of CJK characters. Others are blank unless you
-  pass `--fallback-font`. See [docs/export.md](docs/export.md#fonts-emoji-and-cjk).
+- Export draws emoji up to Emoji 18.0 and a subset of CJK characters. Others are blank unless you
+  pass `--emoji-font` (emoji) or `--fallback-font`. See [docs/export.md](docs/export.md#fonts-emoji-and-cjk).
+- Emoji are drawn with Apple-derived artwork by default, with Noto Color Emoji as fallback
+  (`--emoji-set apple|noto`, `--emoji-font FILE`). Apple's artwork belongs to Apple Inc. and is not
+  licensed by this project, so exports that contain it are your responsibility to share;
+  `--emoji-set noto` is the open source (SIL OFL 1.1), licence-clean choice.
 
 ## Troubleshooting
 

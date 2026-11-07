@@ -2,31 +2,40 @@ shellshot third-party notices
 ============================
 
 shellshot embeds fonts and links libraries written by others. This file lists them and where their
-licence texts are. The checksums, sources and modification notes for the embedded fonts are in
-internal/render/font/assets/NOTICE.txt, which ships next to the font files.
+licence texts are. Checksums, sources and modification notes for each embedded font are in the
+NOTICE.txt next to its files (one directory per font group).
 
-Embedded fonts (internal/render/font/assets/)
----------------------------------------------
+Embedded text fonts (internal/render/font/assets/)
+--------------------------------------------------
 
 JetBrains Mono v2.304 - SIL Open Font License 1.1
-  Licence text: internal/render/font/assets/OFL.txt
+  Licence text: internal/render/font/assets/jetbrains-mono/OFL.txt
+  Notes: internal/render/font/assets/jetbrains-mono/NOTICE.txt
 
 Symbols Nerd Font Mono v3.5.1 - MIT
-  Licence text: internal/render/font/assets/NerdFonts-LICENSE.txt
+  Licence text: internal/render/font/assets/nerd-symbols/NerdFonts-LICENSE.txt
   The font bundles icon sets under their own licences, listed in
-  internal/render/font/assets/NOTICE.txt.
+  internal/render/font/assets/nerd-symbols/NOTICE.txt.
 
 Noto Sans Mono CJK SC, subset - SIL Open Font License 1.1
-  Licence text: internal/render/font/assets/NotoCJK-OFL.txt
+  Licence text: internal/render/font/assets/noto-cjk/NotoCJK-OFL.txt
+  Notes: internal/render/font/assets/noto-cjk/NOTICE.txt
   The embedded file is a modified subset of the original font.
 
-Twemoji Mozilla v0.7.0 (colour emoji font built from Twemoji 14.0.1)
-  The emoji artwork is Twemoji, Copyright Twitter, Inc. and other contributors, licensed under
-  Creative Commons Attribution 4.0 (CC BY 4.0). Mozilla converted the artwork into the layered
-  glyphs of this font; shellshot draws those glyphs unchanged.
-  Licence text: internal/render/font/assets/Twemoji-CC-BY-4.0.txt
-  The font build code is Copyright 2016-2018 Mozilla Foundation, Apache License 2.0
-  (internal/render/font/assets/Twemoji-Mozilla-LICENSE.md).
+Embedded colour emoji fonts (internal/render/emoji/assets/)
+-----------------------------------------------------------
+
+Apple Color Emoji, compact derivative - Apple Inc., NOT open source
+  The emoji artwork and the font belong to Apple Inc. and are licensed by Apple, not by this
+  project. The embedded file is a modified, reduced derivative. Anyone who uses or redistributes
+  shellshot binaries, or exports that contain Apple's emoji artwork, is responsible for complying
+  with Apple's licence terms. `shellshot export --emoji-set noto` avoids it.
+  Source, modifications and checksum: internal/render/emoji/assets/apple-emoji/NOTICE.txt
+
+Noto Color Emoji v2.057 - SIL Open Font License 1.1
+  Copyright 2022 Google Inc.; the embedded file is the unmodified upstream font.
+  Licence text: internal/render/emoji/assets/noto-emoji/NotoColorEmoji-OFL.txt
+  Source and checksums: internal/render/emoji/assets/noto-emoji/NOTICE.txt
 
 libghostty
 ----------

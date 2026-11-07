@@ -23,7 +23,7 @@ fmt:
 noto-asset:
 	./scripts/fetch-noto-emoji.sh
 
-# Rebuilds internal/render/emoji/assets/AppleColorEmoji-shellshot.ttf.zst from
+# Rebuilds internal/render/emoji/assets/apple-emoji/AppleColorEmoji-shellshot.ttf.zst from
 # the published release font (needs network, uv and git; no Mac). See
 # scripts/README.md.
 emoji-asset:

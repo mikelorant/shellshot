@@ -14,6 +14,7 @@ import (
 	"github.com/michaellorant/shellshot/internal/export/spanplan"
 	"github.com/michaellorant/shellshot/internal/export/timeline"
 	"github.com/michaellorant/shellshot/internal/recording/bin/event"
+	"github.com/michaellorant/shellshot/internal/render/emoji"
 	"github.com/michaellorant/shellshot/internal/render/font"
 	"github.com/michaellorant/shellshot/internal/render/fontchain"
 	"github.com/michaellorant/shellshot/internal/render/raster"
@@ -45,6 +46,10 @@ type exportFlags struct {
 	// speedSet, idleLimitSet and holdSet report that the matching flag was
 	// given on the command line; it then beats the scene hint of that name.
 	speedSet, idleLimitSet, holdSet bool
+	// emojiSet is the --emoji-set value ("apple" or "noto") and emojiFont
+	// the --emoji-font file, empty for none.
+	emojiSet  string
+	emojiFont string
 }
 
 // newExportCmd builds "shellshot export", which renders a recording as an
@@ -80,6 +85,8 @@ func newExportCmd() *cobra.Command {
 	fl.BoolVar(&f.systemFonts, "system-fonts", false, "also use installed CJK and symbol fonts (macOS and Linux font folders); the output then depends on this machine's fonts")
 	fl.BoolVar(&f.noHints, "no-hints", false, "ignore the speed, idle and hold hints stored in the recording's scenes (hidden spans are still cut)")
 	fl.BoolVar(&f.showHidden, "show-hidden", false, "render hidden spans like the rest of the recording instead of cutting them")
+	fl.StringVar(&f.emojiSet, "emoji-set", emoji.SetApple.String(), "colour emoji artwork: apple or noto. apple draws Apple Color Emoji, whose artwork belongs to Apple Inc. and is not open source, and takes the few emoji it lacks from Noto. noto draws Noto Color Emoji only (SIL OFL 1.1): the licence-clean choice for exports you share")
+	fl.StringVar(&f.emojiFont, "emoji-font", "", "COLR v0 or CBDT/CBLC colour emoji font `file`, tried before the --emoji-set fonts for every emoji")
 	return cmd
 }
 
@@ -93,6 +100,9 @@ var cursorStyles = map[string]raster.CursorStyle{
 
 // validate checks the flag values and returns the cursor style.
 func (f exportFlags) validate() (raster.CursorStyle, error) {
+	if _, err := emoji.ParseSet(f.emojiSet); err != nil {
+		return 0, fmt.Errorf("invalid --emoji-set %q (want apple or noto)", f.emojiSet)
+	}
 	cursor, ok := cursorStyles[f.cursor]
 	switch {
 	case !ok:
@@ -175,8 +185,18 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	if sameFile(input, output) {
 		return fmt.Errorf("export: output %s would overwrite the input recording", output)
 	}
-	fonts, err := fontchain.New(fontchain.Options{Files: flags.fallbackFonts, System: flags.systemFonts})
+	emojiSet, _ := emoji.ParseSet(flags.emojiSet) // validated above
+	fonts, err := fontchain.New(fontchain.Options{
+		Files:     flags.fallbackFonts,
+		System:    flags.systemFonts,
+		EmojiSet:  emojiSet,
+		EmojiFile: flags.emojiFont,
+	})
 	if err != nil {
+		var emojiErr *fontchain.EmojiFileError
+		if errors.As(err, &emojiErr) {
+			return fmt.Errorf("export: --emoji-font: %w", err)
+		}
 		return fmt.Errorf("export: --fallback-font: %w", err)
 	}
 	renderer, err := raster.New(fonts, raster.Options{
@@ -223,6 +243,9 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 		return err
 	}
 	src.warnIncomplete(cmd.ErrOrStderr())
+	if err := fonts.EmojiErr(); err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: some emoji were not drawn: %v\n", err)
+	}
 	fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d frames (%.1f KB) to %s\n", steps, float64(size)/1024, output)
 	return nil
 }

@@ -46,7 +46,7 @@ internal/export/apng        APNG encoder (standard library only)
 internal/render/raster      frame -> image: cells, clusters, colours, cursor
 internal/render/font        embedded fonts and the fallback chain
 internal/render/fontchain   builds the font set for export: embedded, --fallback-font, --system-fonts
-internal/render/emoji       pure Go COLRv0 colour emoji renderer
+internal/render/emoji       pure Go colour emoji renderer (COLR v0, CBDT/CBLC); the built-in Apple and Noto sets
 internal/render/sprite      box-drawing, block, braille and Powerline glyphs
 internal/render/theme       built-in themes and the JSON theme loader
 internal/script             .script lexer and parser (the runner is not built)
@@ -123,9 +123,17 @@ Design and measurements: [research/emoji-fallback.md](research/emoji-fallback.md
   emoji font for a rune no text font has. Colour emoji are scaled to a square of
   `min(span width, cell height)`, centred in the base's span, and ignore the foreground colour.
 - `font.Set` holds JetBrains Mono and an ordered fallback chain; `FitFace` scales a fallback glyph to its
-  one- or two-cell span.
-- `emoji` reads the COLR v0, CPAL and GSUB ligature tables directly (`x/image`'s sfnt cannot draw colour),
-  maps a cluster to a glyph (whole sequence, with and without variation selectors, then the first rune)
-  and rasterises its layers with `x/image/vector`, cached per glyph and size.
+  one- or two-cell span. `font.Default(extra...)` builds: Symbols Nerd Font Mono, the embedded Noto Sans
+  Mono CJK SC subset, then `extra`. `Set.Emoji(cluster, side)` renders from the colour emoji backend
+  (`emoji.Default(emoji.SetApple)` unless `SetEmoji` replaces it).
+- `emoji` is a pure Go colour emoji renderer. `Chain` tries backends in order; `Default(SetApple|SetNoto)`
+  returns the built-in chains (an Apple Color Emoji derivative then Noto Color Emoji, or Noto only), whose
+  zstd fonts are inflated on first use, so a session without emoji never decompresses them. `Load` accepts
+  COLR/CBDT user fonts. A backend reads the COLR v0, CPAL, CBLC/CBDT and GSUB ligature tables directly
+  (`x/image`'s sfnt cannot draw colour), maps a cluster to a glyph (whole sequence, with and without
+  variation selectors, then the first rune) and rasterises its layers or bitmaps, cached per glyph and size.
+- `fontchain.New` builds the Set for `export`: embedded fonts, then `--fallback-font` files (colour emoji:
+  `--emoji-font`, then the `--emoji-set` chain), then, opt-in and machine dependent, `--system-fonts`.
+  Exports are deterministic unless `--system-fonts` is used.
 - Cell size follows Ghostty: the font advance and line height rounded to whole pixels, then
   `--adjust-cell-*` applied to those pixels.

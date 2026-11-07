@@ -252,7 +252,7 @@ def main() -> None:
     p.add_argument("--dither", type=float, default=0.5, help="libimagequant dithering level, 0..1")
     p.add_argument("--out-dir", type=Path, default=REPO / "build" / "apple-emoji",
                    help="where the uncompressed font is written")
-    p.add_argument("--asset-dir", type=Path, default=REPO / "internal" / "render" / "emoji" / "assets",
+    p.add_argument("--asset-dir", type=Path, default=REPO / "internal" / "render" / "emoji" / "assets" / "apple-emoji",
                    help="where the .zst and .sha256 are written")
     p.add_argument("--no-asset", action="store_true", help="only write the uncompressed font")
     args = p.parse_args()

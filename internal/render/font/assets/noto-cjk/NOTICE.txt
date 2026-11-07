@@ -1,0 +1,14 @@
+Noto Sans Mono CJK SC Regular (SIL OFL 1.1, see NotoCJK-OFL.txt), subset
+Source: https://github.com/notofonts/noto-cjk/raw/main/Sans/Mono/NotoSansMonoCJKsc-Regular.otf
+  (Version 2.004; 16,393,784 bytes; sha256
+  ec04cc376b34887cedbdf84074e2e226ed2761eeabdcb9173fc1dd7bfd153ef7)
+Modified: subset to 6,625 characters (GB2312 level-1 hanzi, KS X 1001 Hangul,
+U+3000-30FF, U+FF00-FFEF, U+2010-2027) with layout features and hinting
+removed, by scripts/subset-cjk-font.sh using fonttools 4.68.0 (pyftsubset).
+The font name table is unchanged (no Reserved Font Name is declared).
+Subset sha256:
+  e969f2583a376232cc9f784d44edcc00e2ef53c0f3f64eae311ddb38aa355091  NotoSansMonoCJKsc-Subset.otf
+  6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2  NotoCJK-OFL.txt
+    (https://github.com/notofonts/noto-cjk/raw/main/Sans/LICENSE)
+Used as a fallback for hanzi, Hangul, kana and CJK punctuation. It has
+simplified Chinese glyph forms.

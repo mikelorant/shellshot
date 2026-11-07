@@ -2,8 +2,8 @@
 # Fetches Noto Color Emoji (CBDT/CBLC bitmap font, SIL OFL 1.1) pinned to one
 # commit of https://github.com/googlefonts/noto-emoji, verifies its sha256 and
 # writes the embedded assets:
-#   internal/render/emoji/assets/NotoColorEmoji.ttf.zst   (zstd -19 of the font)
-#   internal/render/emoji/assets/NotoColorEmoji-OFL.txt   (2D/fonts/LICENSE)
+#   internal/render/emoji/assets/noto-emoji/NotoColorEmoji.ttf.zst   (zstd -19 of the font)
+#   internal/render/emoji/assets/noto-emoji/NotoColorEmoji-OFL.txt   (2D/fonts/LICENSE)
 # The upstream repo is ~1.5 GB, so only these two files are downloaded.
 # Idempotent: when the committed files already match the pins below, nothing is
 # downloaded or rewritten. Exits non-zero on any checksum mismatch. Needs curl,
@@ -16,7 +16,7 @@
 #      mismatch message prints the actual hash (also update FONT_SIZE).
 #   3. Put the new hashes below and re-run `make noto-asset`.
 #   4. Update the Noto Color Emoji entry in
-#      internal/render/font/assets/NOTICE.txt (commit, sha256, sizes, Unicode
+#      internal/render/emoji/assets/noto-emoji/NOTICE.txt (commit, sha256, sizes, Unicode
 #      version) and check the emoji coverage tests still pass.
 set -euo pipefail
 
@@ -29,7 +29,7 @@ raw=https://raw.githubusercontent.com/googlefonts/noto-emoji/$COMMIT/2D/fonts
 lfs=https://media.githubusercontent.com/media/googlefonts/noto-emoji/$COMMIT/2D/fonts
 
 cd "$(dirname "$0")/.."
-dest=internal/render/emoji/assets
+dest=internal/render/emoji/assets/noto-emoji
 font_zst=$dest/NotoColorEmoji.ttf.zst
 license=$dest/NotoColorEmoji-OFL.txt
 

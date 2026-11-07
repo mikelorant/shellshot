@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuilds internal/render/font/assets/NotoSansMonoCJKsc-Subset.otf from
+# Rebuilds internal/render/font/assets/noto-cjk/NotoSansMonoCJKsc-Subset.otf from
 # Noto Sans Mono CJK SC Regular (SIL OFL 1.1) for the embedded CJK fallback.
 # Needs python3 and `pip install fonttools==4.68.0`. The subset keeps:
 #   - 3,755 GB2312 level-1 hanzi, the most used simplified Chinese characters

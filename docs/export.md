@@ -78,17 +78,33 @@ font lacks comes from a chain of fallback fonts; the first font that has it wins
 
 `--fallback-font FILE` takes a TTF, OTF or TTC file and can be repeated. An unreadable or invalid
 file is an error. User fonts are drawn as monochrome outlines, so colour-only fonts do not work
-there, and bold or italic does not change a fallback glyph.
+there (use `--emoji-font` for a colour emoji font), and bold or italic does not change a fallback glyph.
 
 `--system-fonts` also searches the macOS and Linux font folders. The output then depends on the
 fonts installed on the machine, so exports differ between machines. Without it, exports are
 deterministic.
 
-Emoji are drawn in colour from the embedded Twemoji Mozilla font (COLRv0 layers rendered in pure
-Go). A grapheme cluster is drawn once over its one or two cells: ZWJ families, flags, skin tones,
-keycaps and `U+FE0F` sequences look up the whole sequence and fall back to the first emoji if the
-font lacks it. The font covers Emoji 14.0. Newer emoji and rare hanzi outside the subset are
-blank unless a `--fallback-font` has them as outlines.
+Emoji are drawn in colour from embedded bitmap fonts: by default a compact derivative of Apple
+Color Emoji, with Noto Color Emoji behind it for the emoji Apple's font lacks. A grapheme cluster is
+drawn once over its one or two cells: ZWJ families, flags, skin tones, keycaps and `U+FE0F`
+sequences look up the whole sequence and fall back to the first emoji if no font has it. The
+emoji fonts are decompressed the first time an emoji is drawn, so a recording without emoji pays
+nothing. The Noto font covers Emoji 18.0; emoji newer than that and rare hanzi outside the CJK
+subset are blank unless `--emoji-font` (emoji) or `--fallback-font` (outlines) has them.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--emoji-set apple\|noto` | `apple` | `apple`: Apple-derived artwork, then Noto for what it lacks. `noto`: Noto Color Emoji only |
+| `--emoji-font FILE` | none | a COLR v0 or CBDT/CBLC colour emoji font, tried before the `--emoji-set` fonts for every emoji. An unreadable or invalid file is an error |
+
+The Apple artwork belongs to Apple Inc. and is not licensed by this project, so whoever shares
+exports or binaries that contain it must follow Apple's terms; `--emoji-set noto` draws Noto
+Color Emoji only (SIL OFL 1.1) and is the licence-clean choice for exports you share. Licences and
+checksums of the embedded fonts are in the `NOTICE.txt` of each `internal/render/*/assets/<group>/`
+directory (see also the root `NOTICE`).
+
+Colour comes only from the emoji fonts (`--emoji-font` and the built-in sets): `--fallback-font` and
+`--system-fonts` fonts are drawn as monochrome outlines.
 
 Lines are right-trimmed, so a background colour painted on trailing spaces is lost.
 
