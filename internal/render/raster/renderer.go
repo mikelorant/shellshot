@@ -109,6 +109,8 @@ func New(f Fonts, o Options) (*Renderer, error) {
 		Ascent:     m.Ascent * k,
 		Descent:    m.Descent * k,
 		EmPx:       m.EmPx * float64(k),
+
+		UnderlineOffset: m.UnderlineOffset * k,
 	}
 	r.sizePx = r.metrics.EmPx
 	for i := range r.faces {

@@ -16,7 +16,7 @@ const spacingGlyphs = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234
 // logs one table row per combination (go test -run Spacing -v). It fails if
 // the cell pitch differs from the drawn glyph advance, if ink is off-centre in
 // the cell, if scale n is not exactly n times scale 1, or if glyphs or
-// decorations leave the cell.
+// decorations leave the cell or are out of order.
 //
 // Columns: req = requested em px; em = em px drawn; adv = advance of 'M' at
 // the requested size and spacing = cell width - adv, the letter spacing the
@@ -80,7 +80,8 @@ func TestSpacingAudit(t *testing.T) {
 			mid := m.CellHeight / 2
 			ul, strike, th := r.underlineTop(), r.strikeTop(), r.thickness()
 			xhMid := float64(m.Ascent) - xh/2
-			if !(strike < m.Ascent && ul+th <= m.CellHeight) {
+			// Top to bottom: strikethrough (x-height middle), baseline, a gap row, underline.
+			if !(strike < m.Ascent && m.Ascent < ul && ul+th <= m.CellHeight) {
 				t.Errorf("size %v scale %d: strike %d, baseline %d, underline %d+%d, cell height %d out of order", size, scale, strike, m.Ascent, ul, th, m.CellHeight)
 			}
 			// The deepest descender ('p') and the cap height must fit the cell.

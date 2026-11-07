@@ -16,6 +16,10 @@ type Metrics struct {
 	Ascent     int     // baseline offset from cell top
 	Descent    int     // CellHeight - Ascent
 	EmPx       float64 // em size to draw with so that 'M' advances exactly CellWidth
+
+	// UnderlineOffset is how many pixel rows below the baseline the font puts
+	// the top of an underline (at least 1).
+	UnderlineOffset int
 }
 
 // Metrics computes cell metrics for a requested em size of sizePx from the
@@ -53,12 +57,15 @@ func (s *Set) Metrics(sizePx float64) (Metrics, error) {
 	asc, desc := float64(fm.Ascent)/64, float64(fm.Descent)/64
 	height := max(1, int(math.Round(float64(fm.Height)/64)))
 	ascent := int(math.Round(asc + (float64(height)-asc-desc)/2))
+	// post.underlinePosition is negative below the baseline, in font units.
+	underline := -float64(s.fonts[styleRegular].PostTable().UnderlinePosition) / float64(s.fonts[styleRegular].UnitsPerEm()) * em.px
 	return Metrics{
-		CellWidth:  em.cellWidth,
-		CellHeight: height,
-		Ascent:     ascent,
-		Descent:    height - ascent,
-		EmPx:       em.px,
+		CellWidth:       em.cellWidth,
+		CellHeight:      height,
+		Ascent:          ascent,
+		Descent:         height - ascent,
+		EmPx:            em.px,
+		UnderlineOffset: max(1, int(math.Round(underline))),
 	}, nil
 }
 
