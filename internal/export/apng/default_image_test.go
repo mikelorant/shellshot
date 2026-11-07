@@ -183,3 +183,33 @@ func TestSetDefaultImageTwiceReplaces(t *testing.T) {
 	}
 	sameNRGBA(t, "default image", got, second)
 }
+
+func TestFramesCountsTheFramesWritten(t *testing.T) {
+	var buf bytes.Buffer
+	enc, err := apng.NewEncoder(&buf, 8, 8, apng.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	same, other := noisy(8, 8, 1), noisy(8, 8, 2)
+	for _, img := range []image.Image{same, same, other, other, same} {
+		if err := enc.AddFrameAuto(img, time.Second); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := enc.SetDefaultImage(other); err != nil {
+		t.Fatal(err)
+	}
+	if n := enc.Frames(); n != 0 {
+		t.Errorf("Frames before Close = %d, want 0", n)
+	}
+	if err := enc.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// Five images, three pictures; the default image is not a frame.
+	if n := enc.Frames(); n != 3 {
+		t.Errorf("Frames = %d, want 3", n)
+	}
+	if n := binary.BigEndian.Uint32(walkChunks(t, buf.Bytes())[1].data[:4]); n != 3 {
+		t.Errorf("acTL num_frames = %d, want 3", n)
+	}
+}

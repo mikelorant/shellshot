@@ -35,6 +35,7 @@ var (
 	_ DelayLimiter = (*APNGSink)(nil)
 	_ AutoFrame    = (*APNGSink)(nil)
 	_ PosterSetter = (*APNGSink)(nil)
+	_ FrameCounter = (*APNGSink)(nil)
 )
 
 // AddFrame adds img as a full frame.
@@ -51,6 +52,10 @@ func (s *APNGSink) AddFrameAuto(img image.Image, delay time.Duration) error {
 // SetPoster makes img the default image of the APNG: the picture viewers
 // without animation support show. The animation itself is unchanged.
 func (s *APNGSink) SetPoster(img image.Image) error { return s.enc.SetDefaultImage(img) }
+
+// Frames is the number of animation frames in the file Close wrote; the
+// default image is not one of them.
+func (s *APNGSink) Frames() int { return s.enc.Frames() }
 
 // MaxDelay is the longest delay one APNG frame can carry, 65535 ms.
 func (s *APNGSink) MaxDelay() time.Duration { return maxAPNGDelay }

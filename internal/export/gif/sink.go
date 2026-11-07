@@ -102,6 +102,8 @@ type Sink struct {
 	// hist counts the pixels of every patch by colour.
 	hist map[uint32]int
 
+	// written is the number of frames Close wrote.
+	written  int
 	closed   bool
 	closeErr error
 }
@@ -177,6 +179,11 @@ func (s *Sink) addPatch(img *image.RGBA, rect image.Rectangle, delay time.Durati
 	s.patches = append(s.patches, patch{rect: rect, pix: pix, delay: delay})
 }
 
+// Frames returns the number of frames Close wrote: patches that changed no
+// palette entry are merged into the frame before. It is 0 before Close and
+// after a Close that failed.
+func (s *Sink) Frames() int { return s.written }
+
 // Close builds the palette, encodes the frames and writes the GIF. It may be
 // called again; it then returns the first result.
 func (s *Sink) Close() error {
@@ -206,7 +213,11 @@ func (s *Sink) write() error {
 		g.Image[i] = f
 		g.Disposal[i] = stdgif.DisposalNone
 	}
-	return stdgif.EncodeAll(s.w, g)
+	if err := stdgif.EncodeAll(s.w, g); err != nil {
+		return err
+	}
+	s.written = len(frames)
+	return nil
 }
 
 // loopCount maps the play count to image/gif's LoopCount.

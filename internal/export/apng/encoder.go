@@ -70,8 +70,10 @@ type Encoder struct {
 	// defaultIDAT is the compressed default image set by SetDefaultImage,
 	// nil if there is none.
 	defaultIDAT []byte
-	closed      bool
-	closeErr    error
+	// written is the number of animation frames Close wrote.
+	written  int
+	closed   bool
+	closeErr error
 
 	// base is the canvas a decoder starts the next frame from: the previous
 	// frame rendered, then disposed. shown is the canvas as the previous
@@ -129,6 +131,11 @@ func (e *Encoder) SetDefaultImage(img image.Image) error {
 	e.defaultIDAT = idat
 	return nil
 }
+
+// Frames returns the number of animation frames Close wrote, after
+// AddFrameAuto merged identical images into one frame; the default image is
+// not one of them. It is 0 before Close and after a Close that failed.
+func (e *Encoder) Frames() int { return e.written }
 
 // AddFrameRect appends a frame that updates only rect, shown for delay. img
 // is the full canvas-size image (width×height pixels, origin may be
@@ -319,6 +326,9 @@ func (e *Encoder) Close() error {
 	}
 	e.closed = true
 	e.closeErr = e.write()
+	if e.closeErr == nil {
+		e.written = len(e.frames)
+	}
 	e.frames, e.base, e.shown, e.defaultIDAT = nil, nil, nil, nil
 	return e.closeErr
 }

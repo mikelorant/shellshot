@@ -43,7 +43,8 @@ type Renderer interface {
 // nothing behind; Export also silences the writer it gives the sink when the
 // export fails, so a Close after a failure writes nothing.
 //
-// A Sink may additionally implement DelayLimiter, AutoFrame and PosterSetter.
+// A Sink may additionally implement DelayLimiter, AutoFrame, PosterSetter and
+// FrameCounter.
 type Sink interface {
 	// AddFrame appends img, shown for delay. Export never modifies img, and
 	// passes the same image again for the next step if the screen did not
@@ -80,6 +81,14 @@ type AutoFrame interface {
 // when Options.Poster asks for a poster.
 type PosterSetter interface {
 	SetPoster(img image.Image) error
+}
+
+// FrameCounter is implemented by a Sink that can say how many frames its
+// output holds. Frames is the number of frames Close wrote, counting a run of
+// identical images the sink merged into one frame once, which can be fewer
+// than the timeline steps. It is 0 before Close and after a failed Close.
+type FrameCounter interface {
+	Frames() int
 }
 
 // Options configures Export.

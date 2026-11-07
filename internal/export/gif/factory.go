@@ -9,6 +9,7 @@ import (
 var (
 	_ pipeline.Sink         = (*Sink)(nil)
 	_ pipeline.DelayLimiter = (*Sink)(nil)
+	_ pipeline.FrameCounter = (*Sink)(nil)
 )
 
 // SinkFactory returns the pipeline.SinkFactory of a GIF with options o.

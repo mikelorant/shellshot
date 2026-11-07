@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -310,8 +311,23 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 		Poster:   poster,
 		Progress: func(_, total int) { steps = total },
 	}
+	// frames is the count to report: for a raster format what its sink wrote,
+	// which is fewer than the steps when it merged identical images.
+	frames := func() int { return steps }
 	write := func(f *os.File) error {
-		opts.NewSink = outFormat.New(settings)
+		newSink := outFormat.New(settings)
+		var sink pipeline.Sink
+		opts.NewSink = func(w io.Writer, width, height int) (pipeline.Sink, error) {
+			var err error
+			sink, err = newSink(w, width, height)
+			return sink, err
+		}
+		frames = func() int {
+			if fc, ok := sink.(pipeline.FrameCounter); ok {
+				return fc.Frames()
+			}
+			return steps
+		}
 		return pipeline.Export(cmd.Context(), fixedSize{src: it, cols: hdr.Cols, rows: hdr.Rows}, hdr.Cols, hdr.Rows, renderer, f, opts)
 	}
 	if outFormat.NewSteps != nil {
@@ -325,7 +341,7 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	if err := fonts.EmojiErr(); err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: some emoji were not drawn: %v\n", err)
 	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d frames (%.1f KB) to %s\n", steps, float64(size)/1024, output)
+	fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d frames (%.1f KB) to %s\n", frames(), float64(size)/1024, output)
 	return nil
 }
 

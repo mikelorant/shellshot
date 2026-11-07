@@ -1,6 +1,7 @@
 package gif_test
 
 import (
+	"bytes"
 	"errors"
 	"image"
 	"image/color"
@@ -403,4 +404,33 @@ func colourError(got, want *image.RGBA) (mean, worst float64) {
 		}
 	}
 	return sum / float64(len(want.Pix)/4*3), worst
+}
+
+func TestFramesCountsTheFramesWritten(t *testing.T) {
+	var buf bytes.Buffer
+	s, err := gif.NewSink(&buf, 8, 8, gif.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b := image.NewRGBA(image.Rect(0, 0, 8, 8)), image.NewRGBA(image.Rect(0, 0, 8, 8))
+	b.Pix[0], b.Pix[3] = 0xff, 0xff
+	for _, img := range []*image.RGBA{a, a, b, b, a} {
+		if err := s.AddFrame(img, time.Second); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := s.Frames(); n != 0 {
+		t.Errorf("Frames before Close = %d, want 0", n)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	g, err := stdgif.DecodeAll(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Five images, three pictures.
+	if n := s.Frames(); n != 3 || n != len(g.Image) {
+		t.Errorf("Frames = %d, file holds %d, want 3", n, len(g.Image))
+	}
 }
