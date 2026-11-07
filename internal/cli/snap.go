@@ -26,26 +26,29 @@ func (s *lastFrameSink) Frame(f snapshot.Frame) error {
 // final screen as text.
 func newSnapCmd() *cobra.Command {
 	var (
-		opts      captureOptions
-		colorMode string
+		opts       captureOptions
+		colorMode  string
+		ignoreExit bool
 	)
 	cmd := &cobra.Command{
-		Use:   "snap [--cols N] [--rows N] [--interval d] [--color auto|always|never] -- command [args...]",
+		Use:   "snap [--cols N] [--rows N] [--interval d] [--color auto|always|never] [--ignore-exit-status] -- command [args...]",
 		Short: "Run a command and print its final screen as text",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Command = args
-			return runSnap(cmd, opts, colorMode)
+			return runSnap(cmd, opts, colorMode, ignoreExit)
 		},
 	}
 	cmd.Args = cobra.MinimumNArgs(1)
 	addCaptureFlags(cmd, &opts)
 	addColorFlag(cmd, &colorMode)
+	addIgnoreExitStatusFlag(cmd, &ignoreExit)
 	return cmd
 }
 
 // runSnap captures opts.Command and writes the last screen to cmd's stdout.
-// A non-zero exit code of the command is reported on stderr, not as an error.
-func runSnap(cmd *cobra.Command, opts captureOptions, colorMode string) error {
+// A non-zero exit code of the command is reported on stderr after the screen
+// is written and returned as an ExitError, unless ignoreExit is set.
+func runSnap(cmd *cobra.Command, opts captureOptions, colorMode string, ignoreExit bool) error {
 	color, err := resolveColor(colorMode, isTerminal(cmd.OutOrStdout()), os.Getenv("NO_COLOR"))
 	if err != nil {
 		return fmt.Errorf("snap: %w", err)
@@ -58,10 +61,7 @@ func runSnap(cmd *cobra.Command, opts captureOptions, colorMode string) error {
 	if err := writeScreen(cmd.OutOrStdout(), sink.frame.Snapshot, color); err != nil {
 		return err
 	}
-	if code != 0 {
-		fmt.Fprintf(cmd.ErrOrStderr(), "shellshot: command exited with %d\n", code)
-	}
-	return nil
+	return reportExit(cmd.ErrOrStderr(), code, ignoreExit)
 }
 
 // writeScreen prints the screen, one newline-terminated row per line, without

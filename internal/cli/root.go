@@ -3,6 +3,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,7 +13,8 @@ import (
 
 // Run executes the shellshot CLI with args (excluding the program name),
 // writing normal output to stdout and errors to stderr. It returns the
-// process exit code: 0 on success, 1 on any error.
+// process exit code: 0 on success, 1 on any error, or the exit status of the
+// command that snap or record ran (see ExitError).
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	return runWithStdin(ctx, args, os.Stdin, stdout, stderr)
 }
@@ -25,6 +27,10 @@ func runWithStdin(ctx context.Context, args []string, stdin io.Reader, stdout, s
 	cmd.SetErr(stderr)
 	cmd.SetArgs(args)
 	if err := cmd.ExecuteContext(ctx); err != nil {
+		var exit ExitError
+		if errors.As(err, &exit) {
+			return exit.Code
+		}
 		fmt.Fprintf(stderr, "shellshot: %v\n", err)
 		return 1
 	}
