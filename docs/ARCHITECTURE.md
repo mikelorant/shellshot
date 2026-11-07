@@ -16,7 +16,10 @@ script:  .script --> script (Check) --> script/run (Lower, Executor) --> cli dri
                      the session then writes keys to the PTY and logs MARK and SPAN events as above
 
 replay:  .shot --> recording/bin Reader --> recording/frames --(vt.Terminal)--> snapshot.Frame --> replay --> stdout
-export:  .shot --> recording/bin Reader --> recording/frames --> export/timeline --> render/raster --> export/apng --> .png
+export:  .shot --> recording/bin Reader --> recording/frames --> export/spanplan + export/timeline
+                   --> export/pipeline + render/raster --> export/apng | export/gif | export/webp
+                   --> export/svg (works from snapshots, no raster pipeline)
+         the format (--format, else the -o extension) is chosen through export/format
 info:    .shot --> recording/bin (scan only, no terminal) --> recording/spans --> stdout
 ```
 
@@ -44,8 +47,13 @@ internal/recording/spans    SPAN events -> scenes and hidden spans
 internal/recording/frames   recorded events -> snapshot frames through a vt.Factory
 internal/replay             plays frames to an io.Writer with timing
 internal/export/timeline    frames -> timed steps: idle cap, speed, hold, minimum delay, leading blank trim
-internal/export/pipeline    timeline + raster + apng: frames -> animated PNG
+internal/export/spanplan    scenes and hidden spans -> timeline segments and forced frames (pure)
+internal/export/pipeline    timeline + raster: frames -> images for a sink; the sink interface and the APNG poster
+internal/export/format      registry of output formats: name, extensions and constructor of each sink
 internal/export/apng        APNG encoder (standard library only)
+internal/export/gif         animated GIF sink: one palette for all frames, changed rectangles only (image/gif)
+internal/export/webp        animated lossless WebP sink (RIFF container; VP8L from github.com/HugoSmits86/nativewebp)
+internal/export/svg         SVG writer: text or glyph paths, CSS animation or one still frame
 internal/render/raster      frame -> image: cells, clusters, colours, cursor
 internal/render/font        embedded fonts and the fallback chain
 internal/render/fontchain   builds the font set for export: embedded, --fallback-font, --system-fonts
@@ -63,6 +71,8 @@ Dependency rules, enforced in review:
 - `snapshot` imports nothing. `vt`, `replay`, `export/timeline` and `render/theme` import only `snapshot`.
 - Only `vt/ghostty` imports cgo and libghostty. Everything else builds without it.
 - Only `cli` imports cobra and wires concrete types.
+- `export/apng`, `gif` and `webp` are sinks for `export/pipeline`; `export/svg` imports `timeline`,
+  `snapshot` and the render packages. `export/format` is the only package that knows all formats.
 - `recording/bin` imports only its own subpackages. `recording/frames` imports `snapshot`, `vt` and
   `recording/bin`. `recording/spans` imports `recording/bin`.
 - `session` imports `snapshot` and `vt`, and talks to the PTY through interfaces it declares.
