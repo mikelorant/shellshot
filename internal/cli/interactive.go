@@ -70,7 +70,7 @@ func stdinTerminal(r io.Reader) *os.File {
 // always restored before captureLive returns, including on error. When in is
 // not a terminal (a pipe or file), its EOF is forwarded to the process as
 // Ctrl-D so the shell exits instead of waiting forever for more input.
-func captureLive(ctx context.Context, opts captureOptions, in io.Reader, out, errOut io.Writer, sink session.Sink) (code int, err error) {
+func captureLive(ctx context.Context, opts captureOptions, in io.Reader, out, errOut io.Writer) (code int, err error) {
 	opts.Stdin, opts.Live = in, out
 	term := stdinTerminal(in)
 	opts.EOTOnStdinEOF = term == nil
@@ -86,5 +86,5 @@ func captureLive(ctx context.Context, opts captureOptions, in io.Reader, out, er
 			}
 		}()
 	}
-	return capture(ctx, opts, sink)
+	return capture(ctx, opts)
 }

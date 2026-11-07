@@ -53,15 +53,24 @@ The value can be set with `-ldflags "-X github.com/michaellorant/shellshot/inter
 $ shellshot record -o demo.shot --cols 60 --rows 10 -c 'echo hello; sleep 0.5; printf "\033[32mgreen\033[0m done\n"'
 hello
 green done
-recorded 3 frames to demo.shot
+recorded 4 events (0.4 KB) to demo.shot
 ```
 
 With no command, `record` runs `$SHELL` (fallback `/bin/sh`) and records until it
 exits. Use `-c 'string'` (run via `$SHELL -c`) or `-- cmd args...` for a specific
 command. On a terminal, stdin is put in raw mode and output is shown live while
-being recorded. Flags: `-o` (default `recording.shot`), `--cols`/`--rows` (default:
-current terminal size, else 80x24), `--fps` (screen sampling rate in frames per second, default 60, max 1000).
-A frame is stored only when the screen differs from the previous one.
+being recorded. `record` writes the compressed binary event-log format: the raw
+terminal output with its timing, plus the exit status. Flags: `-o` (default
+`recording.shot`), `--cols`/`--rows` (default: current terminal size, else 80x24),
+`--codec none|flate|zstd` (block compression, default `zstd`), `--coalesce DURATION`
+(merge output reads that arrive within this time of each other; default 0 = off) and
+`--record-input` (also log the keystrokes sent to the command, default off; a notice
+is printed to stderr). Nothing is written while the program is idle, and the file is
+written as the command runs, so a crash leaves a recording readable up to its last
+flushed block (at most about 2 seconds are lost). Only the header's size, argv,
+start time, `TERM`, `COLORTERM`, `LANG`, `SHELL`, a random session id and the
+recorder version are stored; the working directory, host name and the rest of the
+environment are not.
 If the command exits non-zero, `record` still writes the recording and then exits
 with the command's status (a note goes to stderr); `--ignore-exit-status` makes it
 exit 0. When stdin is a pipe or file rather than a terminal, reaching its end sends
@@ -156,14 +165,15 @@ prints what could be read, reports `damaged: ...` and exits 1.
 
 ## Recording format
 
-- **Binary format** (`replay`, `export` and `info` read it). A chunked, compressed
+- **Binary format** (`record` writes it; `replay`, `export` and `info` read it). A chunked, compressed
   file designed in [docs/research/binary-format.md](docs/research/binary-format.md)
   and implemented in `internal/recording/bin` (with `varint`, `codec`, `head`,
-  `event`, `chunk` below it): a header, then blocks of timestamped events (terminal
-  output, resizes, marks, exit status). `internal/recording/frames` replays the
+  `event`, `chunk` below it): a `HEAD` chunk, then blocks of timestamped events (`OUT`,
+  optional `IN`, `RESIZE`, `MARK`, `EXIT`), zstd-compressed by default. Themes are not
+  stored; they are chosen at export time. `internal/recording/frames` replays the
   events through libghostty to produce the screen frames the commands use.
-- **JSON Lines, version 2** (what `record` writes until it is switched to the binary
-  format; the three commands above no longer read it). Line 1 is a header
+- **JSON Lines, version 2** (the old format; `record` no longer writes it and the
+  commands above no longer read it). Line 1 is a header
   (`version`, `cols`, `rows`, `command`, `started`); each following line is a
   frame (`t` in ms, `lines`, cursor, `title`, optional `spans` for styles and
   `widths` for wide/zero-width runes).
@@ -209,7 +219,7 @@ internal/pty           spawn a command in a PTY
 internal/tty           IsTerminal, Size, MakeRaw
 internal/live          stdin -> process pump and live output tee
 internal/session       pty + vt + sampler -> frames emitted to a sink
-internal/recording     file format (JSON Lines Reader/Writer); bin/ = binary format parts
+internal/recording     file format (JSON Lines Reader/Writer); bin/ = binary format (written by record)
 internal/replay        play frames to an io.Writer with timing
 internal/export        timeline (timing), apng (encoder), pipeline (frames -> APNG)
 internal/render        font (embedded), theme, raster (frame -> image), sprite (box/block/braille/powerline glyphs)
@@ -245,8 +255,7 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
   font are shrunk to the cell width (and height) and centred, as in the "Nerd Font
   Mono" variants, so they render smaller than in terminals that let icons overflow
   into the next cell.
-- JSON recordings are large and store full-screen text per frame; there is no compression yet.
-- Stable only on macOS; no input events or resize events are recorded.
+- Stable only on macOS; `record` logs input events only with `--record-input`, and no resize events (SIGWINCH is not propagated).
 
 ## Development
 

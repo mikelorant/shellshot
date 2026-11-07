@@ -56,6 +56,15 @@ type Config struct {
 	Ticker Ticker
 	// Events, if non-nil, receives the raw process output. See EventSink.
 	Events EventSink
+	// OnStart, if non-nil, is called once on Run's goroutine with the time
+	// that is the origin of every event offset, before the process is read. It
+	// lets another writer of events (such as input) share the origin.
+	OnStart func(start time.Time)
+	// OnTick, if non-nil, is called on Run's goroutine at every ticker tick
+	// with the current Clock reading, before the screen is sampled. It lets an
+	// event log flush on time without a goroutine of its own. An error aborts
+	// the run like a sink error.
+	OnTick func(now time.Time) error
 }
 
 // Period is the time between samples: one second divided by FPS (DefaultFPS

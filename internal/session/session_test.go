@@ -177,6 +177,8 @@ type harness struct {
 	cols    int
 	rows    int
 	events  EventSink // Config.Events; nil by default
+	onStart func(time.Time)
+	onTick  func(time.Time) error
 }
 
 type runResult struct {
@@ -217,11 +219,13 @@ func startRun(t *testing.T, failOnFrame int, failErr error, mutate func(*harness
 		return nil
 	})
 	cfg := Config{
-		FPS:    h.fps,
-		Cols:   h.cols,
-		Rows:   h.rows,
-		Events: h.events,
-		Clock:  h.clock.now,
+		FPS:     h.fps,
+		Cols:    h.cols,
+		Rows:    h.rows,
+		Events:  h.events,
+		OnStart: h.onStart,
+		OnTick:  h.onTick,
+		Clock:   h.clock.now,
 		Ticker: func(d time.Duration) (<-chan time.Time, func()) {
 			h.period.Store(int64(d))
 			return h.ticks, func() { h.stopped.Store(true) }

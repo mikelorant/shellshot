@@ -10,17 +10,22 @@ import (
 	"github.com/michaellorant/shellshot/internal/live"
 	"github.com/michaellorant/shellshot/internal/pty"
 	"github.com/michaellorant/shellshot/internal/session"
+	"github.com/michaellorant/shellshot/internal/snapshot"
 	"github.com/michaellorant/shellshot/internal/vt/ghostty"
 )
 
 // eot is the end-of-transmission byte (Ctrl-D) a terminal sends for EOF.
 const eot = 0x04
 
-// captureOptions describes one command run that is sampled into frames. It is
+// tickFPS sets the session ticker rate used by record. record discards the
+// frames the session samples; the ticker only drives flushing of the event
+// log, so it is slow to keep the wasted snapshots few.
+const tickFPS = 4
+
+// captureOptions describes one command run recorded as an event log. It is
 // used by record.
 type captureOptions struct {
 	Cols, Rows int
-	FPS        int
 	// Command is the program followed by its arguments; it must not be empty.
 	Command []string
 	// Stdin, when non-nil, is pumped to the process as user input.
@@ -31,10 +36,16 @@ type captureOptions struct {
 	EOTOnStdinEOF bool
 	// Live, when non-nil, shows the process output as it is produced.
 	Live io.Writer
+	// Events, when non-nil, receives the session's events and is flushed by
+	// its ticker.
+	Events *binSink
+	// RecordInput also logs the bytes forwarded to the process as input
+	// events. It requires Events, whose writer must allow input.
+	RecordInput bool
 }
 
-// addCaptureFlags registers --cols, --rows and --fps on cmd, binding
-// them to o, with explicit --cols and --rows defaults. Flag parsing stops at
+// addCaptureFlags registers --cols and --rows on cmd, binding them to o, with
+// explicit defaults. Flag parsing stops at
 // the first positional argument, so the child's own flags (as in "shellshot
 // record -- ls -l") are never interpreted by shellshot. The caller decides how
 // many positional arguments are required and must set o.Command from them in
@@ -43,31 +54,20 @@ func addCaptureFlags(cmd *cobra.Command, o *captureOptions, cols, rows int) {
 	cmd.Flags().SetInterspersed(false)
 	cmd.Flags().IntVar(&o.Cols, "cols", cols, "terminal width in cells")
 	cmd.Flags().IntVar(&o.Rows, "rows", rows, "terminal height in cells")
-	cmd.Flags().IntVar(&o.FPS, "fps", session.DefaultFPS, "screen sampling rate in frames per second")
+	// The sampling rate (--fps) belongs to replay and export, not record.
 }
 
-// validate reports an unusable option value.
-func (o captureOptions) validate() error {
-	if o.FPS < 1 || o.FPS > session.MaxFPS {
-		return fmt.Errorf("invalid --fps %d: must be between 1 and %d", o.FPS, session.MaxFPS)
-	}
-	return nil
-}
-
-// capture runs o.Command in a PTY, feeds its output to a libghostty terminal
-// and sends the resulting frames to sink. It returns the command's exit code;
-// a non-zero exit code is not an error.
+// capture runs o.Command in a PTY and drives a session on it, logging the
+// session events to o.Events. It returns the command's exit code; a non-zero
+// exit code is not an error.
 //
 // If o.Live is set, the process output is also written to it as it arrives.
 // If o.Stdin is set, it is pumped to the process until the capture ends; a
 // blocked read of o.Stdin cannot be interrupted and lingers (see live.Pump).
 // With o.EOTOnStdinEOF, the end of o.Stdin is forwarded as Ctrl-D.
-func capture(ctx context.Context, o captureOptions, sink session.Sink) (exitCode int, err error) {
+func capture(ctx context.Context, o captureOptions) (exitCode int, err error) {
 	if len(o.Command) == 0 {
 		return -1, fmt.Errorf("no command given")
-	}
-	if err := o.validate(); err != nil {
-		return -1, err
 	}
 	proc, err := pty.Start(ctx, pty.Config{
 		Command: o.Command[0],
@@ -84,6 +84,9 @@ func capture(ctx context.Context, o captureOptions, sink session.Sink) (exitCode
 	if o.Live != nil {
 		p = live.Tee(p, o.Live)
 	}
+	if o.Events != nil && o.RecordInput {
+		p = inputRecorder{Process: p, sink: o.Events}
+	}
 	if o.Stdin != nil {
 		pumpCtx, stop := context.WithCancel(ctx)
 		defer stop()
@@ -94,6 +97,12 @@ func capture(ctx context.Context, o captureOptions, sink session.Sink) (exitCode
 		live.PumpWith(pumpCtx, o.Stdin, p, pumpOpts)
 	}
 
-	cfg := session.Config{FPS: o.FPS, Cols: o.Cols, Rows: o.Rows}
-	return session.Run(ctx, p, ghostty.New, cfg, sink)
+	cfg := session.Config{FPS: tickFPS, Cols: o.Cols, Rows: o.Rows}
+	if o.Events != nil {
+		o.Events.configure(&cfg)
+	}
+	return session.Run(ctx, p, ghostty.New, cfg, session.SinkFunc(discardFrame))
 }
+
+// discardFrame ignores a sampled frame: record logs raw events, not frames.
+func discardFrame(snapshot.Frame) error { return nil }

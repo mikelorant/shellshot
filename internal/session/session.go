@@ -50,6 +50,9 @@ const chunkQueueLen = 16
 // been waited for, Events.Exit receives the exit code. Nothing is sent while
 // the process is idle. An Events error aborts the run like a sink error.
 //
+// Config.OnStart receives the start time once, before the process is read, and
+// Config.OnTick is called on every tick before sampling (see Config).
+//
 // If ctx is cancelled Run closes proc and returns an error wrapping ctx.Err().
 // A sink error, terminal error or non-EOF read error also aborts the run with
 // a wrapped error. On every path Run closes the terminal and proc and does not
@@ -109,6 +112,9 @@ type waitResult struct {
 // has been aborted, and joins every goroutine it started.
 func (s *session) run(ctx context.Context) (int, error) {
 	s.start = s.cfg.Clock() // set before the reader starts: it stamps chunks with it
+	if s.cfg.OnStart != nil {
+		s.cfg.OnStart(s.start)
+	}
 	chunks := make(chan chunk, chunkQueueLen)
 	stop := make(chan struct{})
 	var readErr error // written by the reader before it closes chunks
@@ -158,6 +164,11 @@ loop:
 			}
 			s.dirty = true
 		case <-ticks:
+			if s.cfg.OnTick != nil {
+				if err := s.cfg.OnTick(s.cfg.Clock()); err != nil {
+					return 0, fmt.Errorf("session: tick: %w", err)
+				}
+			}
 			if err := s.sample(); err != nil {
 				return 0, err
 			}
