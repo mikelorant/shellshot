@@ -58,7 +58,7 @@ func imageRecord(format, w, h int, data []byte) []byte {
 }
 
 // buildBitmapTables assembles CBLC and CBDT tables (version 3.0) from the
-// strike descriptions. Every PNG is recorded with its own decoded size.
+// strike descriptions. Every PNG is recorded with its own decoded size (0x0 if it does not decode).
 func buildBitmapTables(t testing.TB, strikes []testStrike) (cblc, cbdt []byte) {
 	t.Helper()
 	data := wbuf{0, 3, 0, 0} // CBDT header: version 3.0
@@ -85,10 +85,7 @@ func buildBitmapTables(t testing.TB, strikes []testStrike) (cblc, cbdt []byte) {
 			for g := sub.first; g <= sub.last; g++ {
 				put(len(data) - start)
 				if p, ok := sub.png[g]; ok {
-					cfg, err := png.DecodeConfig(bytes.NewReader(p))
-					if err != nil {
-						t.Fatal(err)
-					}
+					cfg, _ := png.DecodeConfig(bytes.NewReader(p)) // garbage test data records as 0x0
 					data = append(data, imageRecord(sub.imageFormat, cfg.Width, cfg.Height, p)...)
 				}
 			}
