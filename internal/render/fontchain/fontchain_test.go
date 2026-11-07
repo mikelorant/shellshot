@@ -10,7 +10,7 @@ import (
 
 // twemoji is a valid font that maps U+1F600, which no embedded text font
 // has, so it shows whether a user font joined the chain.
-const twemoji = "../font/assets/TwemojiMozilla.ttf"
+const twemoji = "../font/assets/twemoji-mozilla/TwemojiMozilla.ttf"
 
 func hasGlyph(t *testing.T, o Options, r rune) bool {
 	t.Helper()

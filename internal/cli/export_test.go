@@ -640,7 +640,7 @@ func TestExportFallbackFontErrors(t *testing.T) {
 func TestExportFallbackFontAndSystemFontsAreAccepted(t *testing.T) {
 	in := writeExportFixture(t)
 	dir := t.TempDir()
-	font := "../render/font/assets/NotoSansMonoCJKsc-Subset.otf"
+	font := "../render/font/assets/noto-cjk/NotoSansMonoCJKsc-Subset.otf"
 	for _, args := range [][]string{
 		{"--fallback-font", font},
 		{"--fallback-font", font, "--fallback-font", font},

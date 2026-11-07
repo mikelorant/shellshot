@@ -30,7 +30,7 @@ func readAsset(t testing.TB, name string) []byte {
 
 func loadTwemoji(t testing.TB) *Font {
 	t.Helper()
-	f, err := Parse(readAsset(t, "TwemojiMozilla.ttf"))
+	f, err := Parse(readAsset(t, "twemoji-mozilla/TwemojiMozilla.ttf"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func loadTwemoji(t testing.TB) *Font {
 
 func TestParseRejectsFontsWithoutColourTables(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"monochrome font": readAsset(t, "JetBrainsMono-Regular.ttf"),
+		"monochrome font": readAsset(t, "jetbrains-mono/JetBrainsMono-Regular.ttf"),
 		"empty":           nil,
 		"garbage":         bytes.Repeat([]byte{0xAB}, 64),
 	} {
@@ -50,7 +50,7 @@ func TestParseRejectsFontsWithoutColourTables(t *testing.T) {
 }
 
 func TestParseRejectsTruncatedFont(t *testing.T) {
-	data := readAsset(t, "TwemojiMozilla.ttf")
+	data := readAsset(t, "twemoji-mozilla/TwemojiMozilla.ttf")
 	for _, n := range []int{8, 100, len(data) / 2} {
 		if _, err := Parse(data[:n]); err == nil {
 			t.Errorf("Parse of first %d bytes succeeded", n)

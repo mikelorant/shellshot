@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	appleSha256File   = "assets/AppleColorEmoji-shellshot.ttf.sha256"
+	appleSha256File   = "assets/apple-emoji/AppleColorEmoji-shellshot.ttf.sha256"
 	emojiTestList     = "../../../third_party/apple-emoji-ttf/sequences/emoji-test.txt"
 	minAppleCoverage  = 0.99
 	appleFontMaxBytes = 20 << 20

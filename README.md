@@ -249,7 +249,7 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
 
 - APNG output, `dark` and `light` built-in themes, or your own theme JSON.
 - Text is drawn with an **embedded JetBrains Mono** (Regular, Bold, Italic, Bold
-  Italic; licence in `internal/render/font/assets/OFL.txt`). Box-drawing, block,
+  Italic; licence in `internal/render/font/assets/jetbrains-mono/OFL.txt`). Box-drawing, block,
   braille and powerline characters are drawn as sprites.
   Glyphs the main font lacks come from a fallback chain, first font wins:
   the bundled Symbols Nerd Font Mono (icons), a bundled Noto Sans Mono CJK SC
@@ -266,7 +266,7 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
 - Emoji artwork: Twemoji, Copyright Twitter, Inc. and other contributors,
   licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), packaged
   as a font by Mozilla (twemoji-colr, Apache-2.0). All font licences and
-  checksums are in `internal/render/font/assets/NOTICE.txt`. The fonts add 2.6 MB
+  checksums are in the `NOTICE.txt` of each `internal/render/*/assets/<group>/` directory. The fonts add 2.6 MB
   to the binary (Twemoji 1.5 MB, CJK subset 1.1 MB).
 - Idle gaps are capped by `--idle-limit`; very short frames are merged.
 
