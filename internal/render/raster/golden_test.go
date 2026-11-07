@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"image"
+	"image/draw"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -104,4 +105,45 @@ func TestImagesCloseTolerance(t *testing.T) {
 	if _, ok := imagesClose(a, b); ok {
 		t.Error("2% pixels off by 3 accepted")
 	}
+}
+
+func palette(i uint8) snapshot.Color { return snapshot.Color{Kind: snapshot.ColorPalette, Index: i} }
+
+func TestGoldenStyleBasic(t *testing.T) {
+	r, _ := newTestRenderer(t, Options{})
+	s := plainSnapshot(24,
+		"regular bold italic both",
+		"underline strike inverse",
+		"red green on blue faint",
+		"hidden:[invisible] 世a",
+		"bg 世 span after wide")
+	attr := func(a snapshot.Attr) snapshot.Style { return snapshot.Style{Attrs: a} }
+	s.Spans = [][]snapshot.Span{
+		{{Start: 8, End: 12, Style: attr(snapshot.Bold)}, {Start: 13, End: 19, Style: attr(snapshot.Italic)}, {Start: 20, End: 24, Style: attr(snapshot.Bold | snapshot.Italic)}},
+		{{Start: 0, End: 9, Style: attr(snapshot.Underline)}, {Start: 10, End: 16, Style: attr(snapshot.Strike)}, {Start: 17, End: 24, Style: attr(snapshot.Inverse)}},
+		{{Start: 0, End: 3, Style: snapshot.Style{Fg: palette(1)}}, {Start: 4, End: 9, Style: snapshot.Style{Fg: palette(2)}},
+			{Start: 13, End: 17, Style: snapshot.Style{Fg: palette(15), Bg: palette(4)}}, {Start: 18, End: 23, Style: attr(snapshot.Faint)}},
+		{{Start: 7, End: 18, Style: attr(snapshot.Invisible)}},
+		{{Start: 0, End: 2, Style: snapshot.Style{Bg: palette(3), Fg: palette(0)}}, {Start: 4, End: 8, Style: snapshot.Style{Bg: palette(5)}}},
+	}
+	s.Widths = [][]snapshot.Wide{nil, nil, nil, {{Rune: 19, Cells: 2}}, {{Rune: 3, Cells: 2}}}
+	compareGolden(t, "style_basic.png", mustRender(t, r, s))
+}
+
+// TestGoldenCursorShapes stacks one render per cursor style (block, bar,
+// underline, none) over the same text, with the cursor on a letter.
+func TestGoldenCursorShapes(t *testing.T) {
+	s := plainSnapshot(12, "$ echo hello")
+	s.Cursor = snapshot.Cursor{X: 7, Y: 0, Visible: true}
+	var imgs []*image.RGBA
+	for _, style := range []CursorStyle{CursorBlock, CursorBar, CursorUnderline, CursorNone} {
+		r, _ := newTestRenderer(t, Options{Cursor: style})
+		imgs = append(imgs, mustRender(t, r, s))
+	}
+	b := imgs[0].Bounds()
+	stack := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()*len(imgs)))
+	for i, img := range imgs {
+		draw.Draw(stack, image.Rect(0, i*b.Dy(), b.Dx(), (i+1)*b.Dy()), img, b.Min, draw.Src)
+	}
+	compareGolden(t, "cursor_shapes.png", stack)
 }
