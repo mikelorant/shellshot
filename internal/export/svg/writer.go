@@ -14,7 +14,8 @@ import (
 	"github.com/michaellorant/shellshot/internal/snapshot"
 )
 
-// Writer writes timeline steps as an SVG file: one step as a static image.
+// Writer writes timeline steps as an SVG file: the animation, or one step as
+// a static image if Options.Frame selects one.
 type Writer struct {
 	o Options
 }
@@ -23,8 +24,8 @@ type Writer struct {
 func NewWriter(o Options) *Writer { return &Writer{o: o} }
 
 // WriteSteps writes the document to w, which receives nothing if an error is
-// returned. Every step must be a valid snapshot of cols x rows cells. It
-// writes the step Options.Frame selects, the last one by default.
+// returned. Every step must be a valid snapshot of cols x rows cells. A
+// single step, or steps that last no time at all, give a static image.
 func (w *Writer) WriteSteps(out io.Writer, cols, rows int, steps []timeline.Step) error {
 	if w.o.Geometry == nil {
 		return errors.New("svg: no geometry")
@@ -41,10 +42,18 @@ func (w *Writer) WriteSteps(out io.Writer, cols, rows int, steps []timeline.Step
 		}
 	}
 	var buf bytes.Buffer
-	if err := w.writeStatic(&buf, cols, rows, steps[PickStep(steps, w.o.Frame)].Snapshot); err != nil {
+	var err error
+	if w.o.Frame.Kind != FrameNone {
+		err = w.writeStatic(&buf, cols, rows, steps[PickStep(steps, w.o.Frame)].Snapshot)
+	} else if total(steps) <= 0 || len(steps) == 1 {
+		err = w.writeStatic(&buf, cols, rows, steps[len(steps)-1].Snapshot)
+	} else {
+		err = w.writeAnimated(&buf, cols, rows, steps)
+	}
+	if err != nil {
 		return err
 	}
-	_, err := out.Write(buf.Bytes())
+	_, err = out.Write(buf.Bytes())
 	return err
 }
 
