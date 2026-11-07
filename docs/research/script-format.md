@@ -1,100 +1,165 @@
-# Research: automation script format for shellshot (`record --script`)
+# Research: automation script format for shellshot (`record --script`), v2 consolidated
 
-Status: design brief. Read-only research; no repo file other than this one was changed.
+Status: design brief, **v2 consolidated**. One design: the v2 grouped-block language, the scenes refinement ([`script-scenes.md`](script-scenes.md)) and the user's latest decisions (named text blocks, `linger`, the command/setting budget, SPAN events). `script-scenes.md` stays as supporting detail (recording, export, the VHS-tape reference case); **where the two differ, this file wins**. No code exists yet.
 
-**Evidence limits of this run (read first).**
-- I had **no shell**, only file read and web tools. So I could **not** run `go list`, build, or run the throwaway Go program that encodes arrows with and without application cursor mode. Those facts are **unverified**. Section 5.2 gives a ~20-line program to run (≈5 min).
-- The Go module cache was not at `~/go/pkg/mod/go.mitchellh.com/libghostty@v0.0.0-20261106041537-e247028bdf51/`. I read the binding from GitHub `main` (`key_encoder.go`, `key_event.go`), **not the pinned version**. The C headers in `build/libghostty/include/ghostty/vt/key/{encoder,event}.h` I read directly from the repo's build dir (`event.h` only the first 60 lines).
-- I did not read `internal/cli/{capture,interactive}.go`, `internal/live`, `internal/pty`, `internal/export`, `internal/render`. From `record.go` and `session.go` (lines 1–80) I know only what is quoted below. Claims about the new `record` command tree and the binary-format MARK/RESIZE events come from the task statement and `docs/research/binary-format.md` (first 200 lines), not from code.
-- Prior-art claims are labelled **fetched** (README or docs page read this run) or **memory** (unverified).
+**Evidence limits (read first).**
+- This is a design. **No code was run.** Examples were checked by a throwaway Python checker written to this file's EBNF (§4.3), not by the real parser. The checker is not committed. It approximates RE2 with Python `re`.
+- libghostty key encoding (§6) is inherited from the v1 research run (no shell). Encoder output bytes, the pinned-version API and DECCKM sequences are **unverified**. The headers in `build/libghostty/include/ghostty/vt/key/` were read directly; the Go binding was read from GitHub `main`, not the pinned version.
+- MARK (kind 3) and the rule "kinds ≥ 64 are ancillary" come from `docs/research/binary-format.md` (a design). SPAN (kind 64) and its payload are from `script-scenes.md` §4.3 and are unchanged here. Whether `Writer` flushes on kind 64, and how `frames` treats ancillary events, are **unverified**. Of the code I know only what the two earlier briefs quote (`record.go`, `session.go` 1–80, `timeline.go`, `event.go`).
+- Prior-art claims are marked **fetched** (v1 run) or **memory** (unverified).
 
 ---
 
 ## 1. Summary and recommendation
 
-**Build a ~10-command, line-oriented script language ("shotscript", `.shotscript`). It extends `shellshot record` via `--script FILE`. The executor is a pure, non-blocking state machine that the session's existing single goroutine polls. libghostty provides two things VHS cannot: a `Wait` that matches the real screen state, and a mode-aware key encoder.**
+**Build a small, line-oriented, declarative script language in `.script` files, run by `shellshot record --script FILE`. A script is top-level settings, then steps and blocks. It has six commands, two block kinds, and named text blocks for multi-line text. It has no conditions, loops, variables, functions or expressions.**
 
-The language is VHS-flavoured so users already know it, with these VHS mistakes fixed:
-- Bare-number durations: durations are always `500ms` / `2s`.
-- Silently ignored late `Set`: `Set` and `Env` are legal only in a preamble, and misuse is a parse error.
-- Last-line `Wait` default: `Wait` matches the whole visible screen.
-- Browser dependency and heavyweight settings.
-
-Commands (10): `Set`, `Env`, `Output`, `Type`, `Run`, `Key`, `Sleep`, `Wait`, `Mark`, `Resize`.
-
-Decisions in one line each:
-- **Time:** real-time only in v1. The clock is an interface, so a "skip delays" mode can come later. Recordings are reproducible in *inputs and screen at marks*, **not byte-identical**, because the child's output timing is real.
-- **Keys:** use libghostty's `KeyEncoder` with `SetFromTerminal` for non-text keys (arrows, F-keys, Home/End, chords). Plain text bypasses it. The script package owns its own `Key` enum and stays pure Go.
-- **Settings:** only run-affecting settings in the script (size, command, cwd, env, typing speed, timeout, jitter, seed). Theme and font are **not** script settings in v1 (the keyword is reserved).
-- **Precedence:** CLI flags > script `Set` > defaults.
-- **Exit codes:** script-level failures are distinct from the child's exit status.
-- **Deferred:** `Hide/Show`, `Require`, `Source`, `Copy/Paste`, `Screenshot`, heredocs, `Wait` scopes.
+- **Commands (6):** `run`, `type`, `press`, `wait`, `sleep`, `mark`. `expect` is not a seventh: `wait "x" 0s` is an assertion (§3.1).
+- **Blocks (2):** `scene NAME { … }` is a named, exportable chapter. `hidden { … }` runs and is recorded but export may drop it. A `hidden` may sit in a `scene`; no other nesting.
+- **Settings (14) in three classes:** process (`size shell env cwd seed output`, before the first step only), behaviour (`typing jitter timeout settle linger`, anywhere, scoped in blocks) and export hints (`speed idle hold`, preamble or in a `scene`). A setting line inside a block applies to the closing `}`, then reverts.
+- **Text:** `run npm install` takes the rest of the line literally; a leading `"` switches to an escaped string. Multi-line text uses **named text blocks** `type|run lines { … }` and `type|run paragraphs { … }` (§3.5). There is no line continuation.
+- **Waiting:** `run` waits for a quiet screen (`settle`, 200 ms). `wait idle` waits for quiet explicitly. `wait PATTERN` matches libghostty's rendered screen. `linger 2s` pauses after each step so a viewer can read (§3.2).
+- **Recording:** scenes and hidden spans are **SPAN events** (kind 64, ancillary, binary); user `mark` stays MARK (§7.2).
+- **Static:** the whole file is parsed and validated before anything spawns (exit 2). `record --script FILE --list` prints the plan.
+- **Kept from v1:** a non-blocking executor polled by the session goroutine; key chords through libghostty's `KeyEncoder`; real time only; reproducible inputs and screens at marks, not byte-identical recordings; own exit codes.
+- **Deferred or excluded:** §3.4.
 
 ---
 
 ## 2. Prior art
 
-### 2.1 Comparison
+| Tool | Model | Take | Leave |
+|---|---|---|---|
+| **VHS** `.tape` ([README](https://github.com/charmbracelet/vhs/blob/main/README.md), **fetched**) | Flat line DSL over ttyd, headless Chromium, ffmpeg | Verb per line; `Wait`/`Sleep`/`Env`/`Output`; chords | Browser stack; ~25 visual `Set`s; `Source`; `Copy/Paste`; `Hide/Show`; flat structure |
+| **asciinema-automation** (**memory**) | `#$ expect`, `#$ delay` comments | Waiting on output is the core primitive | Raw byte-stream matching |
+| **demo-magic**, **doitlive** (**search summary**) | Bash script / session file with `#doitlive speed: 3` | `run` ≈ `pe`; in-file `key: value` settings | Needs a human; script is code |
+| **Terminalizer** (**search summary**) | YAML records; `maxIdleTime` | Idle capping belongs at export | YAML as authoring format |
+| **expect/pexpect** (**memory**) | Programmatic send/expect | Fail loudly on timeout | Matching a raw byte stream |
 
-| Tool | Model | Source type | Take | Leave |
-|---|---|---|---|---|
-| **VHS** `.tape` ([README](https://github.com/charmbracelet/vhs/blob/main/README.md)) | Line DSL; drives a real shell via ttyd, headless Chromium (xterm.js) and ffmpeg | **fetched** | Verb-per-line; `Type@50ms`; `Key[@t] [count]`; `Wait`/`Sleep`/`Env`/`Output`/`Require`; Ctrl+/Alt+ chords | Browser stack; ~25 visual `Set`s; `Source`; `Copy/Paste`; `Screenshot`; `Hide/Show`; the pitfalls below |
-| **asciinema-automation** | Script file with directive comments (`#$ expect`, `#$ delay`, `#$ wait`, `#$ send`), driving a recording via pexpect-style matching | **memory**, one search hit for a similarly named tool (`asciinwriter`: `SEND/ENTER/EXPECT/DELAY`) | The idea that a *wait/expect on output* is the core primitive | Python/pexpect byte-stream matching (see 2.2) |
-| **demo-magic** | Bash script sourcing `demo-magic.sh`; `pe "cmd"` prints and runs, `p "text"` prints only, `TYPE_SPEED` ([sample](https://github.com/paxtonhare/demo-magic/blob/master/samples/demo-template.sh)) | **fetched via search summary** | `Run` ≈ `pe`. A pre-typed/paced demo is just "type, Enter, pause" | Needs a real human to press keys; the script is code, not data |
-| **doitlive** | Session file of commands; `#doitlive speed: 3` magic comments ([docs](https://doitlive.readthedocs.io/en/stable/)) | **fetched via search summary** | In-file `# key: value` directives are a cheap settings syntax | Interactive (human presses keys); not CI-friendly |
-| **Terminalizer** | Records to YAML with timed `records`; config has `frameDelay`, `maxIdleTime` ([config.yml](https://github.com/faressoft/terminalizer/blob/master/config.yml)) | **fetched via search summary** | Idle-time capping (`maxIdleTime`) as an export-time concern | YAML as an *authoring* format; it is a recording format, not a script |
-| **`script` / `scriptreplay`** | Raw typescript plus a separate timing file | **memory** | Confirms "raw bytes + timing" (already our binary format) | Not an authoring format |
-| **expect / pexpect** | Programmatic send/expect | **memory** | `expect` + timeout failing loudly | Matching against a raw byte stream (see 2.2) |
-| **GitHub Actions** | VHS ships a `vhs-action` | **memory** | CI usage = one command that reads a file and writes artifacts. For us: a single static binary, no browser | n/a |
+**Pain points and our answer.**
+1. *Late settings silently ignored (fetched; VHS README).* Every accepted setting is effective, or a parse error with line:col.
+2. *Unitless durations (fetched; `Sleep 2` s vs `TypingSpeed 0.1` s).* Durations always carry a unit.
+3. *Weak `Wait` defaults (fetched; regex `/>$/`, last line, 15 s).* We match the whole screen; the pattern is mandatory.
+4. *`Sleep` padding (inference).* `wait` is robust; `run` settles; `linger` names the "give the viewer time" intent.
+5. *Echo matches itself (classic expect trap).* `run make && echo DONE` puts `DONE` on screen as echo. Docs say: anchor (`/^DONE$/`).
 
-### 2.2 What caused pain (and what we do about it)
-
-1. **Ignored late settings (fetched).** VHS README: "Any setting except `TypingSpeed` applied after a non-setting or non-output command is ignored." The script author gets no error. → We make a late `Set` a parse error with line:col.
-2. **Ambiguous duration units (fetched).** `Sleep 2` is seconds, `Set TypingSpeed 0.1` is 0.1 s/char, and `Sleep 100ms` is also legal. → Durations always carry a unit.
-3. **Weak `Wait` defaults (fetched).** Defaults are regex `/>$/`, scope `Line`, timeout `15s`. Matching just the last line is fragile (wrapped lines, prompts that don't end in `>`). → Screen scope only.
-4. **Sleep-driven flakiness (memory/inference).** Without a reliable wait, authors pad `Sleep`s. Too short breaks on slow CI; too long makes slow GIFs. → Make `Wait` first-class and robust, and document it as the right primitive.
-5. **Echo matches itself (inference, classic expect trap).** `Run "make && echo DONE"` puts `DONE` on screen as typed echo *before* the build finishes, so `Wait "DONE"` returns instantly. → Wait matches in multiline mode; document `^DONE$`-style patterns (the echo line starts with a prompt).
-6. **Browser stack (memory).** Chromium + ttyd + ffmpeg installs are the biggest CI cost. → N/A for us.
+**Why v2 differs from VHS.** Named scenes instead of a flat list; scoped settings that revert at `}` instead of global `Set`; `hidden` keeps recording (VHS `Hide` stops capture, which would falsify a log) and marks the span instead; process settings only before the first step; rest-of-line text so `run git commit -m "msg"` needs no quoting.
 
 ---
 
-## 3. Proposed command set (10)
+## 3. The language
 
-| # | Command | Purpose | Why it earns a slot |
+### 3.1 Commands (6)
+
+| Command | Meaning |
+|---|---|
+| `run TEXT` | Type TEXT, press Enter, wait for a quiet screen (`settle`). The common case. |
+| `type TEXT` | Type TEXT without Enter. |
+| `press KEY…` | Key chords, e.g. `press ctrl+c`, `press up up enter`. A key may be followed by a repeat `xN`: `press down x3`. |
+| `wait PATTERN [TIMEOUT]` | Block until the visible screen matches PATTERN: a quoted string (substring) or `/regex/`. TIMEOUT overrides `timeout`. **`wait "passed" 0s` checks the current screen once and fails at once if it does not match: this is the assertion** (there is no `expect`, §11). |
+| `wait idle [DURATION]` | Block until the screen has had no output for DURATION (default: `settle`, or 200 ms if `settle off`). Fails at `timeout`. |
+| `sleep DURATION` | Pause. |
+| `mark LABEL` | Emit a MARK event (a user label, §7.2). |
+
+`run` and `type` take **one text form** (§3.5): rest-of-line, a quoted string, or a text block. `run` does not wait for the command to *finish*, only for a quiet screen; use `wait PATTERN` for slow commands.
+
+### 3.2 Settings (14)
+
+| Setting | Argument | Default | Class |
 |---|---|---|---|
-| 1 | `Set NAME VALUE` | Preamble-only settings (below) | One extension point. New settings add no grammar |
-| 2 | `Env NAME "value"` | Environment of the spawned process | Needed for reproducible prompts (`PS1`, `TERM`, `NO_COLOR`). Preamble-only because the process is spawned after the preamble |
-| 3 | `Output "path.shot"` | Recording path | Lets a script be self-contained in CI. `-o` wins. Only `.shot` accepted in v1 |
-| 4 | `Type "text"` | Send text, one character at a time at the typing speed | Core |
-| 5 | `Run "cmd"` | `Type` + `Key Enter` | The 90% case; two lines otherwise. Pure sugar in the parser (desugars to Type+Enter), so the executor does not know it |
-| 6 | `Key CHORD [count]` | Press a named key or chord | Core. Separate from `Type` so text never needs escaping for control keys |
-| 7 | `Sleep DURATION` | Pause | Core |
-| 8 | `Wait [/re/ \| "lit"]` | Block until the screen matches | The only robust sync primitive |
-| 9 | `Mark "name"` | Emit a MARK event | Maps 1:1 to the format. Gives exports named anchors ("export at mark `done`"); also usable as a poor man's screenshot target |
-| 10 | `Resize COLSxROWS` | RESIZE event plus SIGWINCH | The format has RESIZE events, and TUIs react to resizing. Cheap: syntax identical to `Set Size` |
+| `size` | `COLSxROWS`, each 1–1000 | current terminal, else 80x24 | process |
+| `shell` | PATH of the program to run | `$SHELL`, else `/bin/sh` | process |
+| `env` | `KEY=VALUE`, repeatable; later wins | inherited | process |
+| `cwd` | PATH | cwd of `shellshot` | process |
+| `seed` | unsigned int, jitter PRNG seed | `1` | process |
+| `output` | PATH of the recording | `recording.shot`; `-o` wins | process |
+| `typing` | DURATION between typed units | `50ms` | behaviour |
+| `jitter` | PERCENT `0%`–`100%` | `0%` | behaviour |
+| `timeout` | DURATION > 0, default for `wait` | `15s` | behaviour |
+| `settle` | DURATION, or `off`: quiet time `run` waits for after Enter | `200ms` | behaviour |
+| `linger` | DURATION: **pause this long after every step in the block so the viewer can read the screen** | `0s` | behaviour |
+| `speed` | NUMBERx, > 0 (`8x`): export playback speed of the span | export default | hint |
+| `idle` | DURATION: export cap per gap in the span | none | hint |
+| `hold` | DURATION: extra export time on the span's last screen | none | hint |
 
-### 3.1 Settings (all preamble-only)
+**`linger`, precisely.** After every `run`, `type`, `press` and `wait` (including `wait idle`) completes, the executor pauses `linger` before the next step; for `run` that is after the settle. `sleep` and `mark` get no linger (a `sleep` already is a pause). A text block is **one** step, so it gets one linger after the whole block, never one per line. The last step in a block lingers too (inside the span). Unlike `hold`, `linger` costs real recording time; `hold` is export-time only.
 
-| Setting | Default | Notes |
+**Where each class is legal:**
+
+| Class | Preamble (before first step or block) | Later at top level | In `scene` | In `hidden` |
+|---|---|---|---|---|
+| process | yes | **error** | **error** | **error** |
+| behaviour | yes | yes (from that line on) | yes | yes |
+| hint | yes (script-wide default) | **error** | yes | **error** (a hidden span has no output) |
+
+Scoping: a setting at top level applies to everything after it. **A setting line inside a block applies from that line to the closing `}`, then the previous value is restored**; it may appear anywhere in the block, not only first. Process settings need a new child ("`size` must appear before the first step (line N)"). Precedence: CLI flags (when explicitly set) > script > defaults. Hints resolve as: export flag > scene hint > script preamble hint > export default.
+
+### 3.3 Blocks
+
+```
+scene NAME {        # NAME: letters, digits, _ and -; unique; written bare, never quoted
+  …settings and steps…
+}
+hidden {
+  …
+}
+```
+- Nesting is at most one level: `hidden` inside `scene` is allowed. `scene` in `scene`, `hidden` in `hidden`, `scene` in `hidden` are errors (the last two are pointless or confusing).
+- A block must contain at least one step.
+- `hidden` steps run exactly like others (failures fail the run); `hidden` only marks a span that export may drop. A trailing `hidden` runs on success only; `cleanup { }` is deferred.
+- At the end of the script the executor shuts the shell down inside an **implicit trailing hidden span** (§7.4). A script author writes nothing.
+
+### 3.4 Deliberately excluded or deferred
+
+| Item | Status | Why |
 |---|---|---|
-| `Size COLSxROWS` | Current terminal size, else 80x24 (as `record` does today) | One setting, not Cols/Rows/Width/Height |
-| `Command "argv"` | `$SHELL`, else `/bin/sh` | Split into words (no shell involved). Direct-run TUIs: `Set Command "htop"` |
-| `Cwd "dir"` | CWD of `shellshot` | |
-| `TypingSpeed DURATION` | `50ms` | Per character. Overridable per command with `@` |
-| `Jitter PERCENT` | `0%` | Seeded; see §6.3 |
-| `Seed INT` | `1` | PRNG seed for Jitter |
-| `Timeout DURATION` | `15s` | Default `Wait` timeout |
+| Conditions, loops, variables, expressions, functions | Excluded | Rejected by the user; they make scripts non-static. `env` plus the shell cover real needs; copy lines instead |
+| `include`/`source` | Excluded | Path and cycle semantics; `cat a.script b.script` works |
+| `require` | **Deferred, reserved** | A hidden `command -v x && echo OK` plus `wait` covers it (tape, `script-scenes.md` §8.4). Add if CI users ask |
+| `expect`, `expect not`, `wait now` | Excluded | `wait "x" 0s` is the assertion. "Absent now" is unsupported (RE2 has no lookahead); add `expect not` only if asked |
+| `caption`, `cleanup { }`, `fresh`, `export { }`, per-scene `budget` | Deferred, reserved | `script-scenes.md` §3 |
+| `copy`/`paste`, `screenshot`, mid-script `resize` | Excluded | Use `type`; `export --at MARK`; `size` sets the initial size |
+| Theme/font/padding/pixel settings, GIF | Export-time | Export flags; shellshot exports APNG |
+| `type@250ms` one-off suffix | Dropped | Two mechanisms for one idea. Put `typing 250ms` before the `type` line (it reverts at `}`) |
+| `\` line continuation | Dropped | Replaced by text blocks (§3.5) |
+| Heredoc `<<` | Excluded | Text blocks cover it (they can also type a shell heredoc, Example 2) |
 
-### 3.2 Decisions on the other items the task listed
+**Repeating:** copy lines, or `press down x3`. **Extending without breaking the grammar:** new keywords at the start of a line, new setting names, new block kinds fitting `KIND [ARGS] {`. These words are **reserved** (error "reserved for future use", not "unknown command"):
 
-- **Starting command/shell:** there is only `Set Command`. The default is an interactive shell and the script drives it with `Run`. For reproducible prompts the docs recommend `Set Command "bash --noprofile --norc"` plus `Env PS1 "$ "`. A separate `Shell` setting is redundant.
-- **Theme / font-size hints:** **excluded from v1.** They are export-time concerns, and export CLI flags already exist. A second source of truth causes precedence bugs. The binary header's hint slot is the future home: a later `Set Hint.Theme "…"` writes the header hint, and export flag > header hint. Keyword reserved, so v1 errors with "unknown setting (reserved)".
-- **Hide/Show: excluded for now.** VHS's semantic is "stop capturing frames". In an event log the child's output must still be replayed to keep the terminal state correct, so "hide" can only mean "drop this time range at export". That needs a marked range plus export support, and a design for the time gap. Researcher recommendation: setup that must not be visible is better served by `Set Command` + `Env` + `Set Cwd`, which cover most real cases. Revisit as `Mark "setup-end"` plus an export-time `--from-mark` once export lands. Never "skip recording": the recording should stay a faithful log.
-- **Source/include: excluded.** Reuse is solved by the shell (`cat a b > c`) and adds path/cycle semantics.
-- **Require: excluded.** `Run "command -v gum"` then `Wait` covers it. Add `Require` only if CI users ask.
-- **Copy/Paste, Screenshot: excluded.** Paste is a bracketed-paste feature; screenshots are export-time (`export --at mark`).
-- **Wait scopes (`+Line`, `+Screen`): excluded.** Screen only. Add scope later as an optional prefix.
-- **`Wait idle DURATION` (quiet period): excluded for now.** Tempting, but it re-introduces timing flakiness. Leave room (see grammar: `Wait` takes a matcher; `idle` is not a valid matcher yet).
+`if else elif for while repeat loop break let var const set fn func def define call return include import source require use copy paste screenshot resize hide show theme font caption cleanup fresh export expect budget`
+
+### 3.5 Text forms for `run` and `type`
+
+**Single line (unchanged).**
+- *Rest of line:* `run npm install` types `npm install`. The text is trimmed; `#`, `\` and inner quotes are literal. Valid only if the text does not start with `"` and is not a text-block header.
+- *Quoted:* `type "echo \"hi\"\n"` allows `\n \t \" \\ \e \xHH` (any other `\` is an error), leading/trailing spaces, and a trailing comment. `\n` is typed as Enter (CR, 0x0D). `run "hi" | wc` is an error: "text after closing quote; to type a leading quote use `run "\"hi\" | wc"`".
+
+**Named text blocks (multi-line).** Four forms: `type lines {`, `type paragraphs {`, `run lines {`, `run paragraphs {`.
+
+```
+run lines {                 # header: keyword, shape, "{", optional comment
+  git commit -q -F - <<'EOF'
+  fix: racing of requests (#1)
+  EOF
+}                           # alone on its line, at the SAME indentation as "run"
+```
+
+Body rules (all deterministic, applied in this order):
+1. **Raw.** The body is never parsed as script: no escapes, `#` and quotes are literal, `}` is literal text unless it is the closing line.
+2. **Closing line:** a line with only `}` (and optional trailing whitespace; **no comment**), at exactly the same leading whitespace as the `run`/`type` line. A `}` at any other indentation is literal body text. To type a line that is only `}` at that indentation, indent the body deeper or use `type "}"`.
+3. **Indentation:** the common leading whitespace of the non-blank lines (longest common prefix; the minimum indentation when one kind of whitespace is used) is stripped. Whitespace-only lines count as blank. Trailing whitespace on every line is trimmed (use a quoted string if it matters).
+4. **Leading and trailing blank lines are ignored.** A body with no non-blank line is an error.
+5. **`lines`:** each remaining line is typed as written (relative indentation kept; blank lines inside stay blank lines), with Enter **between** lines. `type lines` does not press Enter after the last line; `run lines` does, and then settles once. This matches single-line `type` vs `run`.
+6. **`paragraphs`:** runs of non-blank lines form a paragraph; its lines are trimmed and joined with **one space** (soft wrapping). Paragraphs are separated by a blank line, typed as **two Enters** (a blank line in the typed text); any number of blank lines in the source is one separator. `type paragraphs` has no trailing Enter; `run paragraphs` presses one and settles once.
+
+| Source body | `type …` types | `run …` types |
+|---|---|---|
+| `lines { a ⏎ b }` | `a`⏎`b` | `a`⏎`b`⏎ |
+| `paragraphs { one ⏎ two ⏎⏎ three }` | `one two`⏎⏎`three` | `one two`⏎⏎`three`⏎ |
+
+**Timing.** A block is one step, typed as one stream of units: every character and every Enter is one unit with `typing` between consecutive units (jitter applies the same way), no extra pause at line ends. `run` presses its final Enter after the same delay, then **settles once** after the last line. `linger` follows the whole block once.
+
+**Caveats.** In a shell, `run lines` hands lines over without waiting for each command; the tty buffers typeahead, which is fine for shell commands and wrong for interactive programs (use separate `run` steps with `wait`). **Disambiguation:** `run lines {` is a block header only if the rest of the line is exactly `lines` or `paragraphs`, optional spaces, `{`, optional comment; otherwise it is rest-of-line text (`run lines` types `lines`; `run "lines {"` types it with a brace). A mistyped `run line {` is rest-of-line text, and its body followed by a lone `}` gives `unexpected "}"`, whose message suggests `lines`/`paragraphs`.
 
 ---
 
@@ -102,385 +167,459 @@ Decisions in one line each:
 
 ### 4.1 Rules
 
-- One statement per line. A statement is `COMMAND[@DURATION] args…`.
-- **Style choice: `Type@50ms "…"`** (VHS's form) over `--speed 50ms`. It is shorter, familiar, and `@` unambiguously means "timing for this command", which is also `Key@100ms Down 5` (repeat interval) and `Wait@30s /re/` (timeout). Flags would need a second lexical class.
-- Comments: `#` at line start, or after a statement outside a string/regex. The first line `#!…` is a comment (see 4.5).
-- Case: command, setting and key names are **case-insensitive** (docs show PascalCase). Strings, regexes and `Env` names are case-sensitive.
-- Strings:
-  - `"…"` with escapes `\n \r \t \e \\ \" \xHH \u{HEX}`.
-  - `` `…` `` raw, no escapes (for shell snippets full of `"` and `\`). A backtick cannot appear inside a raw string; use `"…"` then.
-  - In `Type`/`Run`, `\n` is typed as Enter (CR, 0x0D), not LF.
-  - **No heredocs in v1.** Multi-line text is multiple `Run` lines. A heredoc can be added later as `Type <<EOF`; the grammar leaves `<<` unused.
-- Regex: `/…/` with Go RE2 syntax, flags none; `\/` escapes a slash. Matching is **multiline** (`^`/`$` match at line boundaries), applied to the visible screen text with lines joined by `\n`.
-- Durations: `<number><ms|s|m>` (`500ms`, `2s`, `1.5s`, `1m`). A bare number is an error.
-- Key names: `Enter Tab Esc Space Backspace Delete Insert Up Down Left Right Home End PageUp PageDown F1…F12`, a single printable character (`a`, `/`), and chords `Ctrl+X`, `Alt+X`, `Shift+X`, `Ctrl+Alt+X` (modifier order irrelevant). `Key Up 3` repeats 3 times; `Key@200ms Down 5` waits 200 ms between repeats (default repeat interval = TypingSpeed).
-- Errors: `file:line:col: message` plus the offending line and a caret. All parse errors are reported (up to 10), not only the first.
-  Example: `demo.shotscript:7:1: Set must appear before the first action (Type at line 5)`.
+- **Line-oriented.** One statement per line; indentation is insignificant outside text blocks (two spaces by convention); blank lines are ignored. CRLF files are accepted (the lexer normalises to LF). The file must be valid UTF-8.
+- **Comments.** `#` starts a comment at the start of a token: a whole line, or after a statement's arguments or a block header. Not in rest-of-line text or text blocks, where `#` is literal. `#!…` on line 1 is an ordinary comment.
+- **Blocks.** The header ends with `{` (after a space); `}` is alone on its line (a comment may follow).
+- **Case.** Everything is case-sensitive; keywords, setting and key names are lower-case.
+- **Strings.** `"…"` with `\n \t \" \\ \e \xHH`; `\xHH` produces byte HH and the result must be valid UTF-8.
+- **Regex.** `/…/`, Go RE2, no flags; `\/` is a slash, every other `\` goes to RE2. Applied multiline: `^`/`$` match at screen row boundaries.
+- **Durations.** `<number><unit>`, unit `ms`, `s`, `m` (`500ms`, `1.5s`, `2m`); a bare number is an error. Percent `25%`, size `100x28`, speed `8x`.
+- **Keys.** Named: `enter tab esc backspace delete insert space up down left right home end pageup pagedown f1`…`f12`; plus a single `a`–`z` or `0`–`9`. Chords `ctrl+KEY`, `alt+KEY`, `shift+KEY`, combinations in any order, no repeats. A repeat is a separate token `xN` (N: 1–999) after a key.
+- **Unknown identifiers** (commands, settings, keys, block kinds, units) are errors with `file:line:col`, the line with a caret, and a **did-you-mean** (edit distance ≤ 2 among names legal there). All errors are reported, up to 10. Reserved words say so.
 
-### 4.2 EBNF
+  ```
+  demo.script:12:3: unknown command "rn" (did you mean "run"?)
+  demo.script:4:1: "size" must appear before the first step (first step: line 3)
+  demo.script:9:5: "scene" cannot be nested inside scene "intro"
+  demo.script:7:3: unterminated text block opened here: expected a line with only "}" at column 3 (found "}" at line 12 with different indentation; that line is literal text)
+  demo.script:7:3: empty text block: no non-blank line (to press Enter alone use "press enter")
+  ```
+
+### 4.2 Files and header
+
+Extension **`.script`** (the recording is `.shot`). A first line `#!/usr/bin/env -S shellshot record --script` makes a script executable (`env -S` availability is **unverified**). No version pragma: the reserved-word list is the compatibility mechanism.
+
+### 4.3 EBNF
+
+`SP` is a space or tab; `NL` is a newline or end of file; `ANY` is any character. Lines may start with `{ SP }`.
 
 ```ebnf
-script      = { line } ;
-line        = [ stmt ] [ comment ] NL ;
-comment     = "#" { ANY - NL } ;
-stmt        = setStmt | envStmt | outStmt | typeStmt | runStmt | keyStmt
-            | sleepStmt | waitStmt | markStmt | resizeStmt ;
+script          = preamble , { blank | behaviour-setting | step | scene | hidden } ;
+preamble        = { blank | process-setting | behaviour-setting | hint-setting } ;
+                  (* the preamble ends at the first step or block; the parser accepts every setting
+                     anywhere and the validator applies the legality table of 3.2 *)
+blank           = tail , NL ;
+tail            = { SP } , [ comment ] ;
+comment         = "#" , { ANY - NL } ;
 
-setStmt     = "Set" ident value ;                       (* preamble only *)
-envStmt     = "Env" ident string ;                      (* preamble only *)
-outStmt     = "Output" string ;                         (* preamble only *)
-typeStmt    = "Type"  [ "@" duration ] string ;
-runStmt     = "Run"   [ "@" duration ] string ;
-keyStmt     = "Key"   [ "@" duration ] chord [ int ] ;
-sleepStmt   = "Sleep" duration ;
-waitStmt    = "Wait"  [ "@" duration ] [ regex | string ] ;   (* none = prompt-less: error in v1 *)
-markStmt    = "Mark"  string ;
-resizeStmt  = "Resize" size ;
+scene           = "scene" , SP , { SP } , name , SP , { SP } , "{" , tail , NL ,
+                  { blank | behaviour-setting | hint-setting | step | hidden } , close ;
+hidden          = "hidden" , SP , { SP } , "{" , tail , NL ,
+                  { blank | behaviour-setting | step } , close ;
+close           = { SP } , "}" , tail , NL ;
 
-value       = string | duration | percent | int | size ;
-chord       = { modifier "+" } keyname ;
-modifier    = "Ctrl" | "Alt" | "Shift" ;                (* case-insensitive *)
-keyname     = namedkey | printable ;
-size        = int "x" int ;
-duration    = number ( "ms" | "s" | "m" ) ;
-percent     = number "%" ;
-string      = '"' { char | escape } '"' | "`" { ANY - "`" - NL } "`" ;
-regex       = "/" { ANY - "/" - NL | "\/" } "/" ;
-ident       = letter { letter | digit | "_" | "." } ;
+process-setting   = ( size | shell | env | cwd | seed | output ) , tail , NL ;
+behaviour-setting = ( typing | jitter | timeout | settle | linger ) , tail , NL ;
+hint-setting      = ( speed | idle | hold ) , tail , NL ;
+size    = "size" , SP , { SP } , int , "x" , int ;      shell  = "shell" , SP , { SP } , arg ;
+env     = "env" , SP , { SP } , key , "=" , [ arg ] ;   cwd    = "cwd" , SP , { SP } , arg ;
+seed    = "seed" , SP , { SP } , int ;                  output = "output" , SP , { SP } , arg ;
+typing  = "typing" , SP , { SP } , duration ;           timeout = "timeout" , SP , { SP } , duration ;
+jitter  = "jitter" , SP , { SP } , number , "%" ;       linger  = "linger" , SP , { SP } , duration ;
+settle  = "settle" , SP , { SP } , ( duration | "off" ) ;
+speed   = "speed" , SP , { SP } , number , "x" ;
+idle    = "idle" , SP , { SP } , duration ;             hold    = "hold" , SP , { SP } , duration ;
+
+step    = run | type | ( ( press | wait | sleep | mark ) , tail , NL ) ;
+run     = { SP } , "run" , SP , { SP } , ( text-block | text ) ;
+type    = { SP } , "type" , SP , { SP } , ( text-block | text ) ;
+text    = ( string , tail , NL ) | ( raw-text , NL ) ;
+raw-text = ( ANY - SP - NL - '"' ) , { ANY - NL } ;     (* trailing SP trimmed; # and \ literal;
+                  a raw-text that matches a text-block header is a text block (longest match) *)
+text-block = ( "lines" | "paragraphs" ) , { SP } , "{" , tail , NL , { body-line } , block-close ;
+body-line  = { ANY - NL } , NL ;                        (* raw; any line except block-close *)
+block-close = indent , "}" , { SP } , NL ;              (* indent = exactly the leading whitespace of the
+                  run/type line; the first matching line closes the block; EBNF cannot say this *)
+press   = "press" , SP , { SP } , keypress , { SP , { SP } , keypress } ;
+keypress = chord , [ SP , { SP } , repeat ] ;
+wait    = "wait" , SP , { SP } , ( "idle" , [ SP , { SP } , duration ]
+                                 | pattern , [ SP , { SP } , duration ] ) ;
+sleep   = "sleep" , SP , { SP } , duration ;
+mark    = "mark" , SP , { SP } , arg ;
+
+pattern  = string | regex ;
+chord    = { modifier , "+" } , keyname ;   modifier = "ctrl" | "alt" | "shift" ;
+keyname  = "enter" | "tab" | "esc" | "space" | "backspace" | "delete" | "insert"
+         | "up" | "down" | "left" | "right" | "home" | "end" | "pageup" | "pagedown"
+         | "f1" | … | "f12" | lower | digit ;
+repeat   = "x" , digit , { digit } ;
+duration = number , ( "ms" | "s" | "m" ) ;
+number   = digit , { digit } , [ "." , digit , { digit } ] ;      int = digit , { digit } ;
+name     = ( letter | digit ) , { letter | digit | "_" | "-" } ;
+key      = ( letter | "_" ) , { letter | digit | "_" } ;
+arg      = string | word ;
+word     = ( ANY - SP - NL - '"' - "#" ) , { ANY - SP - NL } ;
+string   = '"' , { ( ANY - '"' - "\" - NL ) | escape } , '"' ;
+escape   = "\" , ( "n" | "t" | '"' | "\" | "e" | ( "x" , hex , hex ) ) ;
+regex    = "/" , regexchar , { regexchar } , "/" ;
+regexchar = ( ANY - "/" - "\" - NL ) | ( "\" , ANY - NL ) ;
 ```
 
-Parse-level rules (not expressible in EBNF): the preamble is all leading `Set/Env/Output` statements; any of them after the first action is an error; `Wait` with no matcher is an error in v1 (VHS's implicit `>$` is exactly what we avoid); `Key` repeat count is 1–1000.
+Notes:
+- `press`, `wait`, `sleep`, `mark` may end in a comment. `run`/`type` carry their own line end: unquoted text cannot take one.
+- **Validator-only rules** (the grammar is a superset so errors are precise): names against the known sets; legality table (3.2); no duplicate process settings except `env`; unique scene names; non-empty blocks; nesting (3.3); `timeout` and `idle` > 0, `wait idle` duration > 0, `speed` > 0; size ≤ 1000; repeat 1–999; modifiers not repeated; `\xHH` results valid UTF-8; raw text, text blocks and marks contain no control characters other than tab (use a quoted string with `\e`).
 
-### 4.3 Examples
+### 4.4 Tokenizer note
+
+Hand-written scanner, one line at a time; the first word is the keyword (or `}`). The keyword selects how the rest of the line is scanned:
+- `run`, `type`: one **TEXT** (rest of line, trimmed) or **STRING** plus optional COMMENT, **or a mode switch**: if the remainder is exactly a text-block header (`lines`|`paragraphs`, `{`, optional comment), the scanner emits `TEXTBLOCK{keyword, shape, opener Pos, body lines with Pos}` as **one token**: it reads raw lines until the first line equal to the keyword line's indentation + `}` + optional spaces, and tokenises nothing inside. End of file first: `unterminated text block` at the opener. All body-rule processing (strip, trim, join) happens in the parser, so the lexer stays a pure line splitter.
+- `wait`: first argument is **STRING**, **REGEX** (decided by `"` or `/`) or the bare word `idle`. Other keywords never scan a REGEX, so `cwd /tmp` is not a regex.
+- Everything else: **WORD**, **STRING**, `{`, `}`; `#` starts a COMMENT only at a token start (`cwd /tmp/a#b` is one WORD).
+- Each token has line:col. Typed literals (duration, percent, size, speed, key, repeat) are WORDs classified in the parser, so "needs a unit" and did-you-mean errors live in one place.
+
+### 4.5 AST shape
+
+```go
+type Pos struct{ Line, Col int }
+type Script struct { Settings []Setting; Items []Item } // preamble and top-level settings; steps and blocks
+type Item interface{ ItemPos() Pos }                    // implemented only by Step and Block
+type Setting struct {
+    Pos   Pos
+    Name  string // "size", "typing", "linger", …; unknown names kept for the validator
+    Value string // raw argument text; typed by the validator
+    At    int    // effective before Items[At] of the enclosing list
+}
+type Step struct {
+    Pos      Pos
+    Kind     string        // run | type | press | wait | sleep | mark
+    Form     string        // run/type: raw | quoted | lines | paragraphs
+    Text     string        // run/type, escapes and block rules applied; "\n" = Enter
+    Keys     []KeyPress    // press: {Chord string, Count int}
+    Pattern  *Pattern      // wait: {Regex bool, Source string}; nil for wait idle
+    Idle     bool          // wait idle
+    Duration time.Duration // sleep; wait timeout or idle duration (0 = use setting)
+    Label    string        // mark
+}
+type Block struct { Pos Pos; Kind string /* scene | hidden */; Name string
+                    Settings []Setting; Items []Item }
+```
+`At` keeps source order between settings and items without making settings items. A canonical printer (AST → text) serves golden tests and the round-trip fuzz property; it prints blocks with the resolved text re-indented one level deeper, which the strip rule reverses.
+
+---
+
+## 5. Examples
+
+Each was checked against §4.3 by the throwaway checker (every example passes; invalid variants (nesting, a process setting in a block, an unterminated or empty text block, a mis-indented closing line) are rejected). `/bin/sh` plus `env PS1=…` for a reproducible prompt is **unverified** (memory).
 
 **1. Hello world**
 ```
-Set Command "bash --noprofile --norc"
-Env PS1 "$ "
-Run "echo hello, world"
-Sleep 1s
+#!/usr/bin/env -S shellshot record --script
+# hello.script: the smallest useful demo
+shell /bin/sh
+env PS1="$ "
+size 60x10
+linger 1s              # the viewer gets a second on the final screen
+
+run echo hello, world
 ```
 
-**2. Git workflow demo**
+**2. Git workflow with scenes and a shell heredoc** (assumes `/tmp/demo-repo` exists)
+```
+size 100x28
+shell /bin/sh
+cwd /tmp/demo-repo
+env PS1="\\w $ "
+output git-demo.shot
+typing 40ms
+
+hidden {
+  run lines {
+    rm -rf .git README.md
+    clear
+  }
+}
+
+scene init {
+  linger 800ms
+  run git init -q
+  run git status -s
+}
+
+scene commit {
+  typing 70ms          # slower for the interesting part; reverts at the closing brace
+  linger 1s
+  run echo 'hi' > README.md
+  run git add README.md
+  run lines {
+    git commit -q -F - <<'EOF'
+    initial commit
+    EOF
+  }
+  run git log --oneline
+  wait /^[0-9a-f]{7,} .*initial commit$/ 10s
+}
+
+mark done
+```
+
+**3. TUI session (vim)** (`--clean` and the `~` filler are from memory)
+```
+size 90x24
+shell /bin/sh
+env PS1="$ "
+cwd /tmp
+timeout 10s
+
+scene open {
+  run vim --clean demo.txt
+  wait /^~/                     # vim's empty-line filler; the echoed command line starts with the prompt
+}
+
+scene edit {
+  typing 80ms
+  linger 1s
+  press i
+  type lines {
+    Hello from a scripted vim session.
+    Second line, typed by shellshot.
+  }
+  press esc
+  press left x5
+}
+
+scene save {
+  type :wq
+  mark saving
+  press enter
+  wait /^\$$/                   # a bare prompt: the shell is back
+}
+```
+
+**4. Long build, hidden setup, export hints**
+```
+size 110x30
+shell /bin/sh
+env CI=1
+env PS1="$ "
+timeout 120s
+typing 30ms
+hold 1s                         # script-wide export default (written to meta)
+
+hidden {
+  run lines {
+    cd ~/src/app
+    make clean > /dev/null 2>&1
+    clear
+  }
+}
+
+scene build {
+  speed 8x                      # export: play the wait at 8x
+  idle 2s
+  run make build > build.log 2>&1; echo BUILD-STATUS=$?
+  wait /^BUILD-STATUS=0$/ 5m    # anchored: the echoed command starts with the prompt
+  mark built
+}
+
+scene check {
+  linger 2s
+  run ./bin/app --version
+  wait /v[0-9]+\.[0-9]+/
+}
+```
+
+**5. Deterministic CI script with assertions**
 ```
 #!/usr/bin/env -S shellshot record --script
-Set Size 100x28
-Set Cwd "/tmp/demo-repo"
-Set Command "bash --noprofile --norc"
-Env PS1 "\w $ "
-Output "git-demo.shot"
+# ci-smoke.script: reproducible smoke-test recording
+size 80x24
+shell /bin/sh
+cwd /tmp/ci-work
+env PS1="$ "
+env TERM=xterm-256color
+env NO_COLOR=1
+env LANG=C.UTF-8
+seed 42
+jitter 25%
+typing 35ms
+timeout 20s
+settle 300ms
+output smoke.shot
 
-Mark "start"
-Run "git init -q && git status -s"
-Sleep 800ms
-Run "echo 'hi' > README.md"
-Run "git add README.md && git commit -qm 'initial commit'"
-Run "git log --oneline"
-Wait /^[0-9a-f]{7} initial commit$/
-Mark "done"
-Sleep 1500ms
-```
-
-**3. Interactive TUI (vim) with keys**
-```
-Set Size 90x24
-Set Command "vim --clean demo.txt"
-Wait /demo\.txt/                 # vim has drawn its status line
-Key i
-Type@80ms "Hello from a scripted vim session"
-Key Esc
-Type ":wq"
-Mark "saving"
-Key Enter
-```
-`--clean` is a vim flag I did not verify against a specific version; any editor works.
-
-**4. Waiting for a build**
-```
-Set Timeout 120s
-Env CI "1"
-Run "make build 2>&1 | tail -n 5; echo BUILD-STATUS=${PIPESTATUS[0]}"
-Wait@120s /^BUILD-STATUS=0$/     # anchored: the echoed command line starts with the prompt
-Mark "built"
-Run "./bin/app --version"
-Wait /v\d+\.\d+/
-```
-
-**5. Env + size + resize + chords**
-```
-Set Size 120x30
-Set TypingSpeed 35ms
-Set Jitter 25%
-Set Seed 42
-Env TERM "xterm-256color"
-Env NO_COLOR "1"
-Set Command "htop"
-Wait /CPU/
-Key F6 
-Key Down 3
-Key Enter
-Sleep 2s
-Resize 80x24
-Sleep 1s
-Key q
-```
-
-**6. Shell chords**
-```
-Type "sleep 1000"
-Key Ctrl+A                       # go to line start
-Type "time "
-Key Enter
-Sleep 500ms
-Key Ctrl+C
-Wait /real/
-Key Up 2
-```
-
-### 4.4 Extension
-
-`.shotscript` is the recommended extension (the `.shot` extension is the recording; `.tape` is rejected to avoid being mistaken for a VHS-compatible file, which this is not). Alternatives the user may prefer: `.shots`.
-
-### 4.5 Header and shebang
-
-- A first line `#!/usr/bin/env -S shellshot record --script` makes the file executable (`chmod +x`); the OS appends the file path so the invocation is `shellshot record --script FILE`. `env -S` support (GNU coreutils ≥ 8.30, macOS) is **unverified here**. The lexer treats `#!` as an ordinary comment, so no special parsing is needed.
-- An optional `# shellshot: 1` pragma on line 1 or 2 pins the language version; a higher number fails with "script requires newer shellshot". Cheap, and it lets the grammar change without silent misparses. If skipped now, the cost of adding it later is high, so I recommend including it.
-
----
-
-## 5. Key encoding with libghostty (verified from headers/binding)
-
-### 5.1 What is verified (direct evidence)
-
-- Header `ghostty/vt/key/encoder.h` defines `ghostty_key_encoder_new/free/set/encode` and **`ghostty_key_encoder_set_from_terminal(encoder, terminal)`**, which "reads the terminal's current modes and flags and applies them … cursor key application mode, keypad mode, alt escape prefix, modifyOtherKeys state, and Kitty keyboard protocol flags".
-- Options include `CURSOR_KEY_APPLICATION` (DEC mode 1, DECCKM), `KEYPAD_KEY_APPLICATION`, `ALT_ESC_PREFIX`, `MODIFY_OTHER_KEYS_STATE_2`, `KITTY_FLAGS`, `MACOS_OPTION_AS_ALT`, `BACKARROW_KEY_MODE` (Backspace 0x7f default vs 0x08).
-- `macos_option_as_alt` is reset to `FALSE` by `set_from_terminal` (header says so); irrelevant to us because we never send Option-composed text.
-- Go binding (GitHub `main`, **not the pinned version**) exposes: `NewKeyEncoder()`, `(*KeyEncoder).SetFromTerminal(*Terminal)`, `SetBool(opt, val)`, `SetKittyFlags`, `Encode(*KeyEvent) ([]byte, error)` (nil slice if the key produces no output), `Close()`. Not safe for concurrent use. `KeyEvent` has `SetAction/SetKey/SetMods/SetUTF8/SetUnshiftedCodepoint`. `Key` constants follow the W3C `code` list (`KeyArrowUp`, `KeyEnter`, `KeyA`, `KeyF1`…). `Mods`: `ModShift ModCtrl ModAlt ModSuper …`. `SetUTF8` doc: pass the *unmodified* character; do not pass C0 control characters.
-- DECCKM is the reason this matters: with the mode on, `Up` should be `ESC O A`; off it is `ESC [ A` (standard xterm behaviour, **memory**). Full-screen apps such as vim, less and htop commonly turn it on, so a static table sends the wrong bytes to them.
-
-### 5.2 What is NOT verified
-
-- Actual output bytes (e.g. that `Up` yields `\x1b[A` off and `\x1bOA` on, that `Ctrl+C` yields `0x03`, that `Enter` yields `0x0D`). I could not run code. Run this to close the gap:
-
-```go
-// /tmp/keyprobe/main.go  (go.mod: require go.mitchellh.com/libghostty <pinned version>)
-// PKG_CONFIG_PATH=$REPO/build/libghostty/lib/pkgconfig go run .
-// For each of: Up, Ctrl+C, Enter, Backspace, F5, Alt+x:
-//   enc, _ := ghostty.NewKeyEncoder(); ev := ... NewKeyEvent(); ev.SetAction(KeyActionPress); ev.SetKey(...); ev.SetMods(...)
-//   print enc.Encode(ev)  before and after term.VTWrite([]byte("\x1b[?1h")) + enc.SetFromTerminal(term)
-```
-  I could not verify the exact constructor names (`NewKeyEvent`, `NewTerminal`, `VTWrite`) against the pinned version; check them before running.
-- Whether the pinned module version has the same key API as GitHub `main` (it may be older: the pinned pseudo-version is 20261106).
-- Whether `Encode` for `Ctrl+<letter>` needs `SetUTF8("c")` (the doc implies yes) or derives it from the key.
-
-### 5.3 Recommendation (researcher inference)
-
-Use libghostty's encoder for every `Key` statement; send `Type` text as raw UTF-8 bytes (no encoder; Kitty "report all keys" mode aside, typing is text). Reasons:
-1. It tracks DECCKM, keypad, modifyOtherKeys and Kitty flags from the *live* headless terminal, so scripted `Up` is correct whichever mode vim, less or fzf have switched on. This is the one place libghostty clearly beats a table.
-2. A hand-written table covers ~60 keys, but the modifier combinations (Ctrl+Shift+Arrow, Alt+letter with `ALT_ESC_PREFIX`) multiply.
-3. Cost: cgo coupling. Mitigate with an interface at the consumer (§7) plus a tiny Go fallback only for tests.
-
----
-
-## 6. Semantics and determinism
-
-### 6.1 Time model
-
-- The child process is real, so its output timing is real. Timestamps in the recording come from the real monotonic clock, as in live `record`.
-- **v1: real time.** `Type` and `Sleep` really wait. A 60-second script takes 60 seconds.
-- **Accelerated mode (v2, not in v1):** an interface `Clock{Now() time.Duration; Sleep(ctx, d)}` allows a `--fast` clock whose `Sleep` returns immediately but advances an offset `skipped`; recorded timestamps are `real + skipped`. Consequences, stated so the user can decide:
-  - The *input* timeline matches what a slow run would have produced; the child just sees keystrokes sooner.
-  - Programs with wall-clock animation (spinners, `sleep`, progress bars) produce fewer frames in skipped periods, so a `--fast` file differs from a real one. Therefore it is a different mode, not a transparent speedup.
-  - `Wait` always takes real time (it waits for the child).
-  - Researcher inference: a good compromise is to cap, not skip: `Sleep` and typing delays are scaled by `--time-scale 0.25`. Same caveats. Do not build this until someone needs it.
-- **Tests use a fake Clock** (§8), which is what makes the executor deterministic without a real mode.
-
-### 6.2 Wait semantics
-
-- The executor is polled on the **session's single goroutine** (§7.2). After each output chunk is written to the terminal, and on a timer tick, the driver is given a `Screen` view and calls `Text()`, which is the terminal's current visible text (the existing `Snapshot.Lines`, joined by `\n`, right-trimmed). **No extra goroutine touches the terminal**, which matches the session rule (vt is not concurrency-safe).
-- **Why this is more robust than VHS (interpretation):** VHS matches against the xterm.js buffer in a browser, reached through a poll over a remote-control channel, with last-line default (README, fetched). We match against libghostty's *rendered grid*, in-process: cursor movement, overwrite, clear-line, alt-screen and wrapping have all been resolved, so `Wait /Compiling/` sees what a person would see, not the byte stream. Expect/pexpect-style matching of raw bytes breaks on cursor-addressed output (a progress bar redrawn in place leaves partial fragments in the byte stream). Matching state, not bytes, also removes polling latency: the check happens right after each output chunk is applied.
-- Matching is against the **visible screen only** (alt screen included when active). Scrollback is not searched in v1: a `Wait` for something that has scrolled off will time out. Document this. (Is scrollback accessible via the binding? Not verified.)
-- **Timeout:** `Wait` fails after `Wait@T` or `Set Timeout` (default 15s). On timeout:
-  1. The error is `file:line:col: Wait timed out after 15s waiting for /re/`, plus a dump of the final screen to stderr (the single most useful CI artefact).
-  2. The child is closed (SIGHUP, then kill after grace).
-  3. The recording is **finalised and kept** (a clean close, so partial recordings stay valid and can be inspected with `replay`).
-  4. Exit code 3 (§6.4).
-- If the child has already exited, `Wait` still tests the final screen once; if there is no match it fails immediately with "child exited (status N) before match", rather than burning the timeout.
-- A `Wait` that already matches at the moment it is reached returns immediately. Because of the echo trap (§2.2 #5), the docs must say: anchor on a line start, or print the sentinel via a split literal (`echo BUILD-"DONE"`).
-
-### 6.3 Jitter and typing speed
-
-- `TypingSpeed` is a fixed per-character delay. `Type` text is sent character by character (grapheme/rune boundaries; one `Write` per rune so a multi-byte rune never splits).
-- `Set Jitter 25%` draws each delay uniformly from `[d·(1−j), d·(1+j)]` using a `math/rand/v2` PCG seeded from `Set Seed`. **Same seed + same script gives the same *scheduled* delays.** The recorded timestamps still differ run to run, because write time ≠ scheduled time (scheduler latency) and output is real.
-- Default is no jitter: fully fixed delays. Researcher recommendation: leave it off in CI.
-
-### 6.4 Exit rules and codes
-
-- **End of script:** (1) a short settle so the final output lands (Researcher suggestion: wait until the PTY has been quiet 200 ms, max 2 s, configurable later); (2) if the child is still running: shell → write EOF (Ctrl-D, 0x04), TUI/command → close the PTY master (SIGHUP); (3) wait a grace (default 2 s, `--grace`), then kill. Final frame/footer written on clean close, as `session` does today.
-- **Child exits mid-script:** subsequent `Type/Key/Run` error with "child exited"; `Sleep/Mark/Wait` are allowed (see §6.2). Many demos end with `exit` or `q`, so the last statement exiting is *normal*.
-- **Exit codes** (decision for the user, §9):
-  - `0` script completed (regardless of child exit status). Matches today's `record`, which reports a non-zero child status on stderr only.
-  - `1` runtime error (I/O, PTY, recording write).
-  - `2` parse/validation error (nothing was spawned, no file written).
-  - `3` script failure: `Wait` timeout, child exited when input was required.
-  - `130` cancelled by signal.
-  - Optional `--propagate-exit` makes the child's final status the exit code, for CI that asserts a command succeeded.
-
-### 6.5 What is recorded
-
-- OUT events: the raw PTY output, including the echo of scripted typing. Same as live.
-- IN events: off by default (the format decision). Scripted keystrokes go through the **same** write path as live ones, so with `--record-input` they are recorded as IN events without extra code. Researcher recommendation: no special "scripted" flag; the header's `flags` could note `source=script` later.
-- MARK events: one per `Mark`; also a mark `script:start` / `script:end` is a candidate (open question).
-- RESIZE events: per `Resize`; initial size from `Set Size`.
-- Scripted mode **does not** forward real stdin to the child (no raw mode) and, by default, does not mirror output to stdout. Open question: `--watch`.
-
-### 6.6 Cancellation
-
-`cmd.Context()` cancellation (SIGINT/SIGTERM handled in `cli`) flows into the session, which already "closes proc and returns an error wrapping ctx.Err()". Required extra: finalise the recording (partial file valid) and exit 130. The executor must never block without a `ctx`-aware wait.
-
----
-
-## 7. Architecture fit
-
-### 7.1 Packages
-
-```
-internal/script            // ast + lexer + parser, pure Go, no deps.   (one package at first; split if it grows)
-   ast.go  lex.go  parse.go  validate.go (preamble rules, ranges)
-internal/script/keys       // chord text <-> (Key, Mods) enum; pure Go; NO ghostty types
-internal/script/run        // executor state machine; depends only on the interfaces it declares
-internal/vt/ghostty        // + KeyEncoder adapter (cgo stays here): keys.Key -> ghostty.Key table
-internal/session           // + optional Driver hook (see 7.2)
-internal/cli               // record.go: --script flag, merge settings, wire concrete types
-```
-Dependency rules preserved: `script`, `script/keys`, `script/run` import no cgo, no pty, no cobra; `run` declares its own interfaces (consumer-side):
-
-```go
-// in internal/script/run
-type Screen interface{ Text() string }                      // visible text, \n-joined
-type Keys interface{ Encode(keys.Chord) ([]byte, error) }   // adapter over libghostty KeyEncoder
-type Clock interface {                                      // injectable
-    Now() time.Duration
+scene version {
+  run ./bin/app --version
+  wait /^app v[0-9]+\.[0-9]+\.[0-9]+$/
 }
-type Sink interface {                                       // what the executor asks the host to do
-    // implemented by the session adapter
+
+scene help {
+  run ./bin/app --help | head -n 5
+  wait "Usage:" 0s      # assertion: run has settled, so the text must be on screen now
+  mark help-shown
+}
+
+scene interrupt {
+  run sleep 30
+  sleep 500ms
+  press ctrl+c
+  wait /^\$$/ 5s
+  press up up enter     # recall and run a previous command
 }
 ```
 
-### 7.2 Hook into the session (the important design point)
+**6. The VHS tape** (a `committed` TUI walkthrough): both translations are in `script-scenes.md` §8.2 (literal) and §8.4 (idiomatic: `linger`, `type paragraphs`, `hold`).
 
-Make the executor a **non-blocking state machine** the session loop polls, not a goroutine that blocks:
+---
 
+## 6. Key encoding with libghostty (carried over from v1; mostly unverified)
+
+Only `press` uses the encoder. `run`/`type` text is sent as raw UTF-8, one rune per write; Enter inside text is CR (0x0D).
+- **Verified from headers:** `ghostty/vt/key/encoder.h` has `ghostty_key_encoder_new/free/set/encode` and `ghostty_key_encoder_set_from_terminal`, which reads cursor-key application mode (DECCKM), keypad mode, alt-escape prefix, modifyOtherKeys and Kitty flags from the live terminal. Go binding (GitHub `main`, **not the pinned version**): `NewKeyEncoder()`, `SetFromTerminal`, `Encode(*KeyEvent)`; not safe for concurrent use. `SetUTF8` takes the unmodified character, never C0 controls.
+- **NOT verified:** actual bytes (`up` → `ESC [ A` normally, `ESC O A` under DECCKM; `ctrl+c` → `0x03`; `enter` → `0x0D`); whether the pinned module (pseudo-version 20261106) has the same API; whether `ctrl+<letter>` needs `SetUTF8`.
+- **Recommendation:** use the encoder for every `press` key (a static table sends wrong bytes once vim, less or htop switch DECCKM). Cost: cgo coupling, contained by a consumer-side interface (§8.1). **Task T6 is the verification experiment that must pass before T7** (encode `up`, `ctrl+c`, `enter`, `backspace`, `f5`, `alt+x` before and after feeding `ESC[?1h`, assert bytes). `shift+tab`, `alt+s`, `alt+enter`, `pagedown` (tape) are in the same experiment.
+
+---
+
+## 7. Semantics and determinism
+
+### 7.1 Time model
+- The child is real; timestamps come from the monotonic clock. **Real time only in v1**: `type`, `press`, `sleep`, `linger` and settles really wait. A `--fast` mode would change the recording (spinners get fewer frames); not in v1.
+- Typed text is a stream of **units** (runes, Enters, key presses, repeats). `typing` is the delay between consecutive units within a step, not after the last. With `jitter J` each delay is drawn from `[d(1−J), d(1+J)]` using a `math/rand/v2` PCG seeded by `seed`: the *scheduled* delays repeat; recorded timestamps still vary.
+- Step order: text/keys → (`run`: Enter, then settle) → `linger`.
+- The clock is an interface (`Now`, `Sleep(ctx, d)`) so tests use a fake.
+
+### 7.2 Recording: SPAN and MARK
+- **`scene` and `hidden` are SPAN events** (kind 64, ancillary, inline, versioned binary). Old readers pass them through; there is no collision with user labels, so no label-prefix rule. The payload is exactly `script-scenes.md` §4.3:
+
+  ```
+  every SPAN: u8 version=1 | u8 op (1 begin, 2 end)
+  END:   version, op=2, uvarint id
+  BEGIN: version, op=1, uvarint id (1-based, begin order), u8 type (1 scene, 2 hidden, 3 beat reserved),
+         uvarint parent_id (0 none; hidden-in-scene: the scene's id), uvarint name_len, name (hidden: empty),
+         uvarint n_hints, n_hints x { uvarint tag, uvarint len, value }
+  hint tags: 1 speed (uvarint milli-x) | 2 idle (uvarint µs) | 3 hold (uvarint µs) | 4 caption (reserved) | 5+ reserved
+  ```
+- Hint values are **resolved** (inheritance applied by the executor), so readers need no scope logic. Script-wide preamble hints are also written to `meta` keys `hint.speed`, `hint.idle`, `hint.hold` at start (crash-safe).
+- **Placement:** begin before the span's first step, end after its last step and its `linger`. The executor drains pending PTY output before stamping a boundary (the writer clamps backward timestamps). The implicit end-of-script span (§7.4) is a hidden span with the next id.
+- **Failure:** the executor writes the span ends before EXIT. After a kill or crash an unclosed span ends at the last event (readers must tolerate it). Unknown id, duplicate id, unknown type or `version > 1` makes that event ignorable, never a file error.
+- **User `mark LABEL`** is a MARK (kind 3, UTF-8 label); labels carry no structure. `info` lists scenes and hidden spans from SPAN events.
+- `hidden` output is still replayed (terminal state stays correct); export drops only its frames and time. `binary-format.md` does not yet list kind 64 (docs task T18).
+
+### 7.3 Wait and settle semantics
+- The executor is polled on the **session's single goroutine**. After each output chunk and on a timer tick it is handed a `Screen` and calls `Text()`: the visible rows (alt screen when active), each right-trimmed, joined by `\n`. No extra goroutine touches the terminal.
+- A quoted pattern is `strings.Contains`; a regex is compiled with `(?m)` and used with `MatchString`; a quoted literal may contain `\n` to match across rows. Scrollback is not searched (binding access unverified): text that scrolled off times out. This is more robust than raw-byte matching because the *rendered grid* already resolved cursor movement, clear-line, alt-screen and redraws.
+- **Timeout:** explicit `wait PATTERN TIMEOUT`, else the `timeout` in effect, else 15 s. **`TIMEOUT` of `0s`** tests the current screen once. On failure: error `file:line:col: scene "build": wait timed out after 15s waiting for /re/`, the final screen to stderr, child closed (SIGHUP, kill after grace), recording **finalised and kept**, exit 3. A wait that already matches returns at once. If the child exited, the final screen is tested once, then "child exited (status N) before match".
+- **Settle** (`run`, after the last Enter): wait until the screen has had no output for `settle` (default 200 ms), capped by `timeout`. **Reaching the cap is not an error** (the implicit settle is best effort: a spinner or very chatty command never settles); `settle off` skips it. `wait idle [D]` is the explicit form and **does** fail at `timeout`. Quiet is a heuristic: a command silent for more than `settle` returns early; use `wait PATTERN` for slow commands. OSC 133 prompt detection needs shell integration, so it is not the default.
+- The echo trap (§2): anchor on line start, or print the sentinel through a split literal (`echo DO"NE"`).
+
+### 7.4 Exit rules and codes
+- **End of script:** inside the implicit hidden span: (1) final settle (`settle`, max 2 s); (2) if the child still runs: shell → EOF (Ctrl-D, 0x04), other program → close the PTY master (SIGHUP); (3) grace 2 s, then kill. The final frame and footer are written as `session` does today. Opting out (a `keep-open` setting) is open (§11).
+- **Child exits mid-script:** later `run`/`type`/`press` fail "child exited"; `sleep`/`mark`/`wait` still work. Ending with `run exit` or `press q` is normal.
+- **Exit codes** (these override the scenes brief's "else child's code"): `0` completed (regardless of child status); `1` runtime error; `2` parse or validation error (nothing spawned, no file written); `3` script failure (`wait`/assertion failed, child exited when input was required); `130` cancelled. `--propagate-exit` makes the child's status the exit code.
+
+### 7.5 What is recorded, and cancellation
+OUT: raw PTY output including echo of scripted typing. IN: off by default (`--record-input` records scripted keystrokes through the live write path). MARK: `mark`. SPAN: blocks. RESIZE: the initial size only. Scripted mode forwards no stdin and does not mirror output by default. `cmd.Context()` cancellation flows into the session; the recording is finalised and the exit code is 130. The executor never blocks without a context-aware wait.
+
+---
+
+## 8. Architecture fit
+
+### 8.1 Packages
+```
+internal/script            ast.go lex.go textblock.go parse.go validate.go diag.go   // pure Go
+internal/script/keys       // "ctrl+shift+left" ⇄ (Key, Mods); NO ghostty types
+internal/script/run        // lower.go: AST → Plan (scopes resolved, SPAN ops explicit)
+                           // exec.go: Plan → non-blocking state machine; declares its own interfaces
+internal/recording/bin/event  // + KindSpan, AppendSpan/ParseSpan
+internal/recording/spans   // Scan(reader) → spans + meta hints (info and export)
+internal/export/timeline   // + Options.Segments (script-scenes.md §5.2A)
+internal/vt/ghostty        // + KeyEncoder adapter (cgo stays here)
+internal/session           // + optional Driver hook
+internal/cli               // record.go: --script, --list; export.go: spans → segments
+testdata/script/*.script   // golden inputs; *.ast.golden, *.timeline.golden
+```
+`script`, `keys` and `run` import no cgo, no pty, no cobra. `run` declares `Screen{Text() string}`, `Keys{Encode(Chord) ([]byte, error)}` and `Clock`. **Lowering** resolves scopes once: every op already carries its effective `typing`, `jitter`, `timeout`, `settle`, `linger` and resolved hints, and `SpanBegin`/`SpanEnd` and the implicit end span are explicit ops, so the state machine has no scope logic.
+
+### 8.2 Hook into the session
+The executor is a non-blocking state machine polled by the session loop:
 ```go
-// in internal/session (consumer defines it)
-type Driver interface {
-    // Poll is called on the session goroutine after each output chunk is
-    // applied and when the deadline returned by the previous Poll passes.
+type Driver interface { // defined in internal/session (consumer)
     Poll(now time.Duration, scr Screen) (Step, error)
 }
-type Step struct {
-    Write    []byte        // inject into the PTY (via the same path as live input)
-    Mark     string        // emit MARK
-    Resize   *Size         // resize pty + terminal + RESIZE event
-    Deadline time.Duration // wake me no later than this (0 = only on output)
-    Done     bool
-}
+type Step struct { Write []byte; Mark string; Span *SpanOp; Deadline time.Duration; Done bool }
 ```
-- No new goroutine ever touches the terminal; `Wait` is just "keep polling and `regexp.MatchString` on `scr.Text()`".
-- A fake clock and fake screen make the executor a pure function: trivial table-driven tests, no PTY.
-- The session select loop already has a ticker and output channel; the driver adds one timer case. (Exact structure of `session.go` lines 81–236 not read; adjust.)
-- Key encoding needs the live terminal, so `Keys` is implemented by the ghostty adapter that holds the `*Terminal` and calls `SetFromTerminal` before each `Encode`.
+`wait` is "keep polling and match `scr.Text()`". The session select loop was not read; adjust. `Keys` is implemented by the ghostty adapter holding the `*Terminal` and calling `SetFromTerminal` before each `Encode`.
 
-### 7.3 CLI wiring
-
-- **Extend `record`, not a new `run` command.** The CLI is being reduced to `record/replay/export/version`; scripted recording is `record` with a different input source. `shellshot record --script demo.shotscript [-o out.shot] [--cols/--rows] [--record-input]`.
-- `--script` is mutually exclusive with `-c` and `-- cmd`... *or* the CLI command overrides `Set Command` (decision, §9). Recommendation: CLI overrides script, mirroring the precedence rule.
-- Note an existing naming wart in `record.go`: the variable `script` holds the `-c/--command` string. Rename it when adding the flag to avoid confusion.
-- **Precedence: CLI flag > script `Set`/`Output` > environment defaults.** `--cols/--rows` override `Set Size`; `-o` overrides `Output`. Only flags the user *explicitly set* override (use `cmd.Flags().Changed`), because `--cols` defaults are computed.
-- Parse and validate the whole script before spawning anything (exit 2 on error).
+### 8.3 CLI and export
+- `shellshot record --script demo.script [-o out.shot] [--cols/--rows] [--record-input] [--list]`. `--list` parses, validates, and prints the plan with scene names and estimated duration (typing × chars + sleeps + lingers; waits as "up to timeout"); it is the lint. Explicit flags (`Changed`) > script > defaults; `-o` overrides `output`; `--cols/--rows` override `size`. `-c`/`--` with `--script` overrides `shell` (open, §11). Rename the `script` variable in `record.go`.
+- Export (detail: `script-scenes.md` §5): SPAN → `timeline.Segment{From,To,Speed,IdleLimit,Hold,Skip}`; a gap is split at boundaries; hidden spans are replayed but add no frames or time; `frames` gets a forced sample at span boundaries; flag > scene hint > preamble hint > default; `--no-hints` ignores hints. `export --scene` and `replay --from` are deferred.
 
 ---
 
-## 8. Task plan (small, atomic, each independently testable)
+## 9. Task plan (small, atomic, independently testable)
 
-| # | Task | Output | Tests |
-|---|---|---|---|
-| T1 | AST + lexer | `internal/script` tokens with line:col | Table tests on token streams; error positions |
-| T2 | Parser + validator | AST, preamble rules, ranges, multi-error | Golden `testdata/*.shotscript` → `*.ast.golden`; `go test -fuzz` for parse (never panics, stable error text) |
-| T3 | Durations/strings/regex literals | Escapes, units | Table tests incl. invalid forms |
-| T4 | `keys` package | Chord grammar → `(Key, Mods)`; names, aliases | Table: every documented name parses; invalid reject |
-| T5 | ghostty KeyEncoder adapter | `keys.Chord` → bytes via libghostty, `SetFromTerminal` | cgo test: arrows with/without `ESC[?1h`; Ctrl+C; F-keys. This test **is** the §5.2 verification |
-| T6 | Executor state machine (Type/Key/Run/Sleep/Mark/Resize, jitter) | `run.New(ast, Keys, Clock, rng)` + `Poll` | Fake clock → expected `[]Step` timeline, golden |
-| T7 | Wait semantics | regex/literal, timeout, exited child | Fake screen sequences; timeout error text; anchored vs echo-trap |
-| T8 | Session `Driver` hook | Poll after chunks and on deadline; inject writes; end-of-script/grace | session tests with the existing fake Process/Terminal |
-| T9 | CLI wiring | `record --script`, precedence merge, exit codes | cli tests with a fake runner; one real end-to-end `echo hello` script, gated on libghostty |
-| T10 | Docs | `docs/SCRIPT.md`, ARCHITECTURE update, example scripts under `examples/` run in CI | doc-tested: CI executes `examples/*.shotscript` and checks the final-screen golden |
+| # | Task | Output | Tests | Depends on |
+|---|---|---|---|---|
+| T1 | Lexer core | tokens with line:col; keyword-directed modes (§4.4); CRLF; comments | Table tests per mode: TEXT, STRING escapes, REGEX with `\/`, `#` rules, `{`/`}`; positions | none |
+| T2 | **Text-block lexing and resolution** | `TEXTBLOCK` token (opener, raw body lines); `Resolve(shape, keyword, lines) (text, error)`: closing-indent rule, strip, trim, blank handling, `lines`/`paragraphs`, `run` Enter | Table tests for every rule of §3.5 incl. `}` at other indent, `#`, quotes, tabs vs spaces, blank lines, empty block, EOF; error positions; **fuzz**: never panics, terminates, the closing line is found iff present, re-indenting the body leaves the result unchanged | T1 token types |
+| T3 | Parser + canonical printer | AST (§4.5); syntax errors; permissive superset | Golden `testdata/*.script` → `*.ast.golden`; **fuzz**: no panics, stable error text, accepted input prints and re-parses to the same AST; §5 examples as goldens | T1, T2 |
+| T4 | Validator + diagnostics | legality table, nesting, unique names, ranges, key names, UTF-8/control chars, reserved words, did-you-mean | One table test per error with exact message and line:col; max 10 errors; negative text-block cases | AST types only (hand-built ASTs; parallel with T3) |
+| T5 | `keys` package | chord text → `(Key, Mods)` | every documented name parses; order of modifiers irrelevant | none |
+| T6 | **Verify libghostty key encoder** (experiment) | bytes for the §6 key set, before/after `ESC[?1h`, on the pinned module | cgo test asserts bytes; findings written to §6 | none (needs build tree) |
+| T7 | KeyEncoder adapter | `keys.Chord` → bytes via `SetFromTerminal` | cgo tests as T6 | T5, **T6 passing** |
+| T8 | Lowering | `Lower(AST) → Plan`; scopes resolved; SPAN ops; implicit end span | Plan goldens: scoped `typing`/`linger` revert at `}`; hint inheritance | T3 (AST) |
+| T9 | Executor: input and pacing | `run/type/press/sleep`, text-block units, `typing`, `jitter`, `linger` | fake clock → expected `[]Step` timeline golden; block = one step, one linger | T8, T5 |
+| T10 | Wait and settle semantics | string/regex, `0s` assertion, `wait idle`, implicit settle (best effort), timeouts, child exited | fake screen sequences; timeout text with scene name; echo-trap cases | T9 interfaces (parallel with T9 against fakes) |
+| T11 | **SPAN encoding in `bin`** | `KindSpan` 64, `AppendSpan`/`ParseSpan` per §7.2; check Writer flush on kind 64 | round trip, the hand-computed bytes of `script-scenes.md` §4.3, **fuzz**, torn tails | none |
+| T12 | Span scan + `info` | `spans.Scan`, `info` lists scenes/hidden | open spans end at last event | T11 |
+| T13 | Session `Driver` hook | Poll after chunks and at deadlines; writes, span events; end-of-script and grace | session tests with fake Process/Terminal | T9 interface; after binary-format session changes land |
+| T14 | `timeline` segments | split gaps at boundaries; skip; hold | dedup/min-delay invariant; double-idle-cap case | none |
+| T15 | `frames` forced samples at boundaries | `Options.Boundaries` | screen after a hidden span is emitted | none (reads frames code first) |
+| T16 | `export` wiring | spans → segments + boundaries; flag precedence; `--no-hints` | golden timelines | T11, T12, T14, T15 |
+| T17 | CLI `record --script` and `--list` | precedence merge; exit codes 0/1/2/3/130 | fake runner; end-to-end `hello.script` on `/bin/sh`, gated on libghostty | `--list`: T3, T4, T8; run: T13 |
+| T18 | Docs | `docs/SCRIPT.md`, ARCHITECTURE, add SPAN to `binary-format.md`, `examples/*.script` | CI runs examples, checks screens at marks | all |
 
-T1–T4 can start now in parallel with recording-format work (pure Go, zero overlap). T5 needs the build tree. T6/T7 depend on T1–T4 only. T8 is the only change to a shared package (`session`), so schedule it after the binary-format session changes land.
+**Parallel start (no dependencies):** T1, T5, T6, T11, T14, T15. Then T2 (needs T1's token types), T4 (AST types), T7 (after T5+T6), T12 (after T11). T3 follows T1+T2. T9 and T10 can proceed against fakes once T8's Plan exists. T13 is the only change to a shared package (`session`).
 
-### Test strategy
-- **Golden scripts:** `testdata/<name>.shotscript` + `<name>.timeline.golden` (one line per Step: `t=+50ms write "h"`, `t=+1.2s mark done`). Update with `-update`.
-- **Fake clock/pty/screen** in `run` tests: `Poll(now, screen)` is called by a harness table: `{at, screenText} → want Step`.
-- **End-to-end (opt-in):** `record --script examples/hello.shotscript` against `/bin/sh`, then replay and assert the final screen contains the expected text. Never assert timestamps; assert screen state at marks.
-- **Fuzz:** parser and lexer (inputs must never panic; any accepted script re-prints and re-parses to the same AST).
+**Test strategy:** golden scripts plus timeline goldens (`t=+50ms write "h"`, `t=+1.2s span-begin scene:init`, `-update` to refresh). End-to-end tests assert screen state at marks, never timestamps.
 
 ---
 
-## 9. Open questions, risks, decisions for the user
+## 10. Alternatives considered
 
-**Decisions (my recommendation first)**
-1. **Name/extension:** `.shotscript`. Alternatives: `.shots`.
-2. **Real-time only in v1?** Yes; accelerated mode later behind `Clock`.
-3. **Exit code on child failure:** `0` by default with `--propagate-exit` opt-in, or the opposite? Affects CI ergonomics.
-4. **CLI `-c`/`--` with `--script`:** override `Set Command`, or forbid the combination?
-5. **Mirror output to stdout while scripting?** Recommendation: off by default, `--watch` to show.
-6. **Should `Output` be allowed to name non-`.shot` files (e.g. `demo.apng`) so the script triggers export?** Recommendation: no in v1; keep `record` and `export` separate. A future `Output "x.apng"` can chain.
-7. **Include the `# shellshot: 1` version pragma now?** Recommendation: yes.
-8. **`script:start`/`script:end` automatic marks?** Cheap and useful for export ranges; but they add MARK events the user didn't write.
+- **Flat VHS-like list (the v1 brief).** Rejected by the user: limiting, no grouping, no way to chapter or hide a span, settings only in a preamble.
+- **YAML (or TOML/JSON) steps.** Verbose for typed text (`- run: "git commit -m \"x\""`), quoting hazards, no comments in JSON. Terminalizer shows how it reads.
+- **Transcript style** (`$ cmd` to run, `> pattern` to wait, as in cram). Readable for the simple case, but no room for keys, durations, settings or blocks without a second syntax.
+- **Backslash line continuation (earlier draft).** Replaced by text blocks: `\` joined lines without a space, forced escaping thinking into every long line, and gave no way to type a multi-line paste or a blank line.
+- **Heredoc-style text (`<<EOF`) or a bare `"""` fence.** Needs a delimiter word or collides with content; named blocks reuse the `{ }` the format already has.
+- **Embedded languages (Starlark, Lua, goja, Tengo, Risor, Yaegi, CEL/expr).** Rejected by the user, and: *complexity* (a dependency, a host API, a language to learn for a list of keystrokes); *static analysis* (no "exit 2 before spawning", no scene listing without running); *determinism* (loops, maps, time and randomness); *execution model* (a blocking `wait()` needs a goroutine and a channel handshake with the session loop on every `wait`/`sleep`, breaking "no extra goroutine touches the terminal"; CEL/expr have no statements). Library characteristics are from memory.
+- **MARK pairs for scenes (`scene:NAME:start`).** Replaced by SPAN: label parsing is fragile, collides with user marks, and cannot carry resolved hints (`script-scenes.md` §4.2).
+
+---
+
+## 11. Decisions needing confirmation, risks, unverified claims
+
+**Decisions needing confirmation** (my defaults; recommendation first)
+1. **Command budget:** six commands (`run type press wait sleep mark`). `expect` is not a command: `wait "x" 0s` asserts. No `wait now` alias (it would add a second pattern-position keyword for little gain), no `expect not`.
+2. **`require` deferred** (reserved); **kept:** `run`'s implicit settle (default 200 ms, setting `settle`, best effort at the cap), `wait idle [DURATION]`, export hints `speed`/`idle`/`hold`, and `linger`.
+3. **Settings:** 14 in three classes; process settings preamble-only; export hints preamble (script-wide) or in a `scene`, not in `hidden`; behaviour settings anywhere in a block (not first-only as the scenes brief said).
+4. **`linger`** follows `run`, `type`, `press`, `wait` (not `sleep`/`mark`), including the last step in a block, once per text block.
+5. **Text blocks:** `lines` Enter *between* lines, `run` adds the final Enter; `paragraphs` soft-wrap with one space and blank line = two Enters; trailing whitespace trimmed; closing `}` has no comment; header disambiguated by an exact-match rule (§3.5).
+6. **`type@DURATION` dropped** (use `typing` before the line); **`\` continuation dropped**.
+7. **Nesting:** only `hidden` in `scene`; empty blocks are errors; scene names unique and bare.
+8. **Implicit end-of-script shutdown** as a hidden span: always on, or a `keep-open` opt-out?
+9. **Implicit settle hitting `timeout`** is silent (best effort) vs failing. `wait idle` fails.
+10. **`shell PATH` takes no arguments** today; allow `shell PATH ARGS…` (e.g. `/bin/bash --noprofile --norc`)? Recommendation: yes.
+11. **Exit code on child failure:** `0` with `--propagate-exit` opt-in, or the reverse? Name of the kept recording on failure (`FILE.failed.shot`)?
+12. **CLI `-c`/`--` with `--script`:** override `shell`, or forbid? **Mirror output to stdout while scripting:** off, `--watch` to show. **`output` with non-`.shot` extension:** no in v1.
+13. **AST:** `Block.Items` and `Setting.At` rather than `Block{Steps}`.
 
 **Risks**
-- **Echo trap on `Wait`** is the most likely source of user complaints; mitigated only by docs and anchoring.
-- **cgo key encoder API** may differ at the pinned commit (unverified), and the `keys.Key` → `ghostty.Key` mapping table is manual.
-- **Prompt reproducibility** (user's shell rc files) is not controllable by the tool; docs recommend `bash --noprofile --norc` with explicit `PS1`.
-- **Scrollback not matchable** may surprise authors of long-output scripts.
-- **Session hook** (T8) touches the shared session loop that the binary-format work is also changing; a merge conflict risk.
-- **Non-reproducible bytes**: the same script produces slightly different files each run. Promise reproducible *screens at marks* only.
-- **`env -S` shebang** portability unverified.
+- Echo trap on `wait` (docs, anchoring only). Rest-of-line text surprises (`run "hi" | wc`, trailing `#` is text, `run lines {` header rule).
+- Quiet-screen `run` is a heuristic; `run lines` with an interactive middle command can mis-feed it.
+- Text blocks: whitespace-only differences in the closing line's indentation (tabs vs spaces) fail with the "different indentation" hint; fuzz covers it.
+- SPAN touches shared policy: `timeline` segments double an idle cap at a boundary; forced `frames` samples change the frame stream; writer flush on kind 64 unverified.
+- cgo key-encoder API may differ at the pinned commit. Scrollback is not matchable. Session hook T13 collides with binary-format session work. Only screens at marks are reproducible, not bytes.
+- A failing run leaves a partial recording that could be published by mistake.
 
-**Unverified claims (summary):** actual encoder output bytes; pinned-version API match; DECCKM sequences (from memory); `Mark`/`RESIZE` event availability in the final binary format (taken from the task statement); asciinema-automation directive names (memory); VHS vhs-action and browser-stack pain (memory); vim `--clean`; `env -S` availability; scrollback access via the binding.
+**Contradictions found between the two briefs and how they were resolved:** (a) `read` → `linger`; (b) quoted `run "cmd"` / string scene names / `env ident string` / `command` / `wait … timeout 120s` / `press enter 2` in the scenes grammar → v2 rest-of-line text, bare names, `env K=V`, `shell`, `wait PAT 120s`, `press enter x2`; (c) scenes: "settings first in the block" vs v2 "anywhere" → anywhere; (d) `expect` as a 7th step → `wait … 0s`; (e) `require` kept vs v2 excluded → deferred; (f) `wait idle` and `idle` were reserved/excluded in v2 → `wait idle` kept, `idle` is now a hint setting (removed from the reserved list); (g) MARK pairs (v2) vs SPAN (scenes) → SPAN; (h) auto-exit as hidden span vs v2 §7.4 exit sequence → one sequence, recorded as an implicit hidden span; (i) exit codes "else child's code" vs v2 codes → v2; (j) `type@` and `\` continuation → dropped; (k) span ends on failure written (scenes) vs unclosed start (v2) → ends written, unclosed tolerated after kill.
+
+**Unverified claims:** encoder output bytes; pinned-version API; DECCKM sequences; `/bin/sh` honouring imported `PS1`; vim `--clean` and `~`; `env -S`; scrollback access; `git log --oneline` decorations (the regex tolerates them); embedded-language library facts; asciinema-automation, demo-magic, doitlive, Terminalizer details; Writer/frames behaviour on kind 64; MARK/SPAN availability in the final binary format.
 
 ## Final recommendation
 
-Ship `record --script` with the 10-command language above, in the order T1→T4 (pure Go, now), T6/T7 (executor against fakes), T5 (key encoder verification, which doubles as the missing experiment), then T8–T10. Keep VHS's surface where it helps, adopt libghostty's real screen state for `Wait` and its mode-aware encoder for `Key`, stay real-time, and reserve (not build) `Hide/Show`, `Require`, `Source`, `Wait idle`, theme hints and accelerated time.
+Ship `record --script` in this order: start T1, T5, T6, T11, T14, T15 in parallel; T2→T3 and T4; T8–T10 against fakes; T7 after T6 passes; then T12, T13, T16, T17, T18. Confirm decisions 1–5 before T4, since they fix the validator rules, and decision 8 before T13. Keep the surface at six commands, fourteen settings, two block kinds and four text-block forms; the reserved-word list is the growth path.
 
 ## Sources
-- Kept: VHS README (https://github.com/charmbracelet/vhs/blob/main/README.md): fetched; commands, defaults (Wait `/>$/`, 15 s, Line scope), "late Set ignored".
-- Kept: go-libghostty `key_encoder.go` / `key_event.go` on GitHub main (https://github.com/mitchellh/go-libghostty): fetched; API signatures; not the pinned version.
-- Kept: repo `build/libghostty/include/ghostty/vt/key/encoder.h`, `event.h` (partial): read directly; option list, `set_from_terminal`.
-- Kept: `docs/ARCHITECTURE.md`, `docs/research/binary-format.md`, `internal/cli/record.go`, `internal/session/session.go` (lines 1–80).
-- Kept (search-summary level only): demo-magic template (https://github.com/paxtonhare/demo-magic/blob/master/samples/demo-template.sh), doitlive docs (https://doitlive.readthedocs.io/en/stable/), Terminalizer config (https://github.com/faressoft/terminalizer/blob/master/config.yml), asciinwriter (https://pypi.org/project/asciinwriter/).
-- Rejected: any asciinema-automation page. I did not find or fetch its README, so its directive syntax is memory.
-
-```acceptance-report
-{
-  "criteriaSatisfied": [
-    {"id": "criterion-1", "status": "satisfied", "evidence": "Brief written to docs/research/script-format.md with summary, prior art, command set, EBNF, examples, semantics, architecture, task plan, open questions; limits and unverified claims flagged."}
-  ],
-  "changedFiles": ["docs/research/script-format.md"],
-  "testsAddedOrUpdated": [],
-  "commandsRun": [
-    {"command": "go run key encoder probe", "result": "not-run", "summary": "No shell tool available; encoder output bytes unverified, probe sketch provided in section 5.2"}
-  ],
-  "validationOutput": ["Header API (encoder.h) and Go binding (GitHub main) read directly; module cache not found so pinned version unverified"],
-  "residualRisks": [
-    "Key encoder output bytes and DECCKM behaviour not executed",
-    "Binding read from GitHub main, not pinned version",
-    "internal/pty, live, cli/capture, export, render not read",
-    "asciinema-automation, vhs-action and VHS pain points partly from memory"
-  ],
-  "noStagedFiles": true,
-  "diffSummary": "Added docs/research/script-format.md only",
-  "reviewFindings": ["no blockers"],
-  "manualNotes": "Write tool reported no error, but I could not run a wc or read-back to confirm the line count (target <=600)."
-}
-```
+- Kept: VHS README (https://github.com/charmbracelet/vhs/blob/main/README.md; fetched in the v1 run); go-libghostty `key_encoder.go` on GitHub main (https://github.com/mitchellh/go-libghostty; not the pinned version).
+- Repo: `build/libghostty/include/ghostty/vt/key/{encoder,event}.h` (partial); `docs/research/binary-format.md` (MARK, ancillary kinds ≥ 64); `docs/research/script-scenes.md` (SPAN §4.3, export §5, tape §8); `internal/cli/record.go`, `internal/session/session.go` (lines 1–80).
+- Search-summary level only: demo-magic, doitlive, Terminalizer, asciinwriter.
