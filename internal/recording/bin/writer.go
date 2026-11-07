@@ -99,6 +99,10 @@ type Stats struct {
 // session still reaches the disk. Tick writes nothing when no event is
 // pending, so idle time costs zero bytes.
 //
+// The Writer owns the event data it is given: WriteEvent and the typed helpers
+// copy p before returning, so callers may reuse or overwrite it immediately.
+// This holds whether or not events are coalesced.
+//
 // A Writer is not safe for concurrent use: calls from different goroutines must
 // be serialised by the owner. After the underlying writer fails, every later
 // call returns that first error.
@@ -262,8 +266,8 @@ func (w *Writer) toTicks(at time.Duration) uint64 {
 
 // WriteEvent records an event at time at since the recording start. at is
 // converted to ticks; a time before the previous event's tick is clamped to
-// that tick and counted in Stats.ClampedTimestamps. data is copied, so the
-// caller may reuse it.
+// that tick and counted in Stats.ClampedTimestamps. The writer copies data; the
+// caller may reuse it immediately.
 //
 // It flushes the pending block first if FlushInterval has elapsed since its
 // first event or if data would push the block past FlushBytes, and flushes after
@@ -304,16 +308,22 @@ func (w *Writer) WriteEvent(at time.Duration, kind event.Kind, data []byte) erro
 
 	e := event.Event{Tick: w.toTicks(at), Kind: kind}
 	w.lastTick = e.Tick
-	if w.co != nil {
+	switch {
+	case w.co != nil && kind == event.KindOut:
+		// The Coalescer copies the data of the OUT run it holds.
 		e.Data = data
 		w.evs = append(w.evs, w.co.Add(e)...)
-	} else {
+	default:
 		if len(data) > 0 {
 			start := len(w.arena)
 			w.arena = append(w.arena, data...)
 			e.Data = w.arena[start:len(w.arena):len(w.arena)]
 		}
-		w.evs = append(w.evs, e)
+		if w.co != nil {
+			w.evs = append(w.evs, w.co.Add(e)...)
+		} else {
+			w.evs = append(w.evs, e)
+		}
 	}
 
 	if (w.flushBytes > 0 && w.cost >= w.flushBytes) || len(w.evs) >= event.DefaultMaxEvents {
