@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -13,7 +14,13 @@ import (
 // writing normal output to stdout and errors to stderr. It returns the
 // process exit code: 0 on success, 1 on any error.
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	return runWithStdin(ctx, args, os.Stdin, stdout, stderr)
+}
+
+// runWithStdin is Run with an injectable standard input.
+func runWithStdin(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	cmd := newRootCmd()
+	cmd.SetIn(stdin)
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
 	cmd.SetArgs(args)

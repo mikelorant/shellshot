@@ -32,6 +32,7 @@ func newSnapCmd() *cobra.Command {
 			return runSnap(cmd, opts)
 		},
 	}
+	cmd.Args = cobra.MinimumNArgs(1)
 	addCaptureFlags(cmd, &opts)
 	return cmd
 }
