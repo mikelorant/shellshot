@@ -19,18 +19,20 @@ import (
 
 // exportFlags holds the values of the export command's flags.
 type exportFlags struct {
-	output    string
-	theme     string
-	fontSize  float64
-	scale     int
-	padding   int
-	speed     float64
-	idleLimit time.Duration
-	hold      time.Duration
-	loops     int
-	minDelay  time.Duration
-	cursor    string
-	fps       int
+	output   string
+	theme    string
+	fontSize float64
+	scale    int
+	padding  int
+	// adjustWidth and adjustHeight are the --adjust-cell-width/-height values.
+	adjustWidth, adjustHeight string
+	speed                     float64
+	idleLimit                 time.Duration
+	hold                      time.Duration
+	loops                     int
+	minDelay                  time.Duration
+	cursor                    string
+	fps                       int
 }
 
 // newExportCmd builds "shellshot export", which renders a recording as an
@@ -48,8 +50,10 @@ func newExportCmd() *cobra.Command {
 	fl := cmd.Flags()
 	fl.StringVarP(&f.output, "output", "o", "", "output file (default: FILE with the extension .apng)")
 	fl.StringVar(&f.theme, "theme", "", "built-in theme name ("+strings.Join(theme.Names(), ", ")+") or a theme JSON file (default: "+theme.Default().Name+")")
-	fl.Float64Var(&f.fontSize, "font-size", raster.DefaultFontSize, "font size in pixels, before --scale; adjusted slightly so a character cell is a whole number of pixels wide")
+	fl.Float64Var(&f.fontSize, "font-size", raster.DefaultFontSize, "font size in pixels, before --scale (12 matches Ghostty font-size = 12 on a 2x display with --scale 2)")
 	fl.IntVar(&f.scale, "scale", raster.DefaultScale, "integer scale factor for font size and padding")
+	fl.StringVar(&f.adjustWidth, "adjust-cell-width", "0", "change the cell width after --scale, in pixels (-1, 2) or percent (-7%), like Ghostty's adjust-cell-width")
+	fl.StringVar(&f.adjustHeight, "adjust-cell-height", "0", "change the cell height after --scale, in pixels or percent; text stays vertically centred, like Ghostty's adjust-cell-height")
 	fl.IntVar(&f.padding, "padding", raster.DefaultPadding, "border around the screen in pixels (at least 1), before --scale")
 	fl.Float64Var(&f.speed, "speed", 1, "playback speed multiplier (2 plays twice as fast)")
 	fl.DurationVar(&f.idleLimit, "idle-limit", 2*time.Second, "longest pause between frames, before --speed (0 for no limit)")
@@ -132,6 +136,14 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
+	adjustWidth, err := font.ParseCellAdjust(flags.adjustWidth)
+	if err != nil {
+		return fmt.Errorf("export: invalid --adjust-cell-width: %w", err)
+	}
+	adjustHeight, err := font.ParseCellAdjust(flags.adjustHeight)
+	if err != nil {
+		return fmt.Errorf("export: invalid --adjust-cell-height: %w", err)
+	}
 	th, err := resolveTheme(flags.theme)
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
@@ -153,6 +165,9 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 		Padding:  flags.padding,
 		Scale:    flags.scale,
 		Cursor:   cursor,
+
+		AdjustCellWidth:  adjustWidth,
+		AdjustCellHeight: adjustHeight,
 	})
 	if err != nil {
 		return fmt.Errorf("export: %w", err)

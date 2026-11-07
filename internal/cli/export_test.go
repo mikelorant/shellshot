@@ -229,6 +229,15 @@ func TestExportOptionsChangeOutput(t *testing.T) {
 	if padded.Dx() != base.Dx()+24 || padded.Dy() != base.Dy()+24 {
 		t.Errorf("--padding 20 gave %v, want 24px more than %v", padded, base)
 	}
+	wider, _, _ := decodeSize(t, "--adjust-cell-width", "1")
+	narrower, _, _ := decodeSize(t, "--adjust-cell-width", "-10%")
+	taller, _, _ := decodeSize(t, "--adjust-cell-height", "2")
+	if wider.Dx() <= base.Dx() || narrower.Dx() >= base.Dx() || wider.Dy() != base.Dy() {
+		t.Errorf("--adjust-cell-width gave %v (+1) and %v (-10%%), base %v", wider, narrower, base)
+	}
+	if taller.Dy() <= base.Dy() || taller.Dx() != base.Dx() {
+		t.Errorf("--adjust-cell-height 2 gave %v, base %v", taller, base)
+	}
 	_, bgLight, _ := decodeSize(t, "--theme", "light")
 	if bgLight == bgDark {
 		t.Errorf("--theme light left the background %v", bgDark)
@@ -274,6 +283,9 @@ func TestExportRejectsBadValues(t *testing.T) {
 		{"font size", []string{"--font-size", "0"}, "invalid --font-size"},
 		{"scale", []string{"--scale", "0"}, "invalid --scale"},
 		{"padding", []string{"--padding", "-1"}, "invalid --padding"},
+		{"adjust width", []string{"--adjust-cell-width", "7px"}, "invalid --adjust-cell-width"},
+		{"adjust height", []string{"--adjust-cell-height", "%"}, "invalid --adjust-cell-height"},
+		{"adjust width too small", []string{"--adjust-cell-width", "-100%"}, "would give 0 px"},
 		{"speed", []string{"--speed", "0"}, "invalid --speed"},
 		{"idle limit", []string{"--idle-limit", "-1s"}, "invalid --idle-limit"},
 		{"hold", []string{"--hold", "-1s"}, "invalid --hold"},
