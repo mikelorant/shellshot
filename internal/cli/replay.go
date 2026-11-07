@@ -51,7 +51,7 @@ func runReplay(cmd *cobra.Command, path string, fps int, opts replay.Options) (e
 	if err := validateFPS(fps); err != nil {
 		return fmt.Errorf("replay: %w", err)
 	}
-	it, src, closeAll, err := openFrames(path, fps)
+	it, src, closeAll, err := openFrames(path, fps, nil)
 	if err != nil {
 		return fmt.Errorf("replay: %w", err)
 	}

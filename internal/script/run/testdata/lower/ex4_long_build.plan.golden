@@ -1,0 +1,36 @@
+process
+  size    110x30
+  shell   /bin/sh
+  env     CI=1
+  env     "PS1=$ "
+  output  (default)
+  seed    1
+estimate
+  total   7.51s to 11m10.91s, 2 waits, 2 scenes
+  scene   #2 build: 960ms to 5m0.96s
+  scene   #3 check: 4.77s to 4m4.57s
+ops
+   1  9:1     hidden           span-begin #1 hidden
+   2  10:3    hidden           type "cd ~/src/app\nmake clean > /dev/null 2>&1\nclear" typing=30ms
+   3  10:3    hidden           press enter after-gap typing=30ms
+   4  10:3    hidden           settle quiet=200ms timeout=2m0s (fails at timeout)
+   5  15:1    hidden           span-end #1
+   6  17:1    build            span-begin #2 scene "build" speed=8x idle=2s hold=1s
+   7  21:3    build            type "make build; echo BUILD-STATUS=$?" typing=30ms
+   8  21:3    build            press enter after-gap typing=30ms
+   9  21:3    build            settle off
+  10  22:3    build            wait /^BUILD-STATUS=0$/ timeout=5m0s
+  11  23:3    build            mark "built"
+  12  24:1    build            span-end #2
+  13  26:1    check            span-begin #3 scene "check" hold=1s
+  14  28:3    check            type "./bin/app --version" typing=30ms
+  15  28:3    check            press enter after-gap typing=30ms
+  16  28:3    check            settle quiet=200ms timeout=2m0s (fails at timeout)
+  17  28:3    check            linger 2s
+  18  29:3    check            wait /v[0-9]+\.[0-9]+/ timeout=2m0s
+  19  29:3    check            linger 2s
+  20  30:1    check            span-end #3
+  21  -       hidden           span-begin #4 hidden
+  22  -       hidden           drain quiet=200ms timeout=2s (never fails)
+  23  -       hidden           exit grace=2s
+  24  -       hidden           span-end #4

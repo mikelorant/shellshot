@@ -1,0 +1,10 @@
+t=+0s span-begin scene:check id=1 parent=0
+t=+0s write "e"
+t=+50ms write "c"
+t=+100ms write "h"
+t=+150ms write "o"
+t=+200ms write " "
+t=+250ms write "h"
+t=+300ms write "i"
+t=+350ms write "\r"
+t=+570ms error assert_fail.script:3:3: scene "check": assertion failed: /^nope$/ is not on the screen

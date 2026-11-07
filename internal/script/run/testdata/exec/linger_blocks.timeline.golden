@@ -1,0 +1,22 @@
+t=+0s write "a"
+t=+10ms write "b"
+t=+20ms write "\r"
+t=+30ms write "c"
+t=+40ms write "d"
+t=+1.04s write "\x1b[A"
+t=+1.05s write "\x1b[A"
+t=+3.55s mark after-sleep
+t=+3.55s write "e"
+t=+3.56s write "c"
+t=+3.57s write "h"
+t=+3.58s write "o"
+t=+3.59s write " "
+t=+3.6s write "b"
+t=+3.61s write "y"
+t=+3.62s write "e"
+t=+3.63s write "\r"
+t=+4.85s span-begin hidden id=1 parent=0
+t=+5.05s shutdown
+t=+5.06s child-exit 0
+t=+5.06s span-end id=1
+t=+5.06s done

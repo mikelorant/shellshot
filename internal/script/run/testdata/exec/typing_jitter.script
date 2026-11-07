@@ -1,0 +1,8 @@
+seed 7
+jitter 50%
+typing 40ms
+
+type hello
+press down x3
+sleep 1s
+type "a\nb"

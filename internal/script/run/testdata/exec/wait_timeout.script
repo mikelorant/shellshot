@@ -1,0 +1,4 @@
+scene w {
+  run echo hi
+  wait "never" 2s
+}

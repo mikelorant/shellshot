@@ -1,0 +1,16 @@
+# Setting values.
+size 0x24
+size 80
+seed -1
+jitter 150%
+jitter 25
+speed 0x
+typing 50
+timeout 0s
+settle on
+idle 0s
+env 1A=x
+output notes.txt
+cwd ""
+shell ""
+run echo ok

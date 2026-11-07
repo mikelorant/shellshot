@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/michaellorant/shellshot/internal/recording/bin/event"
 	"github.com/michaellorant/shellshot/internal/recording/bin/head"
 	"github.com/michaellorant/shellshot/internal/recording/frames"
+	"github.com/michaellorant/shellshot/internal/recording/spans"
 	"github.com/michaellorant/shellshot/internal/session"
 	"github.com/michaellorant/shellshot/internal/vt/ghostty"
 )
@@ -87,10 +89,35 @@ func (s *prefixSource) warnIncomplete(w io.Writer) {
 	}
 }
 
+// scanSpans reads the recording at path to its end and returns its scenes and
+// hidden spans. A torn tail is not an error (the valid prefix is scanned), and
+// neither is damage further in: the spans found so far are returned and the
+// frame replay reports the damage. A malformed SPAN event ends the list
+// early: the spans found so far are returned together with an error wrapping
+// event.ErrMalformedSpan.
+func scanSpans(path string) ([]spans.Span, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	r, err := bin.NewReader(f, bin.ReaderOptions{})
+	if err != nil {
+		return nil, openError(path, err)
+	}
+	found, err := spans.Scan(&prefixSource{r: r})
+	if err != nil && !errors.Is(err, event.ErrMalformedSpan) {
+		err = nil
+	}
+	return found, err
+}
+
 // openFrames opens the recording at path and returns a frame iterator over
 // it, sampled at fps and rendered with libghostty, together with the source
 // (for the incomplete-recording note) and a function that closes everything.
-func openFrames(path string, fps int) (*frames.Iterator, *prefixSource, func() error, error) {
+// boundaries are recording times at which the iterator forces a frame (see
+// frames.Options.Boundaries); nil forces none.
+func openFrames(path string, fps int, boundaries []time.Duration) (*frames.Iterator, *prefixSource, func() error, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, nil, nil, err
@@ -101,7 +128,7 @@ func openFrames(path string, fps int) (*frames.Iterator, *prefixSource, func() e
 		return nil, nil, nil, openError(path, err)
 	}
 	src := &prefixSource{r: r}
-	it, err := frames.New(src, frames.Options{FPS: fps, Factory: ghostty.New})
+	it, err := frames.New(src, frames.Options{FPS: fps, Factory: ghostty.New, Boundaries: boundaries})
 	if err != nil {
 		f.Close()
 		return nil, nil, nil, fmt.Errorf("%s: %w", path, err)

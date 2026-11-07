@@ -68,7 +68,7 @@ type Set struct {
 	fonts         [styleCount]*opentype.Font
 	fallbacks     []*opentype.Font
 	fallbackNames []string
-	emoji         *emoji.Font // nil without colour emoji
+	emoji         emoji.Backend // nil without colour emoji
 
 	mu    sync.Mutex
 	faces map[faceKey]xfont.Face
@@ -80,13 +80,15 @@ type Set struct {
 // fallback chain is the embedded Symbols Nerd Font Mono (icons), the embedded
 // Noto Sans Mono CJK SC subset (hanzi, Hangul, kana), then extra, in order;
 // embedded fonts come first so that user fonts never change the glyphs they
-// cover. The embedded Twemoji Mozilla colour emoji font backs Emoji. Each
-// call parses the fonts again and returns an independent Set (with its own
-// caches); callers that render repeatedly should keep the Set.
+// cover. Emoji is backed by the built-in Apple-then-Noto colour emoji chain
+// (emoji.SetApple), whose fonts are only decompressed when the first emoji is
+// drawn; SetEmoji replaces it. Each call parses the fonts again and returns
+// an independent Set (with its own caches, but sharing the emoji chain);
+// callers that render repeatedly should keep the Set.
 func Default(extra ...FallbackFont) (*Set, error) {
-	emojiFont, err := emoji.Parse(twemojiMozilla)
+	emojiChain, err := emoji.Default(emoji.SetApple)
 	if err != nil {
-		return nil, fmt.Errorf("font: embedded colour emoji: %w", err)
+		return nil, fmt.Errorf("font: colour emoji: %w", err)
 	}
 	chain := append([]FallbackFont{
 		{Name: "Symbols Nerd Font Mono", Data: symbolsNerdFontMono},
@@ -96,7 +98,7 @@ func Default(extra ...FallbackFont) (*Set, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.emoji = emojiFont
+	s.emoji = emojiChain
 	return s, nil
 }
 
@@ -154,17 +156,25 @@ func (e *FallbackError) Error() string {
 
 func (e *FallbackError) Unwrap() error { return e.Err }
 
+// SetEmoji replaces the colour emoji backend of s; nil removes colour emoji.
+// Call it before the Set is used.
+func (s *Set) SetEmoji(b emoji.Backend) { s.emoji = b }
+
 // Emoji renders cluster, a grapheme cluster (a base rune with its zero-width
-// followers), as a side x side colour image from the colour emoji font. It
-// uses the glyph of the whole sequence when the font has one and otherwise
-// that of the first rune. ok is false when the Set has no colour emoji font
-// or the font has no glyph. The image is shared: callers must not modify it.
+// followers), as a side x side colour image from the colour emoji backend. It
+// uses the glyph of the whole sequence when a font has one and otherwise
+// that of the first rune. ok is false when the Set has no colour emoji
+// backend or no font in it has a glyph. The image is shared: callers must not modify it.
 func (s *Set) Emoji(cluster string, side int) (img *image.RGBA, ok bool) {
 	if s.emoji == nil {
 		return nil, false
 	}
 	return s.emoji.Image(cluster, side)
 }
+
+// EmojiErr reports why the colour emoji backend could not load a font it
+// needed (a corrupt embedded asset), or nil. It does not load anything.
+func (s *Set) EmojiErr() error { return emoji.LoadErr(s.emoji) }
 
 var styleNames = [styleCount]string{"regular", "bold", "italic", "bold italic"}
 

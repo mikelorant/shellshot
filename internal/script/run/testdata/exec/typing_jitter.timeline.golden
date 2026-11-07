@@ -1,0 +1,16 @@
+t=+0s write "h"
+t=+30.60006ms write "e"
+t=+66.9338ms write "l"
+t=+116.195857ms write "l"
+t=+149.364403ms write "o"
+t=+149.364403ms write "\x1b[B"
+t=+169.92002ms write "\x1b[B"
+t=+202.863239ms write "\x1b[B"
+t=+1.202863239s write "a"
+t=+1.22515865s write "\r"
+t=+1.256762875s write "b"
+t=+1.256762875s span-begin hidden id=1 parent=0
+t=+1.456762875s shutdown
+t=+1.466762875s child-exit 0
+t=+1.466762875s span-end id=1
+t=+1.466762875s done

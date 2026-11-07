@@ -1,0 +1,25 @@
+# Block structure and scene names.
+scene a {
+}
+
+scene a {
+  run echo one
+  scene inner {
+    run echo two
+  }
+  hidden {
+    hidden {
+      run echo three
+    }
+  }
+}
+
+scene -bad {
+  typing 1ms
+}
+
+hidden {
+  scene s {
+    run echo four
+  }
+}

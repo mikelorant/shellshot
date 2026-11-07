@@ -1,12 +1,19 @@
-// Package emoji draws colour emoji from a COLR version 0 / CPAL font such as
-// Twemoji Mozilla. It is pure Go (no cgo): golang.org/x/image/font/sfnt
-// supplies the glyph outlines and cmap, and this package reads the colour
-// layers (COLR, CPAL) and the sequence ligatures (GSUB) from the font file
-// itself, because x/image can draw monochrome outlines only.
+// Package emoji draws colour emoji. It is pure Go (no cgo): the sfnt package
+// of golang.org/x/image supplies the cmap and glyph outlines, and this
+// package reads the colour tables and the sequence ligatures (GSUB) from the
+// font file itself.
 //
-// A Font looks up a whole grapheme cluster (a ZWJ family, a flag, a skin
-// tone, a keycap, a variation-selector sequence or a single emoji) and
-// renders it as a square RGBA image of any pixel size, cached per size.
+// A Backend turns a grapheme cluster (a ZWJ family, a flag, a skin tone, a
+// keycap, a variation-selector sequence or a single emoji) into a square
+// RGBA image of any pixel size, cached per size. Font handles COLR v0 + CPAL
+// layered-outline fonts and Bitmap handles CBLC/CBDT PNG fonts such as
+// Apple Color Emoji and Noto Color Emoji; Load picks the backend for a font
+// file.
+//
+// Chain tries backends in order. Default returns the built-in chains: the
+// embedded Apple Color Emoji derivative with Noto Color Emoji behind it
+// (SetApple), or Noto alone (SetNoto). The embedded fonts are inflated lazily,
+// the first time a cluster needs them.
 package emoji
 
 import (
@@ -20,11 +27,6 @@ import (
 	"golang.org/x/image/vector"
 )
 
-const (
-	variationSelector15 = '\uFE0E' // text presentation
-	variationSelector16 = '\uFE0F' // emoji presentation
-)
-
 type renderKey struct {
 	glyph uint16
 	side  int
@@ -32,15 +34,13 @@ type renderKey struct {
 
 // Font is a parsed colour emoji font. It is safe for concurrent use.
 type Font struct {
-	sf     *sfnt.Font
+	glyphMap
 	layers map[uint16][]layer
-	ligs   ligatures
 
 	unitsPerEm int // side of the square emoji box, in font units
 	top        int // y of the box's top edge in font units (above the baseline)
 
 	mu    sync.Mutex
-	buf   sfnt.Buffer
 	cache map[renderKey]*image.RGBA
 }
 
@@ -64,9 +64,8 @@ func Parse(data []byte) (*Font, error) {
 		return nil, err
 	}
 	f := &Font{
-		sf:         sf,
+		glyphMap:   glyphMap{sf: sf, ligs: ligs},
 		layers:     layers,
-		ligs:       ligs,
 		unitsPerEm: int(sf.UnitsPerEm()),
 		cache:      make(map[renderKey]*image.RGBA),
 	}
@@ -74,8 +73,9 @@ func Parse(data []byte) (*Font, error) {
 	return f, nil
 }
 
-// typoAscender returns the OS/2 typographic ascender, which Twemoji sets to
-// the top of its square emoji box, or the em size when the table is absent.
+// typoAscender returns the OS/2 typographic ascender, which COLR emoji fonts
+// set to the top of their square emoji box, or the em size when the table is
+// absent.
 func typoAscender(t tables, unitsPerEm int) int {
 	os2 := reader{b: t["OS/2"]}
 	if asc := int(int16(os2.u16(68))); os2.err == nil {
@@ -89,10 +89,19 @@ func typoAscender(t tables, unitsPerEm int) int {
 // first rune is used. The image is cached and shared: callers must not
 // modify it.
 func (f *Font) Image(cluster string, side int) (*image.RGBA, bool) {
+	return f.image(cluster, side, false)
+}
+
+// imageExact is Image without the first-rune fallback (see wholeSequencer).
+func (f *Font) imageExact(cluster string, side int) (*image.RGBA, bool) {
+	return f.image(cluster, side, true)
+}
+
+func (f *Font) image(cluster string, side int, exact bool) (*image.RGBA, bool) {
 	if side <= 0 {
 		return nil, false
 	}
-	gid, ok := f.glyphFor(cluster)
+	gid, ok := f.glyphFor(cluster, exact)
 	if !ok {
 		return nil, false
 	}
@@ -110,61 +119,19 @@ func (f *Font) Image(cluster string, side int) (*image.RGBA, bool) {
 	return img, true
 }
 
-// glyphFor resolves cluster to a layered glyph: the whole sequence first
-// (with and without variation selectors, since fonts disagree on whether a
-// sequence includes them), then the first rune alone.
-func (f *Font) glyphFor(cluster string) (uint16, bool) {
-	runes := []rune(cluster)
-	if len(runes) == 0 {
-		return 0, false
-	}
+// glyphFor resolves cluster to a layered glyph; exact refuses the fallback
+// to the first rune.
+func (f *Font) glyphFor(cluster string, exact bool) (uint16, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, seq := range sequenceVariants(runes) {
-		if gid, ok := f.lookup(seq); ok {
-			return gid, true
-		}
+	has := func(gid uint16) bool {
+		_, ok := f.layers[gid]
+		return ok
 	}
-	return f.lookup(runes[:1])
-}
-
-// lookup maps seq to a layered glyph through cmap and, for several runes,
-// the GSUB ligatures. The caller holds f.mu.
-func (f *Font) lookup(seq []rune) (uint16, bool) {
-	gids := make([]uint16, len(seq))
-	for i, r := range seq {
-		g, err := f.sf.GlyphIndex(&f.buf, r)
-		if err != nil || g == 0 {
-			return 0, false
-		}
-		gids[i] = uint16(g)
+	if exact {
+		return f.resolveExact(cluster, has)
 	}
-	gid := gids[0]
-	if len(gids) > 1 {
-		gid = f.ligs[seqKey(gids)]
-	}
-	_, ok := f.layers[gid]
-	return gid, ok && gid != 0
-}
-
-// sequenceVariants lists the spellings of runes to try, most specific first:
-// as given, without variation selectors, and with an emoji variation
-// selector after the first rune (the form keycap sequences use).
-func sequenceVariants(runes []rune) [][]rune {
-	out := [][]rune{runes}
-	var bare []rune
-	for _, r := range runes {
-		if r != variationSelector15 && r != variationSelector16 {
-			bare = append(bare, r)
-		}
-	}
-	if len(bare) != len(runes) {
-		out = append(out, bare)
-	}
-	if len(bare) > 1 {
-		out = append(out, append([]rune{bare[0], variationSelector16}, bare[1:]...))
-	}
-	return out
+	return f.resolve(cluster, has)
 }
 
 // render rasterises the layers of gid into a side x side image. The emoji

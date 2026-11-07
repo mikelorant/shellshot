@@ -153,6 +153,41 @@ func TestExportTimelineOptionsApply(t *testing.T) {
 	}
 }
 
+// Segments reach timeline.Build: a hidden stretch costs no time and no
+// frames, and a scene segment scales its own part of the recording.
+func TestExportSegmentsCutHiddenAndScaleScenes(t *testing.T) {
+	src := &sliceSource{frames: []snapshot.Frame{
+		frame(0, "a"),
+		frame(time.Second, "b"),   // hidden
+		frame(2*time.Second, "c"), // hidden
+		frame(3*time.Second, "c"), // forced frame at the end of the hidden span
+		frame(4*time.Second, "d"), // scene, speed 2
+		frame(5*time.Second, "e"), // last frame
+	}}
+	r := &fakeRenderer{}
+	var buf bytes.Buffer
+	err := Export(context.Background(), src, 4, 1, r, &buf, Options{
+		Timeline: timeline.Options{
+			Hold: time.Second,
+			Segments: []timeline.Segment{
+				{From: time.Second, To: 3 * time.Second, Skip: true},
+				{From: 3 * time.Second, To: 5 * time.Second, Speed: 2, Hold: 500 * time.Millisecond},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []time.Duration{time.Second, 500 * time.Millisecond, time.Second, time.Second}
+	got := delays(decode(t, buf.Bytes()))
+	if !equalDurations(got, want) {
+		t.Errorf("delays = %v, want %v", got, want)
+	}
+	if r.renders != 4 {
+		t.Errorf("renders = %d, want 4 (b is never rendered)", r.renders)
+	}
+}
+
 func TestExportRendersOnceWhenMinDelayFoldLeavesEqualSteps(t *testing.T) {
 	// a, b (10ms, folded into a), a: the folded timeline is a, a, which must
 	// render once and encode as one frame.

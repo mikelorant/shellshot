@@ -1,0 +1,22 @@
+# shellshot logo assets
+
+| File | What |
+| --- | --- |
+| `logo-mark.svg` | Square mark, transparent; works on light and dark. |
+| `logo-light.svg` / `logo.svg` | Mark + `shellshot` lockup for light pages (`logo.svg` is a copy). |
+| `logo-dark.svg` | Same lockup tuned for dark pages. |
+| `social-preview.png` | 1280x640 GitHub social card (lockup on dark). |
+
+Palette: ink `#1d2030` (text, prompt glyph, clapper), coral `#ff6a4d` (shell; `#f85a3c` on light, `#ff7a5c` on dark), cream `#fff0d9` (dark-mode text and clapper), card `#14161f`.
+
+Construction: a scallop seashell (the "shell") carries a `>_` prompt (the terminal), and its five ridged lobes are five film frames.
+It sits on a hinged, striped clapper stick, so the shell "claps" the shot.
+The wordmark is JetBrains Mono Bold outlined to paths (no font needed) with a block cursor after it.
+
+README top (put the tagline right below):
+
+```html
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="shellshot" src="docs/assets/logo.svg" width="360"></picture></p>
+```
+
+Tagline: *Record terminal sessions. Replay them. Export them as animated PNGs.*

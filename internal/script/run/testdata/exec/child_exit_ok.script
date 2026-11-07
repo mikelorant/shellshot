@@ -1,0 +1,6 @@
+scene gone {
+  run exit
+  sleep 1s
+  mark after-exit
+  wait "$" 0s
+}

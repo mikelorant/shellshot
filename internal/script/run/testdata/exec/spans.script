@@ -1,0 +1,13 @@
+scene one {
+  speed 4x
+  hold 1s
+  mark start
+  hidden {
+    run echo setup
+  }
+  run echo shown
+}
+
+hidden {
+  sleep 1s
+}

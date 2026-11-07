@@ -1,0 +1,7 @@
+t=+0s span-begin scene:busy id=1 parent=0
+t=+0s write "s"
+t=+50ms write "p"
+t=+100ms write "i"
+t=+150ms write "n"
+t=+200ms write "\r"
+t=+1.2s error settle_timeout.script:4:3: scene "busy": run did not settle: the screen was still changing after 1s (timeout); for continuous output use "settle off" and "wait PATTERN TIMEOUT", or raise "timeout"
