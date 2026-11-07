@@ -19,8 +19,8 @@ The Go binary links libghostty-vt through cgo. libghostty is built from the pinn
 | `make test-examples` | Runs every `contrib/examples/*.sh` under dash, bash, sh and zsh (takes a few minutes); it checks exit status, terminal restore and Ctrl-C handling |
 | `make check-examples` | Records every `contrib/examples/*.sh` at 80x24 with the real binary, follows the cursor through the raw output to find lines that auto-wrap, and lists every non-ASCII character the demos print, flagging those no embedded font has (they render blank). Takes about a minute; needs `bin/shellshot` (it builds it), libghostty and `uv`. Not part of `make test` |
 | `make fmt` | `gofmt -w .` |
-| `make clean` | Removes `bin/` |
-| `make distclean` | Removes `bin/` and `build/`; run `make deps` again afterwards |
+| `make clean` | Removes `bin/` and `dist/` |
+| `make distclean` | Removes `bin/`, `dist/` and `build/`; run `make deps` again afterwards |
 
 Requirements: Go 1.26 or newer with cgo, a C toolchain, `git`, `pkg-config`, and zig 0.17.x (the
 submodule's `build.zig.zon` sets `minimum_zig_version`). The first `make deps` downloads zig
@@ -89,6 +89,48 @@ flags change, and commit it deliberately. The demo runs in real time, so two run
 `docs/assets/showcase.png.src` holds a sha256 of `showcase.sh`, `lib.sh` and the record and export
 settings. `make check-showcase` recomputes it and fails with `showcase.png is stale: run make showcase`
 when they differ; `make test` runs it too. It is a hash comparison, so it is fast and needs no libghostty.
+
+## Releases
+
+[GoReleaser](https://goreleaser.com) (`.goreleaser.yaml`, version 2) builds one archive per target
+into `dist/`: macOS and Linux, each for amd64 and arm64. Publishing is not configured yet.
+
+Prerequisites: `goreleaser` (`brew install goreleaser`), zig 0.17.x, `git` with the submodule
+(`make release-libs` initialises it), `pkg-config`, and a Mac with Xcode or the Command Line Tools
+(the macOS links need the SDK, see below). No tag, network access or secrets are needed.
+
+| Command | Effect |
+|---|---|
+| `make release-libs` | Builds libghostty-vt for the four targets with `scripts/build-libghostty.sh <zig-target>`, one zig invocation each, into `build/libghostty-{linux,darwin}-{amd64,arm64}`. The native `build/libghostty` is separate and unchanged. Takes a few minutes cold |
+| `make release-check` | `goreleaser check` (validates `.goreleaser.yaml`) |
+| `make snapshot` | `goreleaser release --snapshot --clean --skip=publish`: builds everything into `dist/` without a tag, the network or publishing; the version looks like `0.0.0-SNAPSHOT-<commit>` |
+
+Run `make release-libs` once (and again after bumping the libghostty pin), then `make snapshot`.
+`dist/` holds:
+
+- `shellshot_<version>_<os>_<arch>.tar.gz` for `darwin_amd64`, `darwin_arm64`, `linux_amd64` and
+  `linux_arm64`. Each contains `shellshot`, `README.md` and `NOTICE` (the repository has no
+  `LICENSE` file, so none is shipped);
+- `checksum.txt` (sha256 of the four archives);
+- one directory per target with the bare binary (`dist/shellshot_linux_arm64_v8.0/shellshot`), plus
+  goreleaser's `config.yaml`, `artifacts.json` and `metadata.json`.
+
+How the builds work:
+
+- Every target is cross-compiled from one machine with `zig cc` / `zig c++` (`-target
+  <arch>-<os>`), cgo enabled, `-trimpath`, `-s -w` and the version injected into
+  `internal/cli.Version`. `PKG_CONFIG_PATH` points at the matching `build/libghostty-<os>-<arch>`.
+- libghostty is linked statically. The Linux binaries are dynamic against glibc (`libc`, `libresolv`,
+  `libpthread`, `librt`) and are pinned to glibc 2.28 (`x86_64-linux-gnu.2.28`), so they run on
+  distributions of that age or newer. They do not run on musl systems such as Alpine.
+- zig has no macOS `libresolv`, so the darwin links use the SDK: `make snapshot` sets `SDKROOT` from
+  `xcrun --show-sdk-path` unless you set it. Building the macOS archives therefore needs a Mac.
+- `shellshot` is about 36 MB per binary (the fonts are embedded) and about 29 MB per archive.
+
+Publishing: `release.disable: true` and `changelog.disable: true` in the config keep everything
+local. To release from GitHub Actions later, run `make release-libs` on a macOS runner with zig 0.17
+and goreleaser installed, then `goreleaser release --clean` on a tag push with `GITHUB_TOKEN` set,
+after removing `release.disable` (and setting `release.github` if the repository differs).
 
 ## Worktrees
 
