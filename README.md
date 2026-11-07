@@ -90,7 +90,10 @@ screen is sampled on that grid and a frame is shown only when it changed).
 A file that is not a recording (for example an old JSON `.shot`) is rejected with
 `not a shellshot recording (bad magic)`. A recording cut short by a crash plays up
 to the damage, then `shellshot: recording is truncated (N bytes valid)` goes to
-stderr and the exit status is 0; a corrupt recording is an error. If the terminal
+stderr and the exit status is 0. A recording whose recorder was killed at a block
+boundary plays in full, followed by
+`shellshot: recording is incomplete (no exit event; recorder was interrupted)` on
+stderr and exit status 0. A corrupt recording is an error. If the terminal
 was resized while recording, the new size simply shows up in the following frames.
 
 `--speed f` multiplies the speed. `--clear` redraws from the top of the screen
@@ -124,7 +127,7 @@ $ shellshot export demo.shot        # writes demo.apng next to the input
 A theme file is JSON with all fields required:
 `{"name":"x","foreground":"#rrggbb","background":"#rrggbb","cursor":"#rrggbb","palette":[16 × "#rrggbb"]}`.
 Output is written atomically (a failed run leaves no partial file).
-A truncated recording exports up to the damage with the same stderr note as `replay`.
+A truncated or interrupted recording exports with the same stderr note as `replay`.
 
 Known limitation: the APNG canvas has a fixed size, so a recording whose terminal
 was resized part-way fails with `recording changes size mid-way (80x24 -> 100x30);
@@ -159,9 +162,14 @@ status        complete
 
 `info` reads the event log without replaying it through a terminal, so it is quick on
 large files. `payload bytes` is the raw data of all events and `file/payload` is the
-file size divided by it (below 1 when compression wins). `status` is `complete` when the
-file ends at a chunk boundary, else `truncated (N bytes valid)`. A corrupt file
-prints what could be read, reports `damaged: ...` and exits 1.
+file size divided by it (below 1 when compression wins). `status` is one of:
+
+- `complete`: the file ends at a chunk boundary after the recording's exit event.
+- `interrupted`: the file ends at a chunk boundary but has no exit event, so the
+  recorder was killed or crashed; everything up to its last flushed block is intact.
+- `truncated (N bytes valid)`: bytes follow the last valid chunk (a torn write);
+  the first N bytes are intact.
+- `damaged: ...`: the file is corrupt. `info` prints what could be read and exits 1.
 
 ## Recording format
 

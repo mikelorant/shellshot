@@ -51,19 +51,21 @@ func must(t *testing.T, err error) {
 	}
 }
 
-// simpleRecording is a 10x2 recording: "first" at 10ms, then "second" on the
-// next row 500ms in.
+// simpleRecording is a finished 10x2 recording: "first" at 10ms, then "second"
+// on the next row 500ms in, then the exit.
 func simpleRecording(t *testing.T) []byte {
 	return buildRecording(t, head.Head{Cols: 10, Rows: 2}, bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
 		must(t, w.Output(10*time.Millisecond, []byte("first")))
 		must(t, w.Output(500*time.Millisecond, []byte("\r\nsecond")))
+		must(t, w.Exit(500*time.Millisecond, 0))
 	})
 }
 
-// styledRecording is a 10x1 recording whose first three characters are red.
+// styledRecording is a finished 10x1 recording whose first three characters are red.
 func styledRecording(t *testing.T) []byte {
 	return buildRecording(t, head.Head{Cols: 10, Rows: 1}, bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
 		must(t, w.Output(10*time.Millisecond, []byte("\x1b[31mred\x1b[0m ok")))
+		must(t, w.Exit(10*time.Millisecond, 0))
 	})
 }
 
@@ -95,4 +97,19 @@ func twoBlockRecording(t *testing.T) (data []byte, firstBlockEnd int) {
 		must(t, w.Output(300*time.Millisecond, []byte("\r\ntwo")))
 	})
 	return data, firstBlockEnd
+}
+
+// interruptedRecording is what a recorder killed with SIGKILL right after a
+// block was flushed leaves behind: "one" and "two" in two complete blocks, no
+// EXIT event, and a writer that is never closed. It returns the file.
+func interruptedRecording(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w, err := bin.NewWriter(&buf, head.Head{Cols: 10, Rows: 2}, bin.WriterOptions{Now: fixedNow})
+	must(t, err)
+	must(t, w.Output(10*time.Millisecond, []byte("one")))
+	must(t, w.Flush())
+	must(t, w.Output(300*time.Millisecond, []byte("\r\ntwo")))
+	must(t, w.Flush())
+	return buf.Bytes()
 }

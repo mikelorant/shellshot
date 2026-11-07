@@ -24,7 +24,15 @@ func newInfoCmd() *cobra.Command {
 		Long: `Show the header and statistics of a recording.
 
 The file is scanned event by event but never replayed through a terminal, so
-this is fast even for large recordings.`,
+this is fast even for large recordings.
+
+The status line is one of:
+  complete      the recording ends at a chunk boundary after the exit event
+  interrupted   no exit event: the recorder was killed or crashed; everything
+                up to its last flushed block is intact
+  truncated (N bytes valid)
+                the file has a torn tail after its last valid chunk
+  damaged: ...  the file is corrupt (exit status 1)`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runInfo(cmd, args[0])
@@ -49,9 +57,21 @@ func (s *recordingStats) total() uint64 {
 	return n
 }
 
-// runInfo prints the report for the recording at path. A torn tail is
-// reported as the status, not as an error; a corrupt file is reported in the
-// status and then fails the command.
+// The status values of a recording that is not damaged or truncated.
+const (
+	// statusComplete: the file ends at a chunk boundary after an EXIT event.
+	statusComplete = "complete"
+	// statusInterrupted: the file ends at a chunk boundary but has no EXIT
+	// event, so the recorder was killed or crashed.
+	statusInterrupted = "interrupted"
+)
+
+// runInfo prints the report for the recording at path. A torn tail or a
+// missing EXIT event is reported as the status, not as an error; a corrupt
+// file is reported in the status and then fails the command.
+//
+// An EXIT event anywhere counts: the recorder can log a keystroke after the
+// child's exit, so EXIT is not always the last event.
 func runInfo(cmd *cobra.Command, path string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -89,13 +109,15 @@ func runInfo(cmd *cobra.Command, path string) error {
 		}
 	}
 
-	status := "complete"
+	status := statusComplete
 	switch {
 	case errors.Is(scanErr, bin.ErrTruncated):
 		status = fmt.Sprintf("truncated (%d bytes valid)", r.ValidBytes())
 		scanErr = nil
 	case scanErr != nil:
 		status = fmt.Sprintf("damaged: %v", scanErr)
+	case st.events[event.KindExit] == 0:
+		status = statusInterrupted
 	}
 	writeInfo(cmd.OutOrStdout(), path, r, st, fi.Size(), status)
 	if scanErr != nil {

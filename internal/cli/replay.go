@@ -41,7 +41,8 @@ func newReplayCmd() *cobra.Command {
 }
 
 // runReplay plays the recording at path to cmd's stdout. A recording with a
-// torn tail plays up to the tear and then notes it on stderr; that is not an
+// torn tail plays up to the tear, and one without an EXIT event (its recorder
+// was interrupted) plays to the end; either is noted on stderr and is not an
 // error.
 func runReplay(cmd *cobra.Command, path string, fps int, opts replay.Options) (err error) {
 	if opts.Speed <= 0 {
@@ -62,6 +63,6 @@ func runReplay(cmd *cobra.Command, path string, fps int, opts replay.Options) (e
 	if err := replay.Play(cmd.Context(), it, cmd.OutOrStdout(), opts); err != nil {
 		return err
 	}
-	src.warnTruncated(cmd.ErrOrStderr())
+	src.warnIncomplete(cmd.ErrOrStderr())
 	return nil
 }
