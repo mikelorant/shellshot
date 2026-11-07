@@ -37,7 +37,7 @@ while [ "$i" -le 24 ]; do
 done
 ex_cup $((R / 2)) $((C / 2 - 14))
 printf '\033[1;7m every glyph placed with CUP \033[0m'
-nap 900
+nap 600
 
 # ------------------------------------------------- 2: relative movement
 scene_begin 'CUU CUD CUF CUB, CHA, VPA: relative movement'
@@ -63,7 +63,7 @@ printf '\033[B\033[42G ESC[nC forward'
 printf '\033[B\033[42G ESC[nD back'
 printf '\033[B\033[42G ESC[nG column'
 printf '\033[B\033[42G ESC[nd row'
-nap 1200
+nap 700
 
 # ------------------------------------------------------ 3: save / restore
 scene_begin 'DECSC / DECRC: save and restore the cursor   ESC 7  ESC 8'
@@ -81,7 +81,7 @@ for word in the cursor jumps away and returns to this exact spot every time and 
 done
 ex_cup 8 3
 printf 'Also CSI s / CSI u work in many terminals, ESC 7 / ESC 8 almost everywhere.'
-nap 1000
+nap 600
 
 # ------------------------------------------------------------ 4: erase
 scene_begin 'Erase: EL (ESC [ n K) and ED (ESC [ n J)'
@@ -97,7 +97,7 @@ nap 800
 ex_cup 11 23; printf '\033[J'
 ex_cup 8 45; printf '<- ED 0 at (11,23) erased'
 ex_cup 9 45; printf '   from there to screen end'
-nap 1000
+nap 600
 
 # ------------------------------------------------- 5: insert and delete
 scene_begin 'IL DL ICH DCH: insert and delete lines and characters'
@@ -115,7 +115,7 @@ ex_cup 13 3; printf 'ICH 4 opened four cells at column 6'
 nap 800
 ex_cup 12 6; printf '\033[7P'
 ex_cup 14 3; printf 'DCH 7 closed the gap and removed three letters'
-nap 1000
+nap 600
 
 # --------------------------------------------------------- 6: scroll region
 scene_begin 'DECSTBM: a scroll region keeps header and footer fixed'
@@ -147,10 +147,10 @@ ex_box $((R / 2 - 3)) $((C / 2 - bw / 2)) 7 "$bw" 'alternate screen'
 ex_cup $((R / 2 - 1)) $((C / 2 - 17)); printf 'A separate buffer: no scrollback here.'
 ex_cup $((R / 2)) $((C / 2 - 17)); printf 'Leaving restores the screen you saw.'
 ex_cup $((R / 2 + 1)) $((C / 2 - 17)); printf '\033[2mReturning in a moment\033[0m'
-nap 1500
+nap 800
 ex_alt_off
 ex_cup "$R" 1
 printf '\033[1;32mBack on the main screen: the scroll-region log is still here.\033[0m'
-nap 1500
+nap 900
 printf '\n'
 ex_finish
