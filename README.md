@@ -1,6 +1,6 @@
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="shellshot" src="docs/assets/logo.svg" width="360"></picture></p>
 
-Record terminal sessions. Replay them. Export them as animated PNGs, GIFs or WebPs.
+Record terminal sessions. Replay them. Export them as animated PNGs, GIFs, WebPs or SVGs.
 
 # shellshot
 
@@ -9,7 +9,7 @@ Record terminal sessions. Replay them. Export them as animated PNGs, GIFs or Web
 `shellshot` records a terminal session, either your shell or a single command,
 through a headless terminal emulator ([libghostty](https://github.com/ghostty-org/ghostty)).
 It stores the session as a compact event log (a `.shot` file), replays it in your
-terminal, and exports it as an animated PNG, GIF or WebP.
+terminal, and exports it as an animated PNG, GIF, WebP or SVG.
 
 ## Install
 

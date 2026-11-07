@@ -1,7 +1,7 @@
 # Export reference
 
 `shellshot export FILE [-o OUT] [flags]` renders a recording as an animated PNG (APNG, the
-default), an animated GIF or an animated WebP. An APNG is a standard PNG that carries animation data. Browsers,
+default), an animated GIF, an animated WebP or an SVG. An APNG is a standard PNG that carries animation data. Browsers,
 GitHub, Slack and Discord animate it; at the time of writing, macOS Preview and Quick Look show
 only the first frame. Run `shellshot export --help` for the flag list.
 
@@ -10,12 +10,13 @@ only the first frame. Run `shellshot export --help` for the flag list.
 `--format NAME` chooses the output format. Without it, the format comes from the extension of
 `-o` (case-insensitive), and is `apng` when there is no `-o` or `-o` has no extension. An
 extension that no format owns, or an unknown `--format` name, fails with the list of supported
-formats (`supported: apng, gif, webp`); `--format` then lets you write any file name.
+formats (`supported: apng, gif, svg, webp`); `--format` then lets you write any file name.
 
 | Format | `--format` | Extensions | Notes |
 | --- | --- | --- | --- |
 | Animated PNG | `apng` | `.png`, `.apng` | The default. Full colour. Plays in browsers, GitHub, Slack and Discord. |
 | Animated GIF | `gif` | `.gif` | At most 255 colours plus transparency. Plays everywhere. See [GIF](#gif). |
+| SVG | `svg` | `.svg` | Vector text, animated with CSS (or one still with `--frame`). Small for text, but animation support in viewers varies; see [SVG](#svg). |
 | Animated WebP | `webp` | `.webp` | Lossless, smaller than APNG. Plays in current browsers; see [WebP](#webp) for sharing sites. |
 
 ## GIF
@@ -100,10 +101,59 @@ Use `apng` or `gif` for places you have not tested. The files were checked
 with libwebp's `webpinfo` and `webpmux` and decoded with `ffmpeg`, which gives frames identical to
 the APNG's.
 
+## SVG
+
+`--format svg` (or a `.svg` output name) writes the recording as vector graphics instead of
+pixels: the text of the screen is drawn as text, cell backgrounds as rectangles, emoji as small
+embedded PNG images. By default the SVG is **animated** with CSS (`@keyframes` with `steps()`;
+no script), looping like the other formats (`--loops`). Give `--frame` to write one still instead.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--frame first\|last\|TIME` | off (animate) | Write one frame as a static SVG. `TIME` is a time on the output clock, such as `1.5s` |
+| `--svg-text text\|paths` | `text` | `text`: `<text>` drawn in the viewer's monospace font (small, selectable, every glyph placed at its grid column). `paths`: glyph outlines of the built-in fonts, exact and independent of the viewer's fonts, but larger |
+
+`--frame` is an error for the raster formats and `--svg-text` is an error for any format but
+`svg`.
+`--fallback-font` and `--system-fonts` change SVG output only with `--svg-text paths`.
+
+Each glyph in `text` mode carries its own x position, so text stays on the terminal grid even
+when the viewer's monospace font has a different width. The look of the glyphs still depends on
+the font the viewer picks (JetBrains Mono, then `ui-monospace`, Menlo, `monospace`); use
+`--svg-text paths` when the exact glyphs matter, for example for CJK, symbols or box drawing.
+
+Measured sizes on this implementation (80x24 unless noted; the 60x12 scrolling recording is 41
+frames; sizes include everything in the file):
+
+| Recording | Animated SVG | Static (`--frame last`) | Static, `--svg-text paths` | APNG |
+|---|---|---|---|---|
+| scrolling lines, 60x12 | 49,351 B | 1,446 B | 7,747 B | 260,389 B |
+| colors.sh | 55,805 B | 54,410 B | 79,910 B | 30,167 B |
+| emoji.sh | 126,734 B | 124,344 B | 144,163 B | 87,188 B |
+
+An SVG wins on text and loses on dense colour: colors.sh is thousands of one-cell rectangles,
+and emoji are embedded as PNG images (about 1 KB each, once per distinct emoji).
+
+Where the result plays (from `docs/research/svg-export.md`; only the first rows are well
+supported):
+
+| Where | Animated SVG |
+|---|---|
+| Browser, SVG opened directly or in `<object>` | Yes (per MDN; not re-checked here) |
+| Browser, `<img src="x.svg">` | CSS animations should run in the secure animated mode of the spec; partly verified in research, not tested here |
+| GitHub README `<img>` | **Unverified.** Reports conflict and no current test was made. Use APNG or GIF there |
+| macOS Quick Look, Preview | Unverified; probably a still image |
+| Slack, Discord | Unverified; not expected to preview SVG inline |
+| VS Code Markdown preview | Unverified; may block the image |
+| Figma, Inkscape, resvg, rsvg | Unlikely to run the CSS animation. They draw the base state, which is the first frame (a design rule, not tested in each) |
+
+**PNG is the safe choice for READMEs and chat.** Use SVG where you control the viewer (your own
+site, documentation, a browser tab) or want a small, sharp still (`--frame last`).
+
 ## Output file
 
 - Without `-o`, the output is `FILE` with its extension replaced by the first extension of the
-  format (`.png` for `apng`, `.gif` for `gif`, `.webp` for `webp`).
+  format (`.png` for `apng`, `.gif` for `gif`, `.svg` for `svg`, `.webp` for `webp`).
 - `-o` is used as typed, whatever its extension, and the extension picks the format unless
   `--format` is given. `-o -` writes a file named `-`; export does not write to stdout.
 - Export refuses to overwrite the input recording and replaces any other existing file.
