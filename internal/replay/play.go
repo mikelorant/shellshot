@@ -31,6 +31,9 @@ type Options struct {
 	// Clear clears the screen and homes the cursor before each frame; use it
 	// when w is a terminal. See Render.
 	Clear bool
+	// Color renders style spans as SGR escapes; when false, output is plain
+	// text. See Render.
+	Color bool
 	// Sleep waits for d or until ctx is done, returning ctx's error in the
 	// latter case. Nil means a timer-based wait. Tests inject their own.
 	Sleep func(ctx context.Context, d time.Duration) error
@@ -73,7 +76,7 @@ func Play(ctx context.Context, src Source, w io.Writer, opts Options) error {
 			}
 		}
 		prev = f.At
-		if _, err := io.WriteString(w, Render(f.Snapshot, opts.Clear)); err != nil {
+		if _, err := io.WriteString(w, Render(f.Snapshot, RenderOptions{Clear: opts.Clear, Color: opts.Color})); err != nil {
 			return fmt.Errorf("replay: write frame: %w", err)
 		}
 	}
