@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/michaellorant/shellshot/internal/export/pipeline"
+	"github.com/michaellorant/shellshot/internal/export/webp"
 )
 
 // Settings holds the export knobs the formats share. A format ignores the
@@ -52,6 +53,7 @@ func Default() *Registry {
 				return pipeline.APNGSinkFactory(s.Loops, s.Compression)
 			},
 		},
+		Format{Name: "webp", Extensions: []string{".webp"}, New: func(s Settings) pipeline.SinkFactory { return webp.SinkFactory(s.Loops) }},
 	)
 }
 
