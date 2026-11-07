@@ -3,11 +3,16 @@
 //
 // Header line:
 //
-//	{"version":1,"cols":80,"rows":24,"command":["ls"],"started":"RFC3339"}
+//	{"version":2,"cols":80,"rows":24,"command":["ls"],"started":"RFC3339"}
 //
 // Frame lines:
 //
-//	{"t":<ms int>,"lines":[...],"cx":0,"cy":0,"cv":true,"title":""}
+//	{"t":<ms int>,"lines":[...],"cx":0,"cy":0,"cv":true,"title":"","spans":[...]}
+//
+// "spans" is optional (version 2 only) and present only when the frame has
+// styled text. It has one entry per row, each an array of [start,end,"<SGR>"]
+// triples whose start and end are rune indexes into that row's line, e.g.
+// "spans":[[[0,3,"31"]],[],[]]. Version 1 recordings have no spans.
 package recording
 
 import (
@@ -16,8 +21,12 @@ import (
 	"time"
 )
 
-// Version is the recording format version produced by Writer.
-const Version = 1
+// Version is the recording format version produced by Writer. Reader also
+// accepts version 1, which has no spans.
+const Version = 2
+
+// minVersion is the oldest format version Reader accepts.
+const minVersion = 1
 
 var (
 	// ErrVersion is returned when a header carries an unsupported version.
@@ -55,11 +64,13 @@ type frameLine struct {
 	CY    int      `json:"cy"`
 	CV    bool     `json:"cv"`
 	Title string   `json:"title"`
+	// Spans is omitted when the frame has no styled text.
+	Spans [][]spanJSON `json:"spans,omitempty"`
 }
 
-// validate checks the header is one this package can read or write.
+// validate checks the header is one this package can read.
 func (h Header) validate() error {
-	if h.Version != Version {
+	if h.Version < minVersion || h.Version > Version {
 		return fmt.Errorf("%w: %d", ErrVersion, h.Version)
 	}
 	if h.Cols <= 0 || h.Rows <= 0 {

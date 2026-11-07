@@ -72,16 +72,23 @@ func (r *Reader) Next() (snapshot.Frame, error) {
 	if len(fl.Lines) != r.header.Rows {
 		return snapshot.Frame{}, fmt.Errorf("%w: line %d: %d lines, want %d", ErrMalformed, r.line, len(fl.Lines), r.header.Rows)
 	}
-	return snapshot.Frame{
-		At: time.Duration(fl.T) * time.Millisecond,
-		Snapshot: snapshot.Snapshot{
-			Cols:   r.header.Cols,
-			Rows:   r.header.Rows,
-			Lines:  fl.Lines,
-			Cursor: snapshot.Cursor{X: fl.CX, Y: fl.CY, Visible: fl.CV},
-			Title:  fl.Title,
-		},
-	}, nil
+	snap := snapshot.Snapshot{
+		Cols:   r.header.Cols,
+		Rows:   r.header.Rows,
+		Lines:  fl.Lines,
+		Cursor: snapshot.Cursor{X: fl.CX, Y: fl.CY, Visible: fl.CV},
+		Title:  fl.Title,
+	}
+	if r.header.Version >= 2 {
+		if fl.Spans != nil && len(fl.Spans) != r.header.Rows {
+			return snapshot.Frame{}, fmt.Errorf("%w: line %d: %d span rows, want %d", ErrMalformed, r.line, len(fl.Spans), r.header.Rows)
+		}
+		snap.Spans = decodeSpans(fl.Spans)
+	}
+	if err := snap.Validate(); err != nil {
+		return snapshot.Frame{}, fmt.Errorf("%w: line %d: %w", ErrMalformed, r.line, err)
+	}
+	return snapshot.Frame{At: time.Duration(fl.T) * time.Millisecond, Snapshot: snap}, nil
 }
 
 // readLine returns the next line without its line ending, or io.EOF when no
