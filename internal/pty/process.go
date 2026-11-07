@@ -15,6 +15,7 @@ import (
 
 // Process is a command running inside a PTY. Reading from it returns the
 // terminal output; Read returns io.EOF once the child side has closed.
+// Writing to it sends input to the child's stdin.
 type Process struct {
 	ptmx *os.File
 	cmd  *exec.Cmd
@@ -27,7 +28,7 @@ type Process struct {
 	closeErr  error
 }
 
-var _ io.Reader = (*Process)(nil)
+var _ io.ReadWriter = (*Process)(nil)
 
 // Start launches cfg.Command in a new PTY. Cancelling ctx kills the process.
 func Start(ctx context.Context, cfg Config) (*Process, error) {
@@ -98,6 +99,16 @@ func (p *Process) Read(b []byte) (int, error) {
 		err = io.EOF
 	}
 	return n, err
+}
+
+// Write sends b to the child's stdin through the PTY master. After Close it
+// returns an error wrapping os.ErrClosed.
+func (p *Process) Write(b []byte) (int, error) {
+	n, err := p.ptmx.Write(b)
+	if err != nil {
+		return n, fmt.Errorf("pty: write: %w", err)
+	}
+	return n, nil
 }
 
 // Resize changes the terminal size seen by the child.

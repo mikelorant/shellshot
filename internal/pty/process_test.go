@@ -2,7 +2,9 @@ package pty
 
 import (
 	"context"
+	"errors"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -124,5 +126,52 @@ func TestCloseKillsAndIsIdempotent(t *testing.T) {
 	}
 	if code, err := p.Wait(); err != nil || code == 0 {
 		t.Errorf("Wait after Close = (%d, %v), want non-zero code and nil error", code, err)
+	}
+}
+
+func TestWriteReachesChild(t *testing.T) {
+	p := start(t, context.Background(), Config{Command: "cat"})
+	if n, err := p.Write([]byte("ping\n")); err != nil || n != 5 {
+		t.Fatalf("Write = (%d, %v), want (5, nil)", n, err)
+	}
+
+	found := make(chan error, 1)
+	go func() {
+		var got []byte
+		buf := make([]byte, 256)
+		for !strings.Contains(string(got), "ping") {
+			n, err := p.Read(buf)
+			got = append(got, buf[:n]...)
+			if err != nil {
+				found <- err
+				return
+			}
+		}
+		found <- nil
+	}()
+	select {
+	case err := <-found:
+		if err != nil {
+			t.Fatalf("Read before seeing ping: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for ping")
+	}
+	if err := p.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+func TestWriteAfterCloseFails(t *testing.T) {
+	p, err := Start(context.Background(), Config{Command: "cat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	n, err := p.Write([]byte("x"))
+	if err == nil || !errors.Is(err, os.ErrClosed) || n != 0 {
+		t.Errorf("Write after Close = (%d, %v), want (0, error wrapping os.ErrClosed)", n, err)
 	}
 }
