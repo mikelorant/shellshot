@@ -19,6 +19,12 @@ type Settings struct {
 	Loops int
 	// Compression is the PNG compression level of an APNG's frames.
 	Compression png.CompressionLevel
+	// GIFColors is the largest number of picture colours of a GIF palette,
+	// 2 to 255; 0 means 255.
+	GIFColors int
+	// GIFDither makes a GIF diffuse colour error when the palette is
+	// quantised.
+	GIFDither bool
 }
 
 // Format describes one output format.
@@ -52,6 +58,7 @@ func Default() *Registry {
 				return pipeline.APNGSinkFactory(s.Loops, s.Compression)
 			},
 		},
+		gifFormat(),
 	)
 }
 
