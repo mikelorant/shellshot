@@ -56,7 +56,7 @@ func Start(ctx context.Context, cfg Config) (*Process, error) {
 	cmd.Env = cfg.environ()
 	cmd.Dir = cfg.Dir
 
-	ptmx, slave, err := creackpty.Open()
+	ptmx, slave, err := openPTY()
 	if err != nil {
 		return nil, fmt.Errorf("pty: start %q: %w", cfg.Command, err)
 	}
@@ -86,6 +86,20 @@ func Start(ctx context.Context, cfg Config) (*Process, error) {
 		}
 	}()
 	return p, nil
+}
+
+// openAttempts is how many times openPTY tries to allocate a pty.
+const openAttempts = 5
+
+// openPTY allocates a pty. On macOS, opening many ptys at once occasionally
+// fails with a spurious ioctl error that the next attempt does not repeat.
+func openPTY() (ptmx, slave *os.File, err error) {
+	for range openAttempts {
+		if ptmx, slave, err = creackpty.Open(); err == nil {
+			return ptmx, slave, nil
+		}
+	}
+	return nil, nil, err
 }
 
 // reap waits for the child to exit, records its exit status and then releases
