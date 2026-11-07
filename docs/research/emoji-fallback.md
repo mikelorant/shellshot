@@ -148,7 +148,9 @@ embedded fonts, so embedded glyphs never change.
 
 Binary size delta: Twemoji Mozilla +1,474,284 B, CJK subset +1,117,512 B,
 total **+2.59 MB** (Go embeds the files raw; gzip would save ~0.9 MB at the
-price of a build step and a startup inflate, not done).
+price of a build step and a startup inflate, not done). Measured binary after
+the work: 20,154,882 B, **+2,749,248 B** over the 17,405,634 B baseline (fonts
+plus the new Go code). Parsing the embedded emoji font takes about 0.36 ms.
 
 ## 5. Open product decisions
 
