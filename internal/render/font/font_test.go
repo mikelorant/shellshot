@@ -282,3 +282,87 @@ func TestMetricsUnaffectedByFallbacks(t *testing.T) {
 		t.Errorf("fallbacks changed metrics: %+v vs %+v", a, b)
 	}
 }
+
+// FitFace scales a fallback glyph so its advance equals the cell span and
+// its ink box lies within the span and the cell height.
+func TestFitFaceBoundsWithinBudget(t *testing.T) {
+	s := mustDefault(t)
+	for _, basePx := range []float64{14, 20, 28} {
+		m, err := s.Metrics(basePx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, cells := range []int{1, 2} {
+			for _, r := range []rune{0xF015, 0xE725, 0xF0001} {
+				face, ok, err := s.FitFace(r, false, false, basePx, m.CellWidth, m.CellHeight, cells)
+				if err != nil || !ok {
+					t.Fatalf("FitFace(%U): ok=%v err=%v", r, ok, err)
+				}
+				b, adv, ok := face.GlyphBounds(r)
+				if !ok {
+					t.Fatalf("%U: no bounds", r)
+				}
+				budget := fixed.I(cells * m.CellWidth)
+				if adv > budget {
+					t.Errorf("%v px %d cells %U: advance %v exceeds %v", basePx, cells, r, adv, budget)
+				}
+				if w := b.Max.X - b.Min.X; w > budget {
+					t.Errorf("%v px %d cells %U: ink width %v exceeds %v", basePx, cells, r, w, budget)
+				}
+				if h := b.Max.Y - b.Min.Y; h > fixed.I(m.CellHeight) {
+					t.Errorf("%v px %d cells %U: ink height %v exceeds cell height %d", basePx, cells, r, h, m.CellHeight)
+				}
+				// 1-cell icons are fitted by width: the advance fills the cell
+				// to within the 1/64 px size quantisation.
+				if cells == 1 && budget-adv > fixed.Int26_6(64)/8 {
+					t.Errorf("%v px %U: advance %v is far below the %v cell", basePx, r, adv, budget)
+				}
+			}
+		}
+	}
+}
+
+func TestFitFaceCachesFaces(t *testing.T) {
+	s := mustDefault(t)
+	a, _, err := s.FitFace(0xF015, false, false, 14, 9, 20, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Bold/italic requests and other icons fitted to the same size share the face.
+	b, _, _ := s.FitFace(0xF015, true, true, 14, 9, 20, 1)
+	if a != b {
+		t.Error("FitFace returned different faces for the same fit")
+	}
+	wide, _, _ := s.FitFace(0xF015, false, false, 14, 9, 20, 2)
+	if a == wide {
+		t.Error("1-cell and 2-cell fits share a face")
+	}
+}
+
+// Runes the primary family has are returned unscaled, exactly like FaceFor.
+func TestFitFacePrimaryRuneUnscaled(t *testing.T) {
+	s := mustDefault(t)
+	want, ok, err := s.FaceFor('a', false, false, 14)
+	if err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	got, ok, err := s.FitFace('a', false, false, 14, 9, 20, 1)
+	if err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	if got != want {
+		t.Error("FitFace scaled or replaced a primary-font face")
+	}
+}
+
+func TestFitFaceMissingAndInvalid(t *testing.T) {
+	s := mustDefault(t)
+	if _, ok, err := s.FitFace(0x10FFFE, false, false, 14, 9, 20, 1); ok || err != nil {
+		t.Errorf("missing rune: ok=%v err=%v, want false, nil", ok, err)
+	}
+	for _, c := range [][4]int{{0, 20, 1, 14}, {9, 0, 1, 14}, {9, 20, 0, 14}, {9, 20, 1, 0}} {
+		if _, _, err := s.FitFace(0xF015, false, false, float64(c[3]), c[0], c[1], c[2]); err == nil {
+			t.Errorf("FitFace(%v): no error", c)
+		}
+	}
+}

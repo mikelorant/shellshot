@@ -101,11 +101,11 @@ func TestFallbackSpriteStillFirst(t *testing.T) {
 	}
 	mustRender(t, r, plainSnapshot(4, "─█\ue0b0 "))
 	if f.faceForCalls != 0 {
-		t.Errorf("FaceFor called %d times for sprite runes", f.faceForCalls)
+		t.Errorf("FitFace called %d times for sprite runes", f.faceForCalls)
 	}
 	mustRender(t, r, plainSnapshot(4, "\uf015"))
 	if f.faceForCalls != 1 {
-		t.Errorf("FaceFor called %d times for one icon, want 1", f.faceForCalls)
+		t.Errorf("FitFace called %d times for one icon, want 1", f.faceForCalls)
 	}
 }
 
@@ -114,14 +114,14 @@ type countingFonts struct {
 	faceForCalls int
 }
 
-func (f *countingFonts) FaceFor(r rune, bold, italic bool, sizePx float64) (xfont.Face, bool, error) {
+func (f *countingFonts) FitFace(r rune, bold, italic bool, sizePx float64, cellW, cellH, cells int) (xfont.Face, bool, error) {
 	f.faceForCalls++
-	return f.Set.FaceFor(r, bold, italic, sizePx)
+	return f.Set.FitFace(r, bold, italic, sizePx, cellW, cellH, cells)
 }
 
 type failingFonts struct{ *font.Set }
 
-func (failingFonts) FaceFor(rune, bool, bool, float64) (xfont.Face, bool, error) {
+func (failingFonts) FitFace(rune, bool, bool, float64, int, int, int) (xfont.Face, bool, error) {
 	return nil, false, errors.New("boom")
 }
 
@@ -156,4 +156,107 @@ func TestGoldenNerdSymbols(t *testing.T) {
 		{Start: 7, End: 14, Style: snapshot.Style{Attrs: snapshot.Italic}},
 	}}
 	compareGolden(t, "nerd_symbols.png", mustRender(t, r, s))
+}
+
+// inkBox returns the bounding box of non-background pixels inside rect.
+func inkBox(r *Renderer, img *image.RGBA, rect image.Rectangle) image.Rectangle {
+	var box image.Rectangle
+	for y := rect.Min.Y; y < rect.Max.Y; y++ {
+		for x := rect.Min.X; x < rect.Max.X; x++ {
+			if img.RGBAAt(x, y) != r.theme.Background {
+				box = box.Union(image.Rect(x, y, x+1, y+1))
+			}
+		}
+	}
+	return box
+}
+
+func cellSpan(r *Renderer, col, cells int) image.Rectangle {
+	o := r.cellOrigin(col, 0)
+	return image.Rect(o.X, o.Y, o.X+cells*r.metrics.CellWidth, o.Y+r.metrics.CellHeight)
+}
+
+// Fallback icons are scaled to fit their cell: the ink covers most of the
+// cell width, stays inside the cell span and is centred in it, at several
+// sizes and scales, for one and two cells. (An icon designed to fill its
+// advance legitimately inks the edge columns; TestFitFaceBoundsWithinBudget
+// proves the fitted glyph is not cut off by the clip.)
+func TestFallbackIconsFitTheirCells(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		opts  Options
+		cells int
+	}{
+		{"14px", Options{FontSize: 14}, 1},
+		{"20px", Options{FontSize: 20}, 1},
+		{"scale2", Options{FontSize: 14, Scale: 2}, 1},
+		{"14px wide", Options{FontSize: 14}, 2},
+		{"scale2 wide", Options{FontSize: 14, Scale: 2}, 2},
+	} {
+		r, _ := newTestRenderer(t, tc.opts)
+		for _, c := range []rune{0xF015, 0xE725} {
+			s := plainSnapshot(5, " "+string(c)+"  ")
+			if tc.cells == 2 {
+				s.Widths = [][]snapshot.Wide{{{Rune: 1, Cells: 2}}}
+			}
+			img := mustRender(t, r, s)
+			span := cellSpan(r, 1, tc.cells)
+			box := inkBox(r, img, span)
+			if box.Empty() {
+				t.Errorf("%s %U: no ink", tc.name, c)
+				continue
+			}
+			if w := float64(box.Dx()) / float64(span.Dx()); w <= 0.6 {
+				t.Errorf("%s %U: ink width %d is %.0f%% of the %d px span, want > 60%%", tc.name, c, box.Dx(), w*100, span.Dx())
+			}
+			if !box.In(span) {
+				t.Errorf("%s %U: ink box %v exceeds cell span %v", tc.name, c, box, span)
+			}
+			cols := []int{1}
+			if tc.cells == 2 {
+				cols = append(cols, 2)
+			}
+			if out := inkOutsideCells(r, img, cols...); out != 0 {
+				t.Errorf("%s %U: %d inked pixels outside its cells", tc.name, c, out)
+			}
+			// centred: the ink box midpoint is within a pixel of the span's.
+			dx := box.Min.X + box.Max.X - span.Min.X - span.Max.X
+			dy := box.Min.Y + box.Max.Y - span.Min.Y - span.Max.Y
+			if dx < -3 || dx > 3 || dy < -3 || dy > 3 {
+				t.Errorf("%s %U: ink box %v not centred in %v", tc.name, c, box, span)
+			}
+		}
+	}
+}
+
+// Fitted fallback drawing is deterministic.
+func TestFallbackFitDeterministic(t *testing.T) {
+	s := plainSnapshot(6, "\uf015 \ue725 \U000f0001")
+	a, _ := newTestRenderer(t, Options{})
+	b, _ := newTestRenderer(t, Options{})
+	first := mustRender(t, a, s)
+	if string(first.Pix) != string(mustRender(t, a, s).Pix) || string(first.Pix) != string(mustRender(t, b, s).Pix) {
+		t.Error("fitted fallback rendering is not deterministic")
+	}
+}
+
+// Primary glyphs are drawn where and how they always were: a line of text
+// renders the same with or without an icon elsewhere on the row.
+func TestFallbackFitLeavesPrimaryGlyphsAlone(t *testing.T) {
+	r, _ := newTestRenderer(t, Options{})
+	plain := mustRender(t, r, plainSnapshot(6, "abc   "))
+	mixed := mustRender(t, r, plainSnapshot(6, "abc \uf015 "))
+	for col := 0; col < 3; col++ {
+		if inkInCell(r, plain, col, 0) == 0 {
+			t.Fatalf("cell %d has no ink", col)
+		}
+		span := cellSpan(r, col, 1)
+		for y := span.Min.Y; y < span.Max.Y; y++ {
+			for x := span.Min.X; x < span.Max.X; x++ {
+				if plain.RGBAAt(x, y) != mixed.RGBAAt(x, y) {
+					t.Fatalf("primary cell %d pixel (%d,%d) changed", col, x, y)
+				}
+			}
+		}
+	}
 }

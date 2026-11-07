@@ -109,24 +109,13 @@ func (s *Set) Face(bold, italic bool, sizePx float64) (xfont.Face, error) {
 // does, at the same sizePx. Fallback fonts have one style, so bold and italic
 // requests use their only face. ok is false when no font has r.
 //
-// Fallback glyphs are not scaled to the primary cell width; callers should
-// clip them to the cells the rune occupies.
+// Fallback glyphs are not scaled to the primary cell width; use FitFace to
+// draw them fitted to the cells they occupy.
 func (s *Set) FaceFor(r rune, bold, italic bool, sizePx float64) (face xfont.Face, ok bool, err error) {
 	if !(sizePx > 0) {
 		return nil, false, fmt.Errorf("font: invalid size %v", sizePx)
 	}
-	st := int(styleOf(bold, italic))
-	idx := -1
-	if hasGlyph(s.fonts[st], r) {
-		idx = st
-	} else {
-		for i, f := range s.fallbacks {
-			if hasGlyph(f, r) {
-				idx = int(styleCount) + i
-				break
-			}
-		}
-	}
+	idx := s.fontIndexFor(r, bold, italic)
 	if idx < 0 {
 		return nil, false, nil
 	}
@@ -135,6 +124,21 @@ func (s *Set) FaceFor(r rune, bold, italic bool, sizePx float64) (face xfont.Fac
 		return nil, false, err
 	}
 	return face, true, nil
+}
+
+// fontIndexFor returns the faceKey font index that draws r, or -1 if no font
+// has it.
+func (s *Set) fontIndexFor(r rune, bold, italic bool) int {
+	st := int(styleOf(bold, italic))
+	if hasGlyph(s.fonts[st], r) {
+		return st
+	}
+	for i, f := range s.fallbacks {
+		if hasGlyph(f, r) {
+			return int(styleCount) + i
+		}
+	}
+	return -1
 }
 
 func (s *Set) face(font int, sizePx float64) (xfont.Face, error) {
