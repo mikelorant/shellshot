@@ -87,7 +87,7 @@ green done
 `replay` reads the binary recording format and re-renders the terminal output
 through libghostty at `--fps n` frames per second (default 60, 1 to 1000; the
 screen is sampled on that grid and a frame is shown only when it changed).
-A file that is not a recording (for example an old JSON `.shot`) is rejected with
+A file that is not a recording (for example an old JSON Lines `.shot`) is rejected with
 `not a shellshot recording (bad magic)`. A recording cut short by a crash plays up
 to the damage, then `shellshot: recording is truncated (N bytes valid)` goes to
 stderr and the exit status is 0. A recording whose recorder was killed at a block
@@ -180,18 +180,9 @@ file size divided by it (below 1 when compression wins). `status` is one of:
   optional `IN`, `RESIZE`, `MARK`, `EXIT`), zstd-compressed by default. Themes are not
   stored; they are chosen at export time. `internal/recording/frames` replays the
   events through libghostty to produce the screen frames the commands use.
-- **JSON Lines, version 2** (the old format; `record` no longer writes it and the
-  commands above no longer read it). Line 1 is a header
-  (`version`, `cols`, `rows`, `command`, `started`); each following line is a
-  frame (`t` in ms, `lines`, cursor, `title`, optional `spans` for styles and
-  `widths` for wide/zero-width runes).
+- Details of the chunks and events: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#recording-format-binary-event-log-extension-shot).
 
-  ```
-  {"version":2,"cols":60,"rows":10,"command":["zsh","-c","echo hello; ..."],"started":"..."}
-  {"t":101,"lines":["hello","",...],"cx":0,"cy":1,"cv":true,"title":""}
-  {"t":513,"lines":["hello","green done",...],"cx":0,"cy":2,"cv":true,"title":"","spans":[[],[[0,5,"32"]],...]}
-  ```
-- Full JSON field reference: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#recording-format-json-lines-extension-shot).
+There is no other recording format; the earlier JSON Lines `.shot` files are not read.
 
 ## Why libghostty is a pinned submodule
 
@@ -227,7 +218,8 @@ internal/pty           spawn a command in a PTY
 internal/tty           IsTerminal, Size, MakeRaw
 internal/live          stdin -> process pump and live output tee
 internal/session       pty + vt + sampler -> frames emitted to a sink
-internal/recording     file format (JSON Lines Reader/Writer); bin/ = binary format (written by record)
+internal/recording/bin     binary recording format: container + codec + Writer/Reader (written by record)
+internal/recording/frames  binary events -> snapshot frames through libghostty (replay, export)
 internal/replay        play frames to an io.Writer with timing
 internal/export        timeline (timing), apng (encoder), pipeline (frames -> APNG)
 internal/render        font (embedded), theme, raster (frame -> image), sprite (box/block/braille/powerline glyphs)
