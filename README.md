@@ -131,6 +131,8 @@ to check the animation. `-o` is written as typed, so `-o demo.apng` also works.
 | `--cursor` | `block` | `block`, `bar`, `underline`, `none` |
 | `--fps` | 60 | frame sampling rate in frames per second (1 to 1000) |
 | `--fallback-font FILE` | none | extra TTF/OTF/TTC for glyphs the built-in fonts lack; repeatable, tried in order after the built-in fonts; an unreadable or invalid file is an error |
+| `--emoji-set` | `apple` | colour emoji artwork: `apple` (Apple Color Emoji, with Noto Color Emoji for what Apple's lacks) or `noto` (Noto Color Emoji only). Apple's artwork belongs to Apple Inc.; `noto` is open source (SIL OFL 1.1) and the licence-clean choice for exports you share |
+| `--emoji-font FILE` | none | a COLR v0 or CBDT/CBLC colour emoji font tried before the `--emoji-set` fonts; an unreadable or invalid file is an error |
 | `--system-fonts` | off | also use installed CJK and symbol fonts (macOS and Linux font folders). **The output then depends on this machine's fonts**, so exports differ between machines |
 
 Cell size follows Ghostty: the cell is the font's advance and line height
@@ -238,7 +240,7 @@ internal/recording/bin     binary recording format: container + codec + Writer/R
 internal/recording/frames  binary events -> snapshot frames through libghostty (replay, export)
 internal/replay        play frames to an io.Writer with timing
 internal/export        timeline (timing), apng (encoder), pipeline (frames -> APNG)
-internal/render        font (embedded + fallback chain), fontchain (--fallback-font/--system-fonts), emoji (colour COLRv0 emoji), theme, raster (frame -> image), sprite (box/block/braille/powerline glyphs)
+internal/render        font (embedded + fallback chain), fontchain (--fallback-font/--system-fonts), emoji (colour emoji backends and the built-in sets), theme, raster (frame -> image), sprite (box/block/braille/powerline glyphs)
 scripts/build-libghostty.sh, Makefile
 ```
 
@@ -256,18 +258,19 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
   subset (about 3,750 hanzi, Hangul syllables, kana and CJK punctuation), then
   any `--fallback-font` files, then (only with `--system-fonts`) installed CJK
   and symbol fonts.
-- **Emoji are drawn in colour** from a bundled Twemoji Mozilla font (COLRv0
-  layers rendered in pure Go, so there is no cgo, browser or network). A
-  grapheme cluster is drawn once over its one or two cells: ZWJ families,
-  flags, skin tones, keycaps and `U+FE0F` sequences each look up the whole
-  sequence and fall back to the first emoji if the font lacks it. The embedded
-  font covers Emoji 14.0 (Twemoji 14.0.1); newer emoji are blank unless a
-  `--fallback-font` has them as outlines.
-- Emoji artwork: Twemoji, Copyright Twitter, Inc. and other contributors,
-  licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), packaged
-  as a font by Mozilla (twemoji-colr, Apache-2.0). All font licences and
-  checksums are in the `NOTICE.txt` of each `internal/render/*/assets/<group>/` directory. The fonts add 2.6 MB
-  to the binary (Twemoji 1.5 MB, CJK subset 1.1 MB).
+- **Emoji are drawn in colour** from bundled bitmap fonts: a compact Apple
+  Color Emoji derivative first and Noto Color Emoji behind it (`--emoji-set
+  noto` uses Noto alone). A grapheme cluster is drawn once over its one or two
+  cells: ZWJ families, flags, skin tones, keycaps and `U+FE0F` sequences each
+  look up the whole sequence and fall back to the first emoji if no font has
+  it. The fonts are decompressed the first time an emoji is drawn, so text
+  without emoji pays nothing.
+- Emoji artwork: the Apple set draws Apple Inc.'s artwork, which is not open
+  source and is not licensed by this project; see
+  `internal/render/emoji/assets/apple-emoji/NOTICE.txt`. Noto Color Emoji is
+  SIL OFL 1.1. All font licences and checksums are in the `NOTICE.txt` of each
+  `internal/render/*/assets/<group>/` directory. The fonts add about 23 MB to
+  the binary (Apple emoji 13.0 MB, Noto emoji 9.7 MB, CJK subset 1.1 MB).
 - Idle gaps are capped by `--idle-limit`; very short frames are merged.
 
 ## Known limitations
@@ -277,13 +280,12 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
 - **Trailing coloured blanks are dropped.** Lines are right-trimmed, so a
   background colour painted on trailing spaces (e.g. a full-width status bar's
   empty part) is lost.
-- **Emoji and CJK coverage is bounded.** Emoji newer than Unicode 14 and rare
-  hanzi outside the bundled subset are blank unless `--fallback-font` (or
-  `--system-fonts`) supplies them. The CJK subset has Simplified Chinese glyph
+- **Emoji and CJK coverage is bounded.** Emoji newer than Unicode 18 and rare
+  hanzi outside the bundled subset are blank unless `--emoji-font` (emoji) or
+  `--fallback-font` (or `--system-fonts`) supplies them. The CJK subset has Simplified Chinese glyph
   shapes for Han characters that differ between Chinese, Japanese and Korean.
-  Colour comes only from the bundled font: user fonts are drawn as monochrome
-  outlines, so colour-only fonts (Apple Color Emoji, Noto Color Emoji) cannot be
-  used. Bold and italic do not change fallback glyphs. (`replay` prints these
+  Colour comes only from the emoji fonts (`--emoji-font` and the bundled sets):
+  `--fallback-font` and `--system-fonts` fonts are drawn as monochrome outlines. Bold and italic do not change fallback glyphs. (`replay` prints these
   characters as text.)
 - **Nerd Font icons are scaled down to fit their cell.** Icons from the fallback
   font are shrunk to the cell width (and height) and centred, as in the "Nerd Font
