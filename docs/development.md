@@ -96,8 +96,9 @@ when they differ; `make test` runs it too. It is a hash comparison, so it is fas
 
 The `Dockerfile` builds shellshot in a container: it installs a pinned zig (sha256 checked), builds
 libghostty-vt from the submodule, builds the Go binary, and copies it into a `debian:bookworm-slim`
-image (about 130 MB) that runs as the non-root user `shellshot` (uid 1000) in `/work`. The image has
-`bash` and `less` for demos; fonts are embedded in the binary.
+image that runs as the non-root user `shellshot` (uid 1000) in `/work`. The image holds only the
+base image, the shellshot binary and that user, with no extra packages; `bash` comes from the base
+image and fonts are embedded in the binary.
 
 Prerequisites: Docker with BuildKit, and the submodule in the build context (the build stops with a
 message if `third_party/ghostty` is empty). The first build downloads zig dependencies and takes a
