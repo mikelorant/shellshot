@@ -35,7 +35,6 @@ a terminal), `--pause` (wait for Enter at the end), `--help`.
 
 `lib.sh` holds the shared helpers (sourced, not run). `scripts/*.script` are
 automation samples for `record --script`; they cannot run until that ships.
-
 ## What the exporter draws today
 
 Checked by exporting the demos and looking at the frames. "Recorded" means the
@@ -55,6 +54,6 @@ bytes are in the `.shot` file and the terminal engine tracks them.
 | hyperlinks (OSC 8) | text drawn, no marker, link target dropped |
 | window title (OSC 0/2) | recorded, not drawn |
 | inline images (iTerm2, Kitty, Sixel) | recorded, not drawn |
-| colour emoji, wide CJK, combining marks | drawn |
+| colour emoji, wide CJK, combining marks | drawn; CJK glyphs the built-in fonts lack (e.g. 語, 漢) come out blank without `--system-fonts` or `--fallback-font` |
 | box drawing, blocks, braille | drawn |
-| alternate screen, scroll regions, cursor moves | drawn as screen state in each frame |
+| alternate screen, scroll regions, cursor moves | drawn as the screen state of each frame |
