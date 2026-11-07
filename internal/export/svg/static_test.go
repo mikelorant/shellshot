@@ -328,3 +328,28 @@ func TestFrameSelection(t *testing.T) {
 		}
 	}
 }
+
+// A bar of styled blanks at the end of a line (a status line, an erase with a
+// background colour) is one background rectangle over all of its cells.
+func TestBackgroundRunCoversTrailingStyledBlanks(t *testing.T) {
+	r, g := newRenderer(t, raster.Options{})
+	lay := r.Layout()
+	blue := snapshot.Style{Bg: snapshot.Color{Kind: snapshot.ColorPalette, Index: 4}}
+	s := snapshot.Snapshot{
+		Cols: 20, Rows: 1,
+		Lines: []string{"ab" + strings.Repeat(" ", 18)},
+		Spans: [][]snapshot.Span{{{Start: 0, End: 20, Style: blue}}},
+	}
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	doc := write(t, Options{Geometry: g, Frame: Frame{Kind: FrameLast}}, 20, 1, step(s, time.Second))
+	want := `<rect x="` + itoaT(lay.Pad) + `" y="` + itoaT(lay.Pad) + `" width="` + itoaT(20*lay.CellWidth) +
+		`" height="` + itoaT(lay.CellHeight) + `" fill="` + hex(lay.Theme.Palette[4]) + `"/>`
+	if !strings.Contains(doc, want) {
+		t.Errorf("missing %s in\n%s", want, doc)
+	}
+	if strings.Contains(doc, "ab ") {
+		t.Errorf("trailing blanks were written as text:\n%s", doc)
+	}
+}
