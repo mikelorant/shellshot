@@ -4,3 +4,4 @@
 *.shot
 !internal/recording/bin/testdata/*.shot
 recordings/
+/dist/
