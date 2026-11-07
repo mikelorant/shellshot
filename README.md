@@ -66,7 +66,8 @@ wrote 2 frames (20.3 KB) to demo.png
 ```
 
 The file is a standard PNG with animation data. Browsers, GitHub and Slack animate it;
-at the time of writing, macOS Preview and Quick Look show only the first frame.
+at the time of writing, macOS Preview and Quick Look show only one image, which export makes
+the final screen (`--poster`, see [docs/export.md](docs/export.md#poster-apng)).
 `--scale 2` gives sharp images on retina displays. Without `-o`, the output is the input
 name with a `.png` extension. To match the look of a Ghostty terminal, see
 [docs/export.md](docs/export.md#cell-size).

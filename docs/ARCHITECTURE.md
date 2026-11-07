@@ -43,7 +43,7 @@ internal/recording/bin      binary format: chunk, varint, codec, head, event; Wr
 internal/recording/spans    SPAN events -> scenes and hidden spans
 internal/recording/frames   recorded events -> snapshot frames through a vt.Factory
 internal/replay             plays frames to an io.Writer with timing
-internal/export/timeline    frames -> timed steps: idle cap, speed, hold, minimum delay
+internal/export/timeline    frames -> timed steps: idle cap, speed, hold, minimum delay, leading blank trim
 internal/export/pipeline    timeline + raster + apng: frames -> animated PNG
 internal/export/apng        APNG encoder (standard library only)
 internal/render/raster      frame -> image: cells, clusters, colours, cursor
