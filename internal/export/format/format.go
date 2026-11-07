@@ -23,7 +23,7 @@ import (
 type Settings struct {
 	// Loops is the number of times the animation plays; 0 means forever.
 	Loops int
-	// Compression is the PNG compression level of an APNG's frames.
+	// Compression is the PNG compression level of a PNG's frames.
 	Compression png.CompressionLevel
 	// SVG holds the SVG writer's options; Loops is taken from the field
 	// above.
@@ -45,7 +45,7 @@ type StepsWriter interface {
 
 // Format describes one output format.
 type Format struct {
-	// Name is the lower-case name --format takes, such as "apng".
+	// Name is the lower-case name --format takes, such as "png".
 	Name string
 	// Extensions are the file extensions of the format, lower-case with the
 	// leading dot. The first is the one used for a default output name.
@@ -72,10 +72,12 @@ func NewRegistry(formats ...Format) *Registry {
 func Default() *Registry {
 	return NewRegistry(
 		Format{
-			Name:       "apng",
+			Name: "png",
+			// ".apng" is accepted for files named that way; ".png" is the
+			// default.
 			Extensions: []string{".png", ".apng"},
 			New: func(s Settings) pipeline.SinkFactory {
-				return pipeline.APNGSinkFactory(s.Loops, s.Compression)
+				return pipeline.PNGSinkFactory(s.Loops, s.Compression)
 			},
 		},
 		gifFormat(),

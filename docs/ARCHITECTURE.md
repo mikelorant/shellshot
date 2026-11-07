@@ -48,9 +48,9 @@ internal/recording/frames   recorded events -> snapshot frames through a vt.Fact
 internal/replay             plays frames to an io.Writer with timing
 internal/export/timeline    frames -> timed steps: idle cap, speed, hold, minimum delay, leading blank trim
 internal/export/spanplan    scenes and hidden spans -> timeline segments and forced frames (pure)
-internal/export/pipeline    timeline + raster: frames -> images for a sink; the sink interface and the APNG poster
+internal/export/pipeline    timeline + raster: frames -> images for a sink; the sink interface and the PNG poster
 internal/export/format      registry of output formats: name, extensions and constructor of each sink
-internal/export/apng        APNG encoder (standard library only)
+internal/export/apng        animated PNG encoder (standard library only)
 internal/export/gif         animated GIF sink: one palette for all frames, changed rectangles only (image/gif)
 internal/export/webp        animated lossless WebP sink (RIFF container; VP8L from github.com/HugoSmits86/nativewebp)
 internal/export/svg         SVG writer: text or glyph paths, CSS animation or one still frame

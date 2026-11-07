@@ -11,15 +11,15 @@ import (
 func TestExportHelpListsFormat(t *testing.T) {
 	t.Parallel()
 	usage := newExportCmd().Flags().FlagUsages()
-	for _, want := range []string{"--format", "apng", "from the extension of -o"} {
+	for _, want := range []string{"--format", "png", "from the extension of -o"} {
 		if !strings.Contains(usage, want) {
 			t.Errorf("export flag help lacks %q:\n%s", want, usage)
 		}
 	}
 }
 
-// Every way of choosing apng writes the same bytes.
-func TestExportFormatAPNGIsChosenByNameExtensionOrDefault(t *testing.T) {
+// Every way of choosing png writes the same bytes.
+func TestExportFormatPNGIsChosenByNameExtensionOrDefault(t *testing.T) {
 	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
@@ -29,11 +29,11 @@ func TestExportFormatAPNGIsChosenByNameExtensionOrDefault(t *testing.T) {
 		args []string
 	}{
 		{"png extension", "a.png", nil},
-		{"apng extension", "b.apng", nil},
-		{"upper-case extension", "c.APNG", nil},
-		{"--format apng", "d.png", []string{"--format", "apng"}},
-		{"--format APNG", "e.png", []string{"--format", "APNG"}},
-		{"--format overrides the extension", "f.bin", []string{"--format", "apng"}},
+		{".apng extension", "b.apng", nil},
+		{"upper-case extension", "c.PNG", nil},
+		{"--format png", "d.png", []string{"--format", "png"}},
+		{"--format PNG", "e.png", []string{"--format", "PNG"}},
+		{"--format overrides the extension", "f.bin", []string{"--format", "png"}},
 		{"no extension", "g", nil},
 	}
 	var first []byte
@@ -43,7 +43,7 @@ func TestExportFormatAPNGIsChosenByNameExtensionOrDefault(t *testing.T) {
 			t.Fatalf("%s: exit %d, stderr %q", tc.name, code, stderr)
 		}
 		got := mustRead(t, out)
-		if a := decodeAPNG(t, out); len(a.Frames) < 2 {
+		if a := decodeAnimatedPNG(t, out); len(a.Frames) < 2 {
 			t.Errorf("%s: %d frames, want an animation", tc.name, len(a.Frames))
 		}
 		if first == nil {
@@ -57,11 +57,21 @@ func TestExportFormatAPNGIsChosenByNameExtensionOrDefault(t *testing.T) {
 func TestExportFormatFlagWithoutOutputUsesFormatExtension(t *testing.T) {
 	t.Parallel()
 	in := writeFile(t, "y.shot", mustRead(t, writeExportFixture(t)))
-	if code, stderr := runExportCmd(t, in, "--format", "apng"); code != 0 {
+	if code, stderr := runExportCmd(t, in, "--format", "png"); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(filepath.Dir(in), "y.png")); err != nil {
 		t.Errorf("default output y.png missing: %v", err)
+	}
+}
+
+// "apng" is not a format name: --format apng fails and lists the formats.
+func TestExportFormatAPNGIsNotAFormatName(t *testing.T) {
+	t.Parallel()
+	in := writeExportFixture(t)
+	code, stderr := runExportCmd(t, in, "--format", "apng")
+	if code == 0 || !strings.Contains(stderr, `unknown --format "apng"`) || !strings.Contains(stderr, "supported: png, gif, svg, webp") {
+		t.Errorf("exit %d, stderr %q; want an unknown --format error listing png first", code, stderr)
 	}
 }
 
@@ -75,10 +85,10 @@ func TestExportRejectsUnknownFormat(t *testing.T) {
 		args []string
 		want []string
 	}{
-		{"unknown --format", "o.png", []string{"--format", "tiff"}, []string{`unknown --format "tiff"`, "supported: apng"}},
-		{"empty-looking --format", "o.png", []string{"--format", " "}, []string{"unknown --format", "supported: apng"}},
-		{"unknown extension", "o.tiff", nil, []string{`extension ".tiff"`, "o.tiff", "--format", "supported: apng"}},
-		{"unknown upper-case extension", "o.TIFF", nil, []string{`extension ".TIFF"`, "supported: apng"}},
+		{"unknown --format", "o.png", []string{"--format", "tiff"}, []string{`unknown --format "tiff"`, "supported: png"}},
+		{"empty-looking --format", "o.png", []string{"--format", " "}, []string{"unknown --format", "supported: png"}},
+		{"unknown extension", "o.tiff", nil, []string{`extension ".tiff"`, "o.tiff", "--format", "supported: png"}},
+		{"unknown upper-case extension", "o.TIFF", nil, []string{`extension ".TIFF"`, "supported: png"}},
 	}
 	for _, tc := range cases {
 		out := filepath.Join(dir, tc.out)

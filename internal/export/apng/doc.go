@@ -1,5 +1,5 @@
-// Package apng writes animated PNG (APNG) files using only the standard
-// library.
+// Package apng writes animated PNG files (the APNG chunk container) using only
+// the standard library. The export format built on it is called png.
 //
 // Each frame is encoded by image/png; the encoder lifts the IDAT payload out
 // of that output and re-wraps it in APNG chunks (acTL, fcTL, IDAT, fdAT).

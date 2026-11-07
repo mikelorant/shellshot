@@ -69,12 +69,12 @@ $ shellshot export demo.shot -o demo.png --scale 2 --theme light
 wrote 1 frames (9.1 KB) to demo.png
 ```
 
-Formats: `apng` (default), `gif`, `webp` and `svg`, chosen by the extension of `-o` or by
+Formats: `png` (default), `gif`, `webp` and `svg`, chosen by the extension of `-o` or by
 `--format`; the comparison is in [docs/export.md](docs/export.md#output-format). Without `-o`, the
 output is the input name with the format's extension. `--scale 2` gives sharp images on retina
-displays. An APNG is a standard PNG with animation data: browsers, GitHub and Slack animate it, while
+displays. An animated PNG plays in browsers, GitHub and Slack, while
 macOS Preview and Quick Look show one image, which export makes the final screen
-([`--poster`](docs/export.md#poster-apng)). Use PNG or GIF for READMEs and chat; SVG animation
+([`--poster`](docs/export.md#poster-png)). Use PNG or GIF for READMEs and chat; SVG animation
 depends on the viewer. To match a Ghostty terminal, see [cell size](docs/export.md#cell-size).
 
 `export` takes a file and writes a file, so it works in a loop:

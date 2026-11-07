@@ -39,7 +39,7 @@ func TestExportReportsTheFramesInTheFile(t *testing.T) {
 	dir := t.TempDir()
 	flags := []string{"--cursor", "none", "--min-delay", "0", "--keep-leading-blank", "--hold", "1s"}
 
-	t.Run("apng", func(t *testing.T) {
+	t.Run("png", func(t *testing.T) {
 		// The default poster adds an image that is not a frame.
 		for _, extra := range [][]string{nil, {"--poster", "none"}} {
 			out := filepath.Join(dir, fmt.Sprintf("%d.png", len(extra)))
@@ -47,7 +47,7 @@ func TestExportReportsTheFramesInTheFile(t *testing.T) {
 			if code != 0 {
 				t.Fatalf("exit %d, stderr %q", code, stderr)
 			}
-			a := decodeAPNG(t, out)
+			a := decodeAnimatedPNG(t, out)
 			if len(a.Frames) != 3 {
 				t.Fatalf("file holds %d frames, want 3 (fixture)", len(a.Frames))
 			}

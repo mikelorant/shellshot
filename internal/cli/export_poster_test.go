@@ -52,7 +52,7 @@ func exportPoster(t *testing.T, flags ...string) []byte {
 	return data
 }
 
-func decodeAPNGBytes(t *testing.T, data []byte) kettek.APNG {
+func decodeAnimatedPNGBytes(t *testing.T, data []byte) kettek.APNG {
 	t.Helper()
 	a, err := kettek.DecodeAll(bytes.NewReader(data))
 	if err != nil {
@@ -61,12 +61,12 @@ func decodeAPNGBytes(t *testing.T, data []byte) kettek.APNG {
 	return a
 }
 
-// The default poster of an APNG is the last frame: a viewer that shows one
+// The default poster of a PNG is the last frame: a viewer that shows one
 // image shows the end result, and the animation is unchanged.
 func TestExportPosterDefaultIsLastFrame(t *testing.T) {
 	t.Parallel()
 	data := exportPoster(t)
-	a, hasDefault := animationOf(decodeAPNGBytes(t, data))
+	a, hasDefault := animationOf(decodeAnimatedPNGBytes(t, data))
 	if !hasDefault {
 		t.Fatal("output has no default image, want the last frame")
 	}
@@ -85,7 +85,7 @@ func TestExportPosterDefaultIsLastFrame(t *testing.T) {
 func TestExportPosterFlagValues(t *testing.T) {
 	t.Parallel()
 	none := exportPoster(t, "--poster", "none")
-	a, hasDefault := animationOf(decodeAPNGBytes(t, none))
+	a, hasDefault := animationOf(decodeAnimatedPNGBytes(t, none))
 	if hasDefault {
 		t.Fatal("--poster none wrote a default image")
 	}
@@ -106,7 +106,7 @@ func TestExportPosterFlagValues(t *testing.T) {
 		if !samePixels(pngPicture(t, data), want) {
 			t.Errorf("--poster %s: image/png shows the wrong frame", poster)
 		}
-		if anim, _ := animationOf(decodeAPNGBytes(t, data)); len(anim.Frames) != 2 {
+		if anim, _ := animationOf(decodeAnimatedPNGBytes(t, data)); len(anim.Frames) != 2 {
 			t.Errorf("--poster %s: %d animation frames, want 2", poster, len(anim.Frames))
 		}
 	}
@@ -123,9 +123,9 @@ func TestExportPosterErrors(t *testing.T) {
 	}{
 		{"bad value", []string{"-o", filepath.Join(dir, "a.png"), "--poster", "middle"}, `--poster: invalid poster "middle"`},
 		{"negative time", []string{"-o", filepath.Join(dir, "b.png"), "--poster", "-1s"}, "--poster"},
-		{"gif", []string{"-o", filepath.Join(dir, "c.gif"), "--poster", "last"}, "--poster only applies to apng output, not gif"},
-		{"webp", []string{"-o", filepath.Join(dir, "d.webp"), "--poster", "none"}, "--poster only applies to apng output, not webp"},
-		{"svg", []string{"-o", filepath.Join(dir, "e.svg"), "--poster", "first"}, "--poster only applies to apng output, not svg"},
+		{"gif", []string{"-o", filepath.Join(dir, "c.gif"), "--poster", "last"}, "--poster only applies to png output, not gif"},
+		{"webp", []string{"-o", filepath.Join(dir, "d.webp"), "--poster", "none"}, "--poster only applies to png output, not webp"},
+		{"svg", []string{"-o", filepath.Join(dir, "e.svg"), "--poster", "first"}, "--poster only applies to png output, not svg"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -140,7 +140,7 @@ func TestExportPosterErrors(t *testing.T) {
 	}
 }
 
-// Formats other than apng take no poster, and need no flag to say so.
+// Formats other than png take no poster, and need no flag to say so.
 func TestExportOtherFormatsIgnoreThePosterDefault(t *testing.T) {
 	t.Parallel()
 	in := writeExportFixture(t)

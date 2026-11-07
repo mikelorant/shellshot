@@ -127,7 +127,7 @@ func samePicture(t *testing.T, got image.Image, want *image.RGBA) {
 // posters existed: the first frame is the default image.
 func TestExportPosterNoneAndFirstMatchGolden(t *testing.T) {
 	t.Parallel()
-	want, err := os.ReadFile("testdata/apng_golden.apng")
+	want, err := os.ReadFile("testdata/png_golden.png")
 	if err != nil {
 		t.Fatal(err)
 	}

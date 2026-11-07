@@ -15,7 +15,7 @@ import (
 
 // patternRenderer draws a 16x8 image whose top-left pixel run is set by the
 // first byte of the first line, over a fixed gradient, so consecutive screens
-// differ in a small region and APNG delta frames apply.
+// differ in a small region and PNG delta frames apply.
 type patternRenderer struct{}
 
 func (patternRenderer) Size(cols, rows int) (int, int) { return cols * 4, rows * 8 }
@@ -40,7 +40,7 @@ func (patternRenderer) Render(s snapshot.Snapshot) (*image.RGBA, error) {
 }
 
 // goldenExport exports a fixed recording with the default sink: changing
-// screens, a repeated screen and a final hold longer than one APNG frame.
+// screens, a repeated screen and a final hold longer than one PNG frame.
 func goldenExport(t *testing.T) []byte {
 	t.Helper()
 	src := &sliceSource{frames: []snapshot.Frame{
@@ -59,15 +59,15 @@ func goldenExport(t *testing.T) []byte {
 	return buf.Bytes()
 }
 
-// The default APNG output must stay byte-identical to what Export wrote
-// before the sink refactor (testdata/apng_golden.apng, produced from it).
-func TestExportAPNGBytesMatchGolden(t *testing.T) {
+// The default PNG output must stay byte-identical to what Export wrote
+// before the sink refactor (testdata/png_golden.png, produced from it).
+func TestExportPNGBytesMatchGolden(t *testing.T) {
 	t.Parallel()
-	want, err := os.ReadFile("testdata/apng_golden.apng")
+	want, err := os.ReadFile("testdata/png_golden.png")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := goldenExport(t); !bytes.Equal(got, want) {
-		t.Errorf("APNG output changed: got %d bytes, want %d", len(got), len(want))
+		t.Errorf("PNG output changed: got %d bytes, want %d", len(got), len(want))
 	}
 }

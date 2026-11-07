@@ -91,7 +91,7 @@ func exportSpans(t *testing.T, in string, flags ...string) (kettek.APNG, string)
 	if code != 0 {
 		t.Fatalf("export %v: exit %d, stderr %q", flags, code, stderr)
 	}
-	return decodeAPNG(t, outPath), stderr
+	return decodeAnimatedPNG(t, outPath), stderr
 }
 
 // delaysOf returns the frame delays of a.

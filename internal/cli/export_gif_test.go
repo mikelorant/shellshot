@@ -82,22 +82,22 @@ func TestExportGIFShowsTheRecordedScreens(t *testing.T) {
 	if g.LoopCount != 0 {
 		t.Errorf("LoopCount %d, want 0 (forever)", g.LoopCount)
 	}
-	// The same screens as the APNG of the same recording.
+	// The same screens as the PNG of the same recording.
 	png := filepath.Join(dir, "o.png")
 	if code, stderr := runExportCmd(t, in, "-o", png); code != 0 {
-		t.Fatalf("apng: exit %d, stderr %q", code, stderr)
+		t.Fatalf("png: exit %d, stderr %q", code, stderr)
 	}
-	a := decodeAPNG(t, png)
+	a := decodeAnimatedPNG(t, png)
 	if len(a.Frames) != len(g.Image) {
-		t.Fatalf("%d GIF frames, %d APNG frames", len(g.Image), len(a.Frames))
+		t.Fatalf("%d GIF frames, %d PNG frames", len(g.Image), len(a.Frames))
 	}
 	want, got := compose(t, a, len(a.Frames)-1), lastScreen(g)
 	if want.Rect != got.Rect {
-		t.Fatalf("GIF canvas %v, APNG canvas %v", got.Rect, want.Rect)
+		t.Fatalf("GIF canvas %v, PNG canvas %v", got.Rect, want.Rect)
 	}
-	// Few colours, so the palette is exact: pixel-identical to the APNG.
+	// Few colours, so the palette is exact: pixel-identical to the PNG.
 	if !bytes.Equal(want.Pix, got.Pix) {
-		t.Error("the last GIF screen differs from the last APNG screen")
+		t.Error("the last GIF screen differs from the last PNG screen")
 	}
 }
 

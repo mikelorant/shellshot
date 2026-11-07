@@ -97,7 +97,7 @@ func TestExportFormatErrorListsSVG(t *testing.T) {
 	t.Parallel()
 	in := writeExportFixture(t)
 	code, stderr := runExportCmd(t, in, "-o", filepath.Join(t.TempDir(), "o.png"), "--format", "bogus")
-	if code == 0 || !strings.Contains(stderr, "supported: apng, gif, svg, webp") {
+	if code == 0 || !strings.Contains(stderr, "supported: png, gif, svg, webp") {
 		t.Errorf("exit %d, stderr %q; want the supported list with svg", code, stderr)
 	}
 }

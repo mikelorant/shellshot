@@ -207,7 +207,7 @@ func TestPipelineSplitsLongHoldsAtMaxDelay(t *testing.T) {
 	}
 }
 
-func TestLoopCountMirrorsTheAPNGPlayCount(t *testing.T) {
+func TestLoopCountMirrorsThePNGPlayCount(t *testing.T) {
 	t.Parallel()
 	// Loops is the number of plays, 0 forever; image/gif LoopCount is 0 for
 	// forever, -1 for once, and n for n repeats after the first play.
