@@ -7,6 +7,7 @@ import (
 )
 
 func TestResolveCommand(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		argv    []string
@@ -33,6 +34,7 @@ func TestResolveCommand(t *testing.T) {
 }
 
 func TestShellFromEnv(t *testing.T) {
+	t.Parallel()
 	env := map[string]string{"SHELL": "/bin/fish"}
 	if got := shellFromEnv(func(k string) string { return env[k] }); got != "/bin/fish" {
 		t.Errorf("shell = %q, want /bin/fish", got)
@@ -43,6 +45,7 @@ func TestShellFromEnv(t *testing.T) {
 }
 
 func TestResolveSize(t *testing.T) {
+	t.Parallel()
 	var notTerminal bytes.Buffer
 	tests := []struct {
 		name                     string

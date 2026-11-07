@@ -15,6 +15,7 @@ func envFrom(m map[string]string) func(string) string {
 }
 
 func TestBuildHead(t *testing.T) {
+	t.Parallel()
 	started := time.Date(2024, 1, 2, 3, 4, 5, 6, time.FixedZone("x", 3600))
 	id := [16]byte{1, 2, 3}
 	h := buildHead(headInputs{
@@ -59,6 +60,7 @@ func TestBuildHead(t *testing.T) {
 }
 
 func TestBuildHeadTermFallbackMatchesChildEnvironment(t *testing.T) {
+	t.Parallel()
 	h := buildHead(headInputs{Cols: 1, Rows: 1, Getenv: envFrom(nil)})
 	if h.Term != "xterm-256color" || !reflect.DeepEqual(h.Env, []string{"TERM=xterm-256color"}) {
 		t.Errorf("term %q env %q, want the TERM the child gets", h.Term, h.Env)
@@ -66,6 +68,7 @@ func TestBuildHeadTermFallbackMatchesChildEnvironment(t *testing.T) {
 }
 
 func TestBuildHeadRecordInputFlag(t *testing.T) {
+	t.Parallel()
 	h := buildHead(headInputs{Cols: 1, Rows: 1, Getenv: envFrom(nil), RecordInput: true})
 	if h.Flags != head.FlagInputRecorded {
 		t.Errorf("flags = %#x, want input-recorded only", h.Flags)
@@ -73,6 +76,7 @@ func TestBuildHeadRecordInputFlag(t *testing.T) {
 }
 
 func TestNewSessionIDIsRandom(t *testing.T) {
+	t.Parallel()
 	a, err := newSessionID()
 	if err != nil {
 		t.Fatal(err)
@@ -84,6 +88,7 @@ func TestNewSessionIDIsRandom(t *testing.T) {
 }
 
 func TestWriterOptions(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		codec     string

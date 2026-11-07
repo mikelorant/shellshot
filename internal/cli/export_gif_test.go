@@ -30,6 +30,7 @@ func lastScreen(g *stdgif.GIF) *image.RGBA {
 }
 
 func TestExportGIFIsChosenByNameOrExtension(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	var first []byte
@@ -56,6 +57,7 @@ func TestExportGIFIsChosenByNameOrExtension(t *testing.T) {
 }
 
 func TestExportGIFWithoutOutputUsesGIFExtension(t *testing.T) {
+	t.Parallel()
 	in := writeFile(t, "z.shot", mustRead(t, writeExportFixture(t)))
 	if code, stderr := runExportCmd(t, in, "--format", "gif"); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
@@ -66,6 +68,7 @@ func TestExportGIFWithoutOutputUsesGIFExtension(t *testing.T) {
 }
 
 func TestExportGIFShowsTheRecordedScreens(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	out := filepath.Join(dir, "o.gif")
@@ -99,6 +102,7 @@ func TestExportGIFShowsTheRecordedScreens(t *testing.T) {
 }
 
 func TestExportGIFLoops(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	for loops, want := range map[string]int{"0": 0, "1": -1, "4": 3} {
 		out := filepath.Join(t.TempDir(), "o.gif")
@@ -112,6 +116,7 @@ func TestExportGIFLoops(t *testing.T) {
 }
 
 func TestExportGIFOptions(t *testing.T) {
+	t.Parallel()
 	usage := newExportCmd().Flags().FlagUsages()
 	for _, want := range []string{"--gif-colors", "--gif-dither"} {
 		if !strings.Contains(usage, want) {
@@ -129,6 +134,7 @@ func TestExportGIFOptions(t *testing.T) {
 }
 
 func TestExportGIFRejectsBadColors(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	for _, v := range []string{"0", "1", "256", "-5"} {
 		out := filepath.Join(t.TempDir(), "o.gif")

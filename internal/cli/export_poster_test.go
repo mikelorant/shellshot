@@ -64,6 +64,7 @@ func decodeAPNGBytes(t *testing.T, data []byte) kettek.APNG {
 // The default poster of an APNG is the last frame: a viewer that shows one
 // image shows the end result, and the animation is unchanged.
 func TestExportPosterDefaultIsLastFrame(t *testing.T) {
+	t.Parallel()
 	data := exportPoster(t)
 	a, hasDefault := animationOf(decodeAPNGBytes(t, data))
 	if !hasDefault {
@@ -82,6 +83,7 @@ func TestExportPosterDefaultIsLastFrame(t *testing.T) {
 }
 
 func TestExportPosterFlagValues(t *testing.T) {
+	t.Parallel()
 	none := exportPoster(t, "--poster", "none")
 	a, hasDefault := animationOf(decodeAPNGBytes(t, none))
 	if hasDefault {
@@ -111,6 +113,7 @@ func TestExportPosterFlagValues(t *testing.T) {
 }
 
 func TestExportPosterErrors(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	tests := []struct {
@@ -139,6 +142,7 @@ func TestExportPosterErrors(t *testing.T) {
 
 // Formats other than apng take no poster, and need no flag to say so.
 func TestExportOtherFormatsIgnoreThePosterDefault(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	for _, name := range []string{"a.gif", "b.webp", "c.svg"} {
 		out := filepath.Join(t.TempDir(), name)

@@ -20,6 +20,7 @@ import (
 )
 
 func TestRecordFlagDefaults(t *testing.T) {
+	t.Parallel()
 	cmd := newRecordCmd()
 	for name, want := range map[string]string{
 		"output":       "recording.shot",
@@ -51,6 +52,7 @@ func TestRecordFlagDefaults(t *testing.T) {
 }
 
 func TestRecordFlagParsing(t *testing.T) {
+	t.Parallel()
 	var ro recordOptions
 	cmd := newRecordCmd()
 	cmd.RunE = func(*cobra.Command, []string) error { return nil }
@@ -68,6 +70,7 @@ func TestRecordFlagParsing(t *testing.T) {
 }
 
 func TestRecordRejectsBadFlags(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		args []string
@@ -97,6 +100,7 @@ func TestRecordRejectsBadFlags(t *testing.T) {
 }
 
 func TestRecordRejectsCommandStringWithArgv(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	args := []string{"record", "-o", filepath.Join(t.TempDir(), "x.shot"), "-c", "true", "--", "ls"}
 	code := runWithStdin(context.Background(), args, strings.NewReader(""), &stdout, &stderr)
@@ -179,6 +183,7 @@ func recordToFile(t *testing.T, args []string, stdin string) (data []byte, stder
 }
 
 func TestRecordWritesBinaryRecording(t *testing.T) {
+	t.Parallel()
 	data, stderr := recordToFile(t, []string{"--cols", "40", "--rows", "6", "-c", "printf hi; sleep 0.2; printf there"}, "")
 
 	if !bytes.HasPrefix(data, []byte(chunk.Magic)) {
@@ -253,6 +258,7 @@ func TestRecordWritesBinaryRecording(t *testing.T) {
 }
 
 func TestRecordExitStatusIsInRecording(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "x.shot")
 	var stdout, stderr bytes.Buffer
 	args := []string{"record", "-o", path, "--cols", "40", "--rows", "5", "-c", "exit 7"}
@@ -271,6 +277,7 @@ func TestRecordExitStatusIsInRecording(t *testing.T) {
 }
 
 func TestRecordRecordInput(t *testing.T) {
+	t.Parallel()
 	data, stderr := recordToFile(t, []string{"--cols", "40", "--rows", "6", "--record-input", "-c", "read x; echo got:$x"}, "hello\n")
 
 	rec := readRecording(t, data)
@@ -296,6 +303,7 @@ func TestRecordRecordInput(t *testing.T) {
 }
 
 func TestRecordInputSharesOriginWithOutput(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "x.shot")
 	pr, pw := io.Pipe()
 	defer pw.Close()
@@ -339,6 +347,7 @@ func TestRecordInputSharesOriginWithOutput(t *testing.T) {
 }
 
 func TestRecordCoalesceMergesOutputs(t *testing.T) {
+	t.Parallel()
 	script := "printf a; sleep 0.02; printf b; sleep 0.02; printf c"
 	plain, _ := recordToFile(t, []string{"--cols", "40", "--rows", "6", "-c", script}, "")
 	merged, _ := recordToFile(t, []string{"--cols", "40", "--rows", "6", "--coalesce", "1s", "-c", script}, "")
@@ -362,6 +371,7 @@ func TestRecordCoalesceMergesOutputs(t *testing.T) {
 }
 
 func TestRecordCodecs(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"none", "flate", "zstd"} {
 		t.Run(name, func(t *testing.T) {
 			data, _ := recordToFile(t, []string{"--cols", "40", "--rows", "6", "--codec", name, "-c", "seq 1 200"}, "")
@@ -374,6 +384,7 @@ func TestRecordCodecs(t *testing.T) {
 }
 
 func TestRecordTruncatedFileReadsUpToLastGoodBlock(t *testing.T) {
+	t.Parallel()
 	data, _ := recordToFile(t, []string{"--cols", "40", "--rows", "6", "-c", "printf hi"}, "")
 	full := readRecording(t, data)
 	cut := readRecording(t, data[:len(data)-10])
@@ -389,6 +400,7 @@ func TestRecordTruncatedFileReadsUpToLastGoodBlock(t *testing.T) {
 }
 
 func TestRecordForwardsStdinAndShowsOutputLive(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "x.shot")
 	var stdout, stderr bytes.Buffer
 	args := []string{"record", "-o", path, "--cols", "40", "--rows", "6", "-c", "read x; echo got:$x"}
@@ -455,6 +467,7 @@ func TestRecordPipedStdinEOFExitsDefaultShell(t *testing.T) {
 }
 
 func TestRecordPipedStdinEOFEndsCat(t *testing.T) {
+	t.Parallel()
 	data, _ := recordToFile(t, []string{"--cols", "40", "--rows", "5", "-c", "cat"}, "hi\n")
 	if out := readRecording(t, data).out(); !strings.Contains(out, "hi") {
 		t.Errorf("OUT = %q, want it to contain hi", out)
@@ -478,6 +491,7 @@ func assertOutputContains(t *testing.T, path, want string) {
 // the end of stdin ends cat without the terminal echoing it into the
 // recording.
 func TestRecordPipedStdinEOFDoesNotEchoEOT(t *testing.T) {
+	t.Parallel()
 	data, _ := recordToFile(t, []string{"--cols", "40", "--rows", "5", "-c", "cat"}, "x\n")
 	if out, want := readRecording(t, data).out(), "x\r\nx\r\n"; out != want {
 		t.Errorf("OUT = %q, want %q (typed echo and cat's output, no echoed EOT)", out, want)
@@ -487,6 +501,7 @@ func TestRecordPipedStdinEOFDoesNotEchoEOT(t *testing.T) {
 // TestRecordEmptyStdinSendsNoEOT checks that an stdin already at EOF (such as
 // /dev/null) records only the command's own output.
 func TestRecordEmptyStdinSendsNoEOT(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "x.shot")
 	var stdout, stderr bytes.Buffer
 	args := []string{"record", "-o", path, "--cols", "40", "--rows", "5", "-c", "printf hi"}

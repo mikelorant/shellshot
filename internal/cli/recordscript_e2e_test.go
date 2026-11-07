@@ -115,6 +115,7 @@ func spanNames(sp []spans.Span) []string {
 }
 
 func TestRecordScriptEndToEnd(t *testing.T) {
+	t.Parallel()
 	r := runScriptCLI(t, `
 scene hello {
   run echo hello
@@ -178,6 +179,7 @@ hidden {
 }
 
 func TestRecordScriptExportsWithSpans(t *testing.T) {
+	t.Parallel()
 	r := runScriptCLI(t, `
 scene a {
   speed 4x
@@ -200,6 +202,7 @@ scene b {
 }
 
 func TestRecordScriptWatch(t *testing.T) {
+	t.Parallel()
 	src := "run echo watched-output\n"
 	if r := runScriptCLI(t, src); strings.Contains(r.stdout, "watched-output") {
 		t.Errorf("without --watch stdout = %q, want nothing", r.stdout)
@@ -211,6 +214,7 @@ func TestRecordScriptWatch(t *testing.T) {
 }
 
 func TestRecordScriptFailedWaitKeepsRecording(t *testing.T) {
+	t.Parallel()
 	r := runScriptCLI(t, `
 scene probe {
   run echo hi
@@ -256,6 +260,7 @@ scene probe {
 }
 
 func TestRecordScriptSettleTimeoutFails(t *testing.T) {
+	t.Parallel()
 	r := runScriptCLI(t, `
 timeout 1s
 scene busy {
@@ -275,6 +280,7 @@ scene busy {
 }
 
 func TestRecordScriptChildExitsEarlyFails(t *testing.T) {
+	t.Parallel()
 	r := runScriptCLI(t, "run exit\nrun echo too-late\n")
 	if r.code != 3 || !strings.Contains(r.stderr, "child exited") {
 		t.Errorf("exit code = %d, stderr = %s, want 3 and a child exited failure", r.code, r.stderr)
@@ -282,6 +288,7 @@ func TestRecordScriptChildExitsEarlyFails(t *testing.T) {
 }
 
 func TestRecordScriptChildStatus(t *testing.T) {
+	t.Parallel()
 	src := "run exit 7\n"
 	r := runScriptCLI(t, src)
 	if r.code != 7 || !strings.Contains(r.stderr, "command exited with 7") {
@@ -296,6 +303,7 @@ func TestRecordScriptChildStatus(t *testing.T) {
 }
 
 func TestRecordScriptCannotStartProgram(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	file := filepath.Join(dir, "x.script")
 	if err := os.WriteFile(file, []byte("shell /nonexistent/shell\nrun echo hi\n"), 0o644); err != nil {
@@ -312,6 +320,7 @@ func TestRecordScriptCannotStartProgram(t *testing.T) {
 }
 
 func TestRecordScriptCancelClosesSpans(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(1500*time.Millisecond, cancel)
 	r := runScriptCLIContext(t, ctx, `
@@ -348,6 +357,7 @@ scene waiting {
 }
 
 func TestRecordScriptRecordInput(t *testing.T) {
+	t.Parallel()
 	r := runScriptCLI(t, "type echo ab\npress enter\n", "--record-input")
 	if r.code != 0 {
 		t.Fatalf("exit code = %d\n%s", r.code, r.stderr)
@@ -378,6 +388,7 @@ func (s shot) timeline() []string {
 }
 
 func TestRecordScriptIsDeterministic(t *testing.T) {
+	t.Parallel()
 	const src = `
 seed 42
 jitter 40%
@@ -403,10 +414,12 @@ scene two {
 }
 
 func TestRecordScriptFlagsBeatScript(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
-	t.Chdir(dir)
+	// The script names its output by absolute path, so the test does not need
+	// t.Chdir, which cannot be used in a parallel test.
 	file := filepath.Join(dir, "p.script")
-	src := scriptPrelude + "output from-script.shot\nrun echo hi\n"
+	src := scriptPrelude + "output " + filepath.Join(dir, "from-script.shot") + "\nrun echo hi\n"
 	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -441,6 +454,7 @@ func TestRecordScriptFlagsBeatScript(t *testing.T) {
 }
 
 func TestRecordScriptEnvAndCwd(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	r := runScriptCLI(t, fmt.Sprintf(`
 env GREETING=howdy
@@ -461,6 +475,7 @@ scene env {
 // program does not leave on Ctrl-D: shellshot closes it after the grace time,
 // says so, and does not count it as a failure of the child.
 func TestRecordScriptClosesChildThatIgnoresEOF(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	file := filepath.Join(dir, "x.script")
 	if err := os.WriteFile(file, []byte("shell /bin/sleep 30\nsleep 100ms\n"), 0o644); err != nil {

@@ -88,6 +88,7 @@ func runExportCmd(t *testing.T, args ...string) (code int, stderr string) {
 }
 
 func TestExportWritesStyledAPNG(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	out := filepath.Join(t.TempDir(), "out.png")
 
@@ -181,6 +182,7 @@ func TestExportWritesStyledAPNG(t *testing.T) {
 }
 
 func TestExportDefaultOutputPath(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	code, stderr := runExportCmd(t, in)
 	if code != 0 {
@@ -199,6 +201,7 @@ func TestExportDefaultOutputPath(t *testing.T) {
 // PNG and the extension operating systems recognise. Only the output file
 // remains next to the input (the atomic temporary file is gone).
 func TestExportDefaultsToPNGExtension(t *testing.T) {
+	t.Parallel()
 	in := writeFile(t, "x.shot", mustRead(t, writeExportFixture(t)))
 	if code, stderr := runExportCmd(t, in); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
@@ -222,6 +225,7 @@ func TestExportDefaultsToPNGExtension(t *testing.T) {
 // -o is used as typed: an ".apng" name is neither rewritten nor given a
 // second extension, and the bytes equal those written to a ".png" name.
 func TestExportOutputExtensionIsNotRewritten(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	apngOut := filepath.Join(dir, "out.apng")
@@ -253,6 +257,7 @@ func mustRead(t *testing.T, path string) []byte {
 }
 
 func TestExportOptionsChangeOutput(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	themeFile := filepath.Join(dir, "t.json")
@@ -330,6 +335,7 @@ func writeThemeFile(t *testing.T, path string, th theme.Theme) {
 }
 
 func TestExportRejectsBadValues(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	tests := []struct {
 		name string
@@ -373,6 +379,7 @@ func TestExportRejectsBadValues(t *testing.T) {
 }
 
 func TestExportBadThemeFile(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	bad := filepath.Join(t.TempDir(), "bad.json")
 	if err := os.WriteFile(bad, []byte(`{"name":"x"}`), 0o644); err != nil {
@@ -385,6 +392,7 @@ func TestExportBadThemeFile(t *testing.T) {
 }
 
 func TestExportRefusesToOverwriteInput(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	before, _ := os.ReadFile(in)
 	code, stderr := runExportCmd(t, in, "-o", in)
@@ -400,6 +408,7 @@ func TestExportRefusesToOverwriteInput(t *testing.T) {
 // A recording that fails midway must leave no output file and no temporary
 // file, and must keep an existing output untouched.
 func TestExportFailureLeavesNoPartialOutput(t *testing.T) {
+	t.Parallel()
 	data, firstEnd := twoBlockRecording(t)
 	data[firstEnd-10] ^= 0xff // corrupt the first block, which is followed by more data
 	in := writeFile(t, "broken.shot", data)
@@ -432,6 +441,7 @@ func TestExportFailureLeavesNoPartialOutput(t *testing.T) {
 }
 
 func TestExportRejectsNonRecordings(t *testing.T) {
+	t.Parallel()
 	tests := map[string][]byte{
 		"json": []byte(`{"version":1,"cols":10,"rows":2}` + "\n"),
 		"text": []byte("hello, this is not a recording\n"),
@@ -454,6 +464,7 @@ func TestExportRejectsNonRecordings(t *testing.T) {
 // Known limitation: the APNG canvas is fixed, so a recording that resizes
 // cannot be exported yet.
 func TestExportRejectsResizingRecording(t *testing.T) {
+	t.Parallel()
 	in := writeFile(t, "resize.shot", resizingRecording(t))
 	out := filepath.Join(t.TempDir(), "out.png")
 	code, stderr := runExportCmd(t, in, "-o", out)
@@ -468,6 +479,7 @@ func TestExportRejectsResizingRecording(t *testing.T) {
 
 // A torn recording exports up to the tear and says so; it is not an error.
 func TestExportTruncatedExportsValidPrefix(t *testing.T) {
+	t.Parallel()
 	data, firstEnd := twoBlockRecording(t)
 	in := writeFile(t, "torn.shot", data[:len(data)-3])
 	out := filepath.Join(t.TempDir(), "out.png")
@@ -486,6 +498,7 @@ func TestExportTruncatedExportsValidPrefix(t *testing.T) {
 // A recording without an EXIT event exports in full and says its recorder was
 // interrupted.
 func TestExportInterruptedWarns(t *testing.T) {
+	t.Parallel()
 	in := writeFile(t, "killed.shot", interruptedRecording(t))
 	out := filepath.Join(t.TempDir(), "out.png")
 	code, stderr := runExportCmd(t, in, "-o", out)
@@ -503,6 +516,7 @@ func TestExportInterruptedWarns(t *testing.T) {
 // Idle time costs one step: a five minute pause exports a handful of frames,
 // and the pause is capped by --idle-limit.
 func TestExportIdleGap(t *testing.T) {
+	t.Parallel()
 	in := writeFile(t, "idle.shot", idleGapRecording(t))
 	out := filepath.Join(t.TempDir(), "out.png")
 	start := time.Now()
@@ -529,6 +543,7 @@ func TestExportIdleGap(t *testing.T) {
 // --fps sets the sampling grid: two writes 20ms apart share one frame at
 // 10 fps and get a frame each at 1000 fps.
 func TestExportFPSChangesFrameCount(t *testing.T) {
+	t.Parallel()
 	data := buildRecording(t, head.Head{Cols: 10, Rows: 2}, bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
 		must(t, w.Output(10*time.Millisecond, []byte("a")))
 		must(t, w.Output(30*time.Millisecond, []byte("b")))
@@ -548,6 +563,7 @@ func TestExportFPSChangesFrameCount(t *testing.T) {
 // on, a ZWJ family is one two-cell cluster, so the text after it lands in the
 // column after its second cell and nothing is drawn past it.
 func TestExportDrawsColourEmojiSequences(t *testing.T) {
+	t.Parallel()
 	const family = "\U0001F468\u200d\U0001F469\u200d\U0001F467"
 	data := buildRecording(t, head.Head{Cols: 12, Rows: 1}, bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
 		must(t, w.Output(100*time.Millisecond, []byte("\U0001F600x"+family+"y")))
@@ -615,6 +631,7 @@ func TestExportDrawsColourEmojiSequences(t *testing.T) {
 }
 
 func TestExportFallbackFontErrors(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "bad.ttf")
@@ -638,6 +655,7 @@ func TestExportFallbackFontErrors(t *testing.T) {
 }
 
 func TestExportFallbackFontAndSystemFontsAreAccepted(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	font := "../render/font/assets/noto-cjk/NotoSansMonoCJKsc-Subset.otf"
@@ -657,6 +675,7 @@ func TestExportFallbackFontAndSystemFontsAreAccepted(t *testing.T) {
 // A short blank screen at the start is dropped by default, so the first frame
 // shows the first output; --keep-leading-blank keeps it.
 func TestExportDropsLeadingBlankFrame(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	kept, dropped := filepath.Join(dir, "kept.png"), filepath.Join(dir, "dropped.png")

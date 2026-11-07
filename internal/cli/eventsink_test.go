@@ -32,6 +32,7 @@ func newTestSink(t *testing.T, flags uint64, o bin.WriterOptions, clk *testClock
 }
 
 func TestBinSinkWritesEvents(t *testing.T) {
+	t.Parallel()
 	clk := &testClock{t: time.Unix(1000, 0)}
 	s, buf := newTestSink(t, 0, bin.WriterOptions{Uncompressed: true}, clk)
 
@@ -67,6 +68,7 @@ func TestBinSinkWritesEvents(t *testing.T) {
 }
 
 func TestBinSinkInputIsStampedFromSessionOrigin(t *testing.T) {
+	t.Parallel()
 	clk := &testClock{t: time.Unix(1000, 0)}
 	s, buf := newTestSink(t, head.FlagInputRecorded, bin.WriterOptions{Uncompressed: true}, clk)
 
@@ -89,6 +91,7 @@ func TestBinSinkInputIsStampedFromSessionOrigin(t *testing.T) {
 }
 
 func TestBinSinkInputSurvivesPumpBufferReuseWhileCoalescing(t *testing.T) {
+	t.Parallel()
 	clk := &testClock{t: time.Unix(1000, 0)}
 	s, buf := newTestSink(t, head.FlagInputRecorded, bin.WriterOptions{Uncompressed: true, CoalesceTicks: 100}, clk)
 	s.start(clk.t)
@@ -107,6 +110,7 @@ func TestBinSinkInputSurvivesPumpBufferReuseWhileCoalescing(t *testing.T) {
 }
 
 func TestBinSinkInputRequiresInputFlag(t *testing.T) {
+	t.Parallel()
 	clk := &testClock{t: time.Unix(1000, 0)}
 	s, _ := newTestSink(t, 0, bin.WriterOptions{Uncompressed: true}, clk)
 	if err := s.input([]byte("secret")); !errors.Is(err, bin.ErrInputNotRecorded) {
@@ -115,6 +119,7 @@ func TestBinSinkInputRequiresInputFlag(t *testing.T) {
 }
 
 func TestBinSinkTickFlushesOnlyWhenDue(t *testing.T) {
+	t.Parallel()
 	clk := &testClock{t: time.Unix(1000, 0)}
 	s, buf := newTestSink(t, 0, bin.WriterOptions{Uncompressed: true, FlushInterval: 2 * time.Second}, clk)
 	headBytes := buf.Len()
@@ -156,6 +161,7 @@ func TestBinSinkTickFlushesOnlyWhenDue(t *testing.T) {
 }
 
 func TestBinSinkConfigure(t *testing.T) {
+	t.Parallel()
 	clk := &testClock{t: time.Unix(1000, 0)}
 	s, _ := newTestSink(t, 0, bin.WriterOptions{Uncompressed: true}, clk)
 	var cfg session.Config
@@ -173,6 +179,7 @@ func TestBinSinkConfigure(t *testing.T) {
 var _ session.EventSink = (*binSink)(nil)
 
 func TestBinSinkWritesMarkAndSpan(t *testing.T) {
+	t.Parallel()
 	clk := &testClock{t: time.Unix(1000, 0)}
 	s, buf := newTestSink(t, 0, bin.WriterOptions{Uncompressed: true}, clk)
 
@@ -212,6 +219,7 @@ func TestBinSinkWritesMarkAndSpan(t *testing.T) {
 }
 
 func TestBinSinkSpanRejectsOtherOperations(t *testing.T) {
+	t.Parallel()
 	clk := &testClock{t: time.Unix(1000, 0)}
 	s, _ := newTestSink(t, 0, bin.WriterOptions{Uncompressed: true}, clk)
 	if err := s.Span(0, "not a span"); err == nil {

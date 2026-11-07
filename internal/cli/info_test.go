@@ -49,6 +49,7 @@ func runInfoCmd(t *testing.T, args ...string) (code int, stdout, stderr string) 
 }
 
 func TestInfoCompleteGolden(t *testing.T) {
+	t.Parallel()
 	data, _ := infoFixture(t)
 	path := writeFile(t, "demo.shot", data)
 	code, stdout, stderr := runInfoCmd(t, path)
@@ -103,6 +104,7 @@ func infoInterruptedFixture(t *testing.T) []byte {
 func itoa(n int) string { return strconv.Itoa(n) }
 
 func TestInfoTruncated(t *testing.T) {
+	t.Parallel()
 	data, firstEnd := infoFixture(t)
 	path := writeFile(t, "torn.shot", data[:len(data)-2])
 	code, stdout, stderr := runInfoCmd(t, path)
@@ -136,6 +138,7 @@ func infoGoldenOutput(t *testing.T, data []byte, wantCode int) string {
 // A recorder killed at a block boundary leaves a clean file without an EXIT
 // event: the status says it was interrupted, and info still succeeds.
 func TestInfoInterruptedGolden(t *testing.T) {
+	t.Parallel()
 	got := infoGoldenOutput(t, infoInterruptedFixture(t), 0)
 	want := `file          FILE
 size          80x24
@@ -167,6 +170,7 @@ status        interrupted
 // A file cut inside its second chunk keeps the first chunk and reports how
 // many bytes of it are valid.
 func TestInfoTruncatedGolden(t *testing.T) {
+	t.Parallel()
 	data, firstEnd := infoFixture(t)
 	if firstEnd != 130 {
 		t.Fatalf("fixture first block ends at %d, the golden expects 130", firstEnd)
@@ -202,6 +206,7 @@ status        truncated (130 bytes valid)
 // A corrupt chunk with data after it is damage: the report shows what was
 // read and the command fails.
 func TestInfoDamagedGolden(t *testing.T) {
+	t.Parallel()
 	data, firstEnd := infoFixture(t)
 	bad := append([]byte(nil), data...)
 	bad[firstEnd-10] ^= 0xff
@@ -236,6 +241,7 @@ status        damaged: bin: corrupt recording: chunk: crc mismatch: chunk EVNT a
 // A keystroke can be logged after the child's exit; the recording is still
 // complete.
 func TestInfoCompleteWhenExitIsNotLast(t *testing.T) {
+	t.Parallel()
 	data := buildRecording(t, infoFixtureHead(), bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
 		must(t, w.Output(100*time.Millisecond, []byte("bye")))
 		must(t, w.Exit(200*time.Millisecond, 0))
@@ -249,6 +255,7 @@ func TestInfoCompleteWhenExitIsNotLast(t *testing.T) {
 
 // The three non-error statuses are explained in --help.
 func TestInfoHelpExplainsStatuses(t *testing.T) {
+	t.Parallel()
 	var out, errBuf bytes.Buffer
 	if code := Run(context.Background(), []string{"info", "--help"}, &out, &errBuf); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, errBuf.String())
@@ -261,6 +268,7 @@ func TestInfoHelpExplainsStatuses(t *testing.T) {
 }
 
 func TestInfoDefaultsForMinimalHeader(t *testing.T) {
+	t.Parallel()
 	data := buildRecording(t, head.Head{Cols: 5, Rows: 2}, bin.WriterOptions{}, func(*bin.Writer, *bytes.Buffer) {})
 	path := writeFile(t, "min.shot", data)
 	code, stdout, stderr := runInfoCmd(t, path)
@@ -278,6 +286,7 @@ func TestInfoDefaultsForMinimalHeader(t *testing.T) {
 }
 
 func TestInfoErrors(t *testing.T) {
+	t.Parallel()
 	data, firstEnd := infoFixture(t)
 	bad := append([]byte(nil), data...)
 	bad[firstEnd-10] ^= 0xff
@@ -331,6 +340,7 @@ func spanFixture(t *testing.T, exit bool) []byte {
 }
 
 func TestInfoListsSpansGolden(t *testing.T) {
+	t.Parallel()
 	path := writeFile(t, "spans.shot", spanFixture(t, false))
 	code, stdout, stderr := runInfoCmd(t, path)
 	if code != 0 || stderr != "" {
@@ -369,6 +379,7 @@ status        interrupted
 }
 
 func TestInfoWithoutSpansHasNoSpanLines(t *testing.T) {
+	t.Parallel()
 	data, _ := infoFixture(t)
 	_, stdout, _ := runInfoCmd(t, writeFile(t, "demo.shot", data))
 	if strings.Contains(stdout, "scenes") || strings.Contains(stdout, "hidden") {

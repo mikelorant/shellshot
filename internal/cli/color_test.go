@@ -3,6 +3,7 @@ package cli
 import "testing"
 
 func TestResolveColor(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		mode    string

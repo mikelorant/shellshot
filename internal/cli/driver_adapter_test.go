@@ -48,6 +48,7 @@ func startedDriver(exec scriptExecutor) *scriptDriver {
 func (s fakeScreen) Text() string { return string(s) }
 
 func TestScriptDriverConvertsSteps(t *testing.T) {
+	t.Parallel()
 	begin := event.Span{Op: event.SpanBegin, ID: 1, Type: event.SpanScene, Name: "intro"}
 	fake := &fakeExecutor{steps: []run.Step{
 		{Write: []byte("ls\r"), Deadline: 5 * time.Millisecond},
@@ -95,6 +96,7 @@ func TestScriptDriverConvertsSteps(t *testing.T) {
 
 // TestScriptDriverSpanIsEventSpan checks the type the binSink expects.
 func TestScriptDriverSpanIsEventSpan(t *testing.T) {
+	t.Parallel()
 	fake := &fakeExecutor{steps: []run.Step{{Span: &run.SpanOp{Event: event.Span{Op: event.SpanEnd, ID: 3}}}}}
 	st, err := startedDriver(fake).Poll(0, fakeScreen(""))
 	if err != nil {
@@ -106,6 +108,7 @@ func TestScriptDriverSpanIsEventSpan(t *testing.T) {
 }
 
 func TestScriptDriverPassesErrorsAndScreen(t *testing.T) {
+	t.Parallel()
 	scriptErr := &run.ScriptError{Kind: run.WaitTimeout, Message: "boom", ExitCode: 3}
 	fake := &fakeExecutor{err: scriptErr}
 	d := startedDriver(fake)
@@ -120,6 +123,7 @@ func TestScriptDriverPassesErrorsAndScreen(t *testing.T) {
 }
 
 func TestScriptDriverForwardsChildExitAndOpenSpans(t *testing.T) {
+	t.Parallel()
 	end2 := event.Span{Op: event.SpanEnd, ID: 2}
 	end1 := event.Span{Op: event.SpanEnd, ID: 1}
 	fake := &fakeExecutor{open: []run.SpanOp{{Event: end2}, {Event: end1}}}
@@ -135,6 +139,7 @@ func TestScriptDriverForwardsChildExitAndOpenSpans(t *testing.T) {
 }
 
 func TestLazyKeysNeedTheTerminal(t *testing.T) {
+	t.Parallel()
 	h := &termHolder{}
 	k := &lazyKeys{holder: h}
 	defer k.close()
@@ -144,6 +149,7 @@ func TestLazyKeysNeedTheTerminal(t *testing.T) {
 }
 
 func TestLazyKeysEncodeWithTheCapturedTerminal(t *testing.T) {
+	t.Parallel()
 	h := &termHolder{}
 	term, err := h.factory(ghostty.New)(40, 5)
 	if err != nil {
@@ -185,6 +191,7 @@ type poll struct {
 }
 
 func TestScriptDriverStart(t *testing.T) {
+	t.Parallel()
 	ms := time.Millisecond
 	tests := []struct {
 		name      string
@@ -256,6 +263,7 @@ func TestScriptDriverStart(t *testing.T) {
 }
 
 func TestScriptDriverStartedPassesEveryPollThrough(t *testing.T) {
+	t.Parallel()
 	fake := &fakeExecutor{steps: []run.Step{{Deadline: 1}, {Deadline: 2}, {Deadline: 3}}}
 	d := newScriptDriver(fake)
 	for i, at := range []time.Duration{time.Second, 1100 * time.Millisecond, 1200 * time.Millisecond} {
@@ -269,6 +277,7 @@ func TestScriptDriverStartedPassesEveryPollThrough(t *testing.T) {
 }
 
 func TestScriptDriverKeepsScreenWhileHeld(t *testing.T) {
+	t.Parallel()
 	d := newScriptDriver(&fakeExecutor{})
 	if _, err := d.Poll(0, fakeScreen("$ ")); err != nil {
 		t.Fatal(err)

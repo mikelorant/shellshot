@@ -54,6 +54,7 @@ func TestReplayColorFlag(t *testing.T) {
 }
 
 func TestReplayPlaysFramesInOrder(t *testing.T) {
+	t.Parallel()
 	path := writeFile(t, "demo.shot", simpleRecording(t))
 	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000")
 	if code != 0 {
@@ -69,6 +70,7 @@ func TestReplayPlaysFramesInOrder(t *testing.T) {
 }
 
 func TestReplayClearFlag(t *testing.T) {
+	t.Parallel()
 	path := writeFile(t, "demo.shot", simpleRecording(t))
 	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear")
 	if code != 0 {
@@ -85,6 +87,7 @@ func TestReplayClearFlag(t *testing.T) {
 // --fps sets the sampling grid: two writes 20ms apart share one frame at
 // 10 fps and get a frame each at 1000 fps.
 func TestReplayFPSChangesFrameCount(t *testing.T) {
+	t.Parallel()
 	data := buildRecording(t, head.Head{Cols: 10, Rows: 2}, bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
 		must(t, w.Output(10*time.Millisecond, []byte("a")))
 		must(t, w.Output(30*time.Millisecond, []byte("b")))
@@ -101,6 +104,7 @@ func TestReplayFPSChangesFrameCount(t *testing.T) {
 // A five minute pause is one step of the frame iterator, not thousands, and
 // replays at --speed in a fraction of the pause.
 func TestReplayIdleGapIsInstant(t *testing.T) {
+	t.Parallel()
 	path := writeFile(t, "idle.shot", idleGapRecording(t))
 	start := time.Now()
 	code, stdout, stderr := runReplayCmd(t, path, "--speed", "2000", "--clear")
@@ -119,6 +123,7 @@ func TestReplayIdleGapIsInstant(t *testing.T) {
 }
 
 func TestReplaySurvivesResize(t *testing.T) {
+	t.Parallel()
 	path := writeFile(t, "resize.shot", resizingRecording(t))
 	for _, clear := range []string{"--clear=false", "--clear=true"} {
 		code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", clear)
@@ -132,6 +137,7 @@ func TestReplaySurvivesResize(t *testing.T) {
 }
 
 func TestReplayTruncatedPlaysValidPrefix(t *testing.T) {
+	t.Parallel()
 	data, firstEnd := twoBlockRecording(t)
 	path := writeFile(t, "torn.shot", data[:len(data)-3])
 	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000")
@@ -149,6 +155,7 @@ func TestReplayTruncatedPlaysValidPrefix(t *testing.T) {
 // A recording with no EXIT event ends cleanly but its recorder died: replay
 // plays everything, exits 0 and says so on stderr.
 func TestReplayInterruptedWarns(t *testing.T) {
+	t.Parallel()
 	path := writeFile(t, "killed.shot", interruptedRecording(t))
 	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000")
 	if code != 0 {
@@ -164,6 +171,7 @@ func TestReplayInterruptedWarns(t *testing.T) {
 
 // A finished recording gets no note.
 func TestReplayCompleteHasNoWarning(t *testing.T) {
+	t.Parallel()
 	path := writeFile(t, "done.shot", simpleRecording(t))
 	if code, _, stderr := runReplayCmd(t, path, "--speed", "1000"); code != 0 || stderr != "" {
 		t.Errorf("exit %d, stderr %q, want 0 and no output", code, stderr)
@@ -171,6 +179,7 @@ func TestReplayCompleteHasNoWarning(t *testing.T) {
 }
 
 func TestReplayCorruptIsFatal(t *testing.T) {
+	t.Parallel()
 	data, firstEnd := twoBlockRecording(t)
 	bad := append([]byte(nil), data...)
 	bad[firstEnd-10] ^= 0xff // inside the first block, which is followed by more data
@@ -182,6 +191,7 @@ func TestReplayCorruptIsFatal(t *testing.T) {
 }
 
 func TestReplayErrors(t *testing.T) {
+	t.Parallel()
 	good := writeFile(t, "demo.shot", simpleRecording(t))
 	json := writeFile(t, "old.jsonl", []byte(`{"version":1,"cols":10,"rows":2}`+"\n"))
 	empty := writeFile(t, "empty.shot", nil)
@@ -219,6 +229,7 @@ func TestReplayErrors(t *testing.T) {
 }
 
 func TestIsTerminal(t *testing.T) {
+	t.Parallel()
 	if isTerminal(&bytes.Buffer{}) {
 		t.Error("bytes.Buffer reported as terminal")
 	}

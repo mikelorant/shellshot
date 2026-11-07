@@ -23,6 +23,7 @@ func wellFormed(t *testing.T, doc []byte) {
 }
 
 func TestExportSVGIsAnimatedByDefaultAndStaticWithFrame(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	animated := filepath.Join(dir, "a.svg")
@@ -48,6 +49,7 @@ func TestExportSVGIsAnimatedByDefaultAndStaticWithFrame(t *testing.T) {
 }
 
 func TestExportSVGTextPaths(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	text := filepath.Join(dir, "t.svg")
@@ -65,6 +67,7 @@ func TestExportSVGTextPaths(t *testing.T) {
 }
 
 func TestExportSVGFlagsAreRejectedForOtherFormats(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	cases := []struct {
@@ -91,6 +94,7 @@ func TestExportSVGFlagsAreRejectedForOtherFormats(t *testing.T) {
 }
 
 func TestExportFormatErrorListsSVG(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	code, stderr := runExportCmd(t, in, "-o", filepath.Join(t.TempDir(), "o.png"), "--format", "bogus")
 	if code == 0 || !strings.Contains(stderr, "supported: apng, gif, svg, webp") {
