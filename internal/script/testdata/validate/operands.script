@@ -1,0 +1,14 @@
+# Step operands.
+run ""
+type "\xff"
+run lines {
+  keep
+  bell:
+}
+mark ""
+mark "a\e"
+wait ""
+wait /(/
+wait /a(?=b)/
+wait idle 0s
+press enter

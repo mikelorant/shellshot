@@ -6,6 +6,18 @@ import (
 	"slices"
 )
 
+// Check parses src and, if it parses without errors, validates the result.
+// Parse errors are returned alone: validation of a script the parser could
+// not read in full would only add noise. The Script is never nil; with
+// diagnostics it must not be run.
+func Check(filename string, src []byte) (*Script, []Diagnostic) {
+	s, diags := Parse(filename, src)
+	if len(diags) > 0 {
+		return s, diags
+	}
+	return s, Validate(s)
+}
+
 // Validate checks what the parser leaves out (docs/research/script-format.md
 // §3.2, §3.3, §4.3): where each setting may appear, the values of settings,
 // the structure of blocks and scene names. The result is sorted by position
@@ -159,10 +171,3 @@ func isIdentifier(s string) bool {
 func isDigit(c byte) bool  { return '0' <= c && c <= '9' }
 func isLetter(c byte) bool { return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' }
 func isAlnum(c byte) bool  { return isLetter(c) || isDigit(c) }
-
-// step validates one step.
-func (v *validator) step(st Step) {
-	if !isStep(st.Kind) {
-		v.unknownWord(st.Pos, st.Kind)
-	}
-}

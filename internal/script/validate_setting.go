@@ -254,6 +254,8 @@ func (v *validator) outputValue(st Setting) {
 	}
 }
 
+const notUTF8 = "is not valid UTF-8"
+
 const utf8Hint = `a "\xHH" escape must form valid UTF-8 together with its neighbours; the file itself must be UTF-8`
 
 // textProblem describes why s may not be used, or returns "" if it may: it
@@ -261,7 +263,7 @@ const utf8Hint = `a "\xHH" escape must form valid UTF-8 together with its neighb
 // other than line feed when lineFeed is set.
 func textProblem(s string, lineFeed bool) string {
 	if !utf8.ValidString(s) {
-		return "is not valid UTF-8"
+		return notUTF8
 	}
 	for _, r := range s {
 		if unicode.IsControl(r) && r != '\t' && !(lineFeed && r == '\n') {
