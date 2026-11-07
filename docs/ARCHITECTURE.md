@@ -123,7 +123,11 @@ The format is in [format.md](format.md). The wiring:
 `Cells` is 2 for a wide rune (CJK) or 0 for a zero-width rune (a combining mark). Entries are sorted by
 `Rune`, unique and within the line (`Snapshot.Validate`). `Snapshot.Columns(row)` returns each rune's
 starting cell column (`"世界ab"` gives `0,2,4,5`) and `Snapshot.CellWidth(row, runeIdx)` its width.
-Lines are right-trimmed, so columns are meaningful only up to the last rune.
+Lines are right-trimmed, except for trailing spaces that carry a visible style (a background colour,
+inverse, underline or strikethrough): the adapter keeps those, up to the last one, and `Spans` covers
+them, so a status bar or a colour swatch made of blanks survives. A foreground colour, bold, italic,
+faint or blink alone shows nothing on a blank, so such trailing blanks are still trimmed. Columns are
+meaningful only up to the last rune. `Snapshot.Text()` right-trims every line, as it ignores styling.
 
 Widths are produced by replaying a recording (`recording/frames`) and are not stored in it. The adapter
 enables grapheme clustering (mode 2027), so an emoji sequence (ZWJ family, flag, skin tone, keycap,

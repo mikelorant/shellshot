@@ -252,7 +252,9 @@ directory (see also the root `NOTICE`).
 Colour comes only from the emoji fonts (`--emoji-font` and the built-in sets): `--fallback-font` and
 `--system-fonts` fonts are drawn as monochrome outlines.
 
-Lines are right-trimmed, so a background colour painted on trailing spaces is lost.
+A background colour, inverse, underline or strikethrough on trailing blanks is drawn (a status bar
+filled with `ESC[K`, a row of colour swatches, a full-screen background). Blanks that would show
+nothing (no background, or only a foreground colour, bold, italic, faint or blink) are trimmed.
 
 ## Timing
 
