@@ -1,0 +1,5 @@
+settle off
+timeout 120s
+
+run make build; echo BUILD-STATUS=$?
+wait /^BUILD-STATUS=0$/ 5m

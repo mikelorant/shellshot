@@ -1,0 +1,4 @@
+scene check {
+  run echo hi
+  wait /^nope$/ 0s
+}

@@ -1,0 +1,23 @@
+t=+0s write "e"
+t=+50ms write "c"
+t=+100ms write "h"
+t=+150ms write "o"
+t=+200ms write " "
+t=+250ms write "h"
+t=+300ms write "e"
+t=+350ms write "l"
+t=+400ms write "l"
+t=+450ms write "o"
+t=+500ms write ","
+t=+550ms write " "
+t=+600ms write "w"
+t=+650ms write "o"
+t=+700ms write "r"
+t=+750ms write "l"
+t=+800ms write "d"
+t=+850ms write "\r"
+t=+2.07s span-begin hidden id=1 parent=0
+t=+2.27s shutdown
+t=+2.28s child-exit 0
+t=+2.28s span-end id=1
+t=+2.28s done
