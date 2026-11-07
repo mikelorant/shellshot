@@ -7,7 +7,7 @@ import (
 	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
-func TestAppendWidesClipsAtLimit(t *testing.T) {
+func TestAppendWidesThenClipWides(t *testing.T) {
 	tests := []struct {
 		name  string
 		pos   int
@@ -24,9 +24,31 @@ func TestAppendWidesClipsAtLimit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := appendWides(nil, tt.pos, tt.limit, tt.cell)
+			got := clipWides(appendWides(nil, tt.pos, tt.cell), tt.limit)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("appendWides = %+v, want %+v", got, tt.want)
+				t.Errorf("clipWides(appendWides) = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClipSpans(t *testing.T) {
+	red := snapshot.Style{Bg: snapshot.Color{Kind: snapshot.ColorPalette, Index: 1}}
+	tests := []struct {
+		name  string
+		spans []snapshot.Span
+		limit int
+		want  []snapshot.Span
+	}{
+		{"inside", []snapshot.Span{{Start: 0, End: 2, Style: red}}, 5, []snapshot.Span{{Start: 0, End: 2, Style: red}}},
+		{"straddles", []snapshot.Span{{Start: 1, End: 6, Style: red}}, 4, []snapshot.Span{{Start: 1, End: 4, Style: red}}},
+		{"past", []snapshot.Span{{Start: 0, End: 2, Style: red}, {Start: 4, End: 6, Style: red}}, 4, []snapshot.Span{{Start: 0, End: 2, Style: red}}},
+		{"none", nil, 4, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := clipSpans(tt.spans, tt.limit); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("clipSpans = %+v, want %+v", got, tt.want)
 			}
 		})
 	}

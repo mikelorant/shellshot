@@ -8,11 +8,12 @@ import (
 	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
-// Snapshot copies the visible screen: exactly Rows lines of plain text with
-// trailing spaces removed, the styled spans and the non-single-cell runes
-// (Widths) of those lines, the cursor and the title. Spans is nil when no line
-// has styling and Widths is nil when every rune is one cell. The result owns
-// all of its memory.
+// Snapshot copies the visible screen: exactly Rows lines of plain text, the
+// styled spans and the non-single-cell runes (Widths) of those lines, the
+// cursor and the title. Trailing spaces are removed unless a blank cell renders
+// something (a background colour, inverse, underline or strikethrough), which
+// is kept up to the last such cell. Spans is nil when no line has styling and
+// Widths is nil when every rune is one cell. The result owns all of its memory.
 func (t *terminal) Snapshot() (snapshot.Snapshot, error) {
 	if t.closed {
 		return snapshot.Snapshot{}, ErrClosed
@@ -37,12 +38,16 @@ func (t *terminal) Snapshot() (snapshot.Snapshot, error) {
 		t.rowBuf = text
 		// string() copies, so lines never alias rowBuf or native memory.
 		line := strings.TrimRight(string(text), " ")
-		lines = append(lines, line)
+		trimmed := utf8.RuneCountInString(line)
 
-		layout, err := t.rowLayout(utf8.RuneCountInString(line))
+		layout, err := t.rowLayout(trimmed)
 		if err != nil {
-			return snapshot.Snapshot{}, fmt.Errorf("ghostty: read row %d styles: %w", len(lines)-1, err)
+			return snapshot.Snapshot{}, fmt.Errorf("ghostty: read row %d styles: %w", len(lines), err)
 		}
+		// Blank cells that render something (a background, an inverse bar)
+		// stay in the line as spaces.
+		line += strings.Repeat(" ", layout.keep-trimmed)
+		lines = append(lines, line)
 		spans = append(spans, layout.spans)
 		widths = append(widths, layout.widths)
 		styled = styled || len(layout.spans) > 0

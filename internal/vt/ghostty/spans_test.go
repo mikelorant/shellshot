@@ -184,18 +184,6 @@ func TestSpansStyleContinuesAcrossLinesUntilReset(t *testing.T) {
 	wantSpans(t, s, 1, snapshot.Span{Start: 0, End: 3, Style: red})
 }
 
-func TestSpansTrailingStyledBlanksAreDropped(t *testing.T) {
-	term := newTerminal(t, 20, 1)
-	write(t, term, "ab\x1b[41m   \x1b[0m")
-
-	s := snap(t, term)
-	wantLines(t, s, 1, "ab")
-	wantSpans(t, s, 0)
-	if s.Spans != nil {
-		t.Errorf("Spans = %+v, want nil when nothing visible is styled", s.Spans)
-	}
-}
-
 func TestSpansClippedToTrimmedLine(t *testing.T) {
 	term := newTerminal(t, 20, 1)
 	write(t, term, "\x1b[31mab   \x1b[0m")

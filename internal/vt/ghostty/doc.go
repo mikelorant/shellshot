@@ -16,15 +16,24 @@
 // # Styling
 //
 // Snapshot reports styled runs in Spans as rune-index ranges into the
-// trimmed lines. Colours keep their kind: palette indexes (SGR 30-37, 90-97,
+// lines. Colours keep their kind: palette indexes (SGR 30-37, 90-97,
 // 38;5;n) stay palette entries and 38;2 colours stay RGB, so the renderer
 // applies its own theme. Underline of any kind maps to Underline; the
 // underline colour and overline are dropped.
 //
-// Limitation: lines are right-trimmed before spans are computed, and spans are
-// clipped to the trimmed text. Styled blank cells after the last visible
-// character, such as a coloured background filling the end of a line, are
-// therefore not reported.
+// # Trailing blanks
+//
+// Lines are right-trimmed, except for blank cells that render something. A
+// blank cell is kept, as one space, when it has a background colour, is
+// inverted, underlined or struck through, and every blank up to the last such
+// cell is kept with it, so the line keeps the coloured bar a status line,
+// swatch or full-screen background draws to the right of its last character.
+// A foreground colour, bold, italic, faint or blink alone show nothing on a
+// blank, so blanks with only those, and unstyled blanks, are trimmed. Cells
+// cleared by an erase operation (such as CSI K or CSI 2 J while a background
+// colour is set) hold only that background colour, so they keep it and
+// nothing else: the erase does not copy the foreground or the inverse
+// attribute. Spans and Widths are clipped to the kept text.
 //
 // # Cell widths
 //
@@ -54,7 +63,7 @@
 // A program that switches the mode off (CSI ? 2027 l) gets that layout.
 //
 // Widths is nil when every rune of every line is one cell, and entries at or
-// past the trimmed length of a line are dropped like clipped spans.
+// past the kept length of a line are dropped like clipped spans.
 //
 // # Concurrency
 //
