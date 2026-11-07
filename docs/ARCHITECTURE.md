@@ -12,6 +12,9 @@ record:  command --PTY--> session --> live tee --> your terminal
                              |
                              +--> recording/bin Writer --> .shot file
 
+script:  .script --> script (Check) --> script/run (Lower, Executor) --> cli driver adapter --> session.Driver
+                     the session then writes keys to the PTY and logs MARK and SPAN events as above
+
 replay:  .shot --> recording/bin Reader --> recording/frames --(vt.Terminal)--> snapshot.Frame --> replay --> stdout
 export:  .shot --> recording/bin Reader --> recording/frames --> export/timeline --> render/raster --> export/apng --> .png
 info:    .shot --> recording/bin (scan only, no terminal) --> recording/spans --> stdout
@@ -49,8 +52,9 @@ internal/render/fontchain   builds the font set for export: embedded, --fallback
 internal/render/emoji       pure Go colour emoji renderer (COLR v0, CBDT/CBLC); the built-in Apple and Noto sets
 internal/render/sprite      box-drawing, block, braille and Powerline glyphs
 internal/render/theme       built-in themes and the JSON theme loader
-internal/script             .script lexer and parser (the runner is not built)
+internal/script             .script lexer, parser and validator (pure Go)
 internal/script/keys        key chord text -> structured chord
+internal/script/run         lowering to a Plan, --list text, and the Executor state machine (no cgo, no pty)
 scripts/build-libghostty.sh, Makefile   dependency and build tooling
 ```
 
@@ -98,6 +102,18 @@ The format is in [format.md](format.md). The wiring:
 - Context cancellation kills the process and returns.
 - `Config.Driver` (optional, nil = off) is polled on the same goroutine after output and at its own
   deadlines; it writes to the PTY and logs marks and spans, and adds no goroutine that touches the terminal.
+
+## Scripts: how `record --script` runs
+
+- `cli/recordscript.go` loads the plan (`script.Check`, `run.Lower`), merges settings (explicit flag, then
+  script, then default), starts the PTY and the recording, and maps the outcome to an exit code.
+- `cli/driver_adapter.go` adapts `*run.Executor` to `session.Driver` (the only difference is the span type:
+  `run.SpanOp` becomes the `event.Span` that `binSink` records) and remembers the last screen for failures.
+- The executor needs the key encoder, which needs the terminal, which `session.Run` creates. A wrapper
+  around `vt.Factory` keeps the terminal, and the encoder is made on first use. Both live on the session
+  goroutine, the one that polls the driver.
+- A failure ends the run through `session`: open spans are ended, the child is killed and `EXIT` is logged,
+  so the partial recording is complete. A cancelled run ends its spans but writes no `EXIT`.
 
 ## Cell widths (`Snapshot.Widths`)
 

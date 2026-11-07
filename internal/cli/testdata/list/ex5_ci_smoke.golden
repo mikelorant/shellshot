@@ -1,0 +1,44 @@
+process
+  size    80x24
+  shell   /bin/sh
+  env     "PS1=$ "
+  env     TERM=xterm-256color
+  env     NO_COLOR=1
+  env     LANG=C.UTF-8
+  cwd     /tmp/ci-work
+  output  smoke.shot
+  seed    42
+estimate
+  total   3.196s to 1m31.994s, 2 waits, 3 scenes
+  scene   #1 version: 799ms to 40.831s
+  scene   #2 help: 1.035s to 21.225s
+  scene   #3 interrupt: 1.063s to 25.938s
+ops
+   1  17:1    version          span-begin #1 scene "version"
+   2  18:3    version          type "./bin/app --version" typing=35ms jitter=25%
+   3  18:3    version          press enter after-gap typing=35ms jitter=25%
+   4  18:3    version          settle quiet=300ms timeout=20s (fails at timeout)
+   5  19:3    version          wait /^app v[0-9]+\.[0-9]+\.[0-9]+$/ timeout=20s
+   6  20:1    version          span-end #1
+   7  22:1    help             span-begin #2 scene "help"
+   8  23:3    help             type "./bin/app --help | head -n 5" typing=35ms jitter=25%
+   9  23:3    help             press enter after-gap typing=35ms jitter=25%
+  10  23:3    help             settle quiet=300ms timeout=20s (fails at timeout)
+  11  24:3    help             wait "Usage:" assert
+  12  25:3    help             mark "help-shown"
+  13  26:1    help             span-end #2
+  14  28:1    interrupt        span-begin #3 scene "interrupt"
+  15  29:3    interrupt        type "sleep 30" typing=35ms jitter=25%
+  16  29:3    interrupt        press enter after-gap typing=35ms jitter=25%
+  17  29:3    interrupt        settle quiet=300ms timeout=20s (fails at timeout)
+  18  30:3    interrupt        sleep 500ms
+  19  31:3    interrupt        press ctrl+c typing=35ms jitter=25%
+  20  32:3    interrupt        wait /^\$$/ timeout=5s
+  21  33:3    interrupt        press up typing=35ms jitter=25%
+  22  33:3    interrupt        press up after-gap typing=35ms jitter=25%
+  23  33:3    interrupt        press enter after-gap typing=35ms jitter=25%
+  24  34:1    interrupt        span-end #3
+  25  -       hidden           span-begin #4 hidden
+  26  -       hidden           drain quiet=300ms timeout=2s (never fails)
+  27  -       hidden           exit grace=2s
+  28  -       hidden           span-end #4

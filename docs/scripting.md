@@ -1,14 +1,42 @@
-Status: designed, partly implemented. The lexer, parser, validator and lowering to a run plan exist; the runner (`record --script`) does not.
+Status: implemented. `shellshot record --script FILE` runs a script and records it; `--list` prints the plan. Reserved, not built: `fresh`, `cleanup { }`, `caption`, `require`, and `export --scene`.
 
 # Script format
 
 A `.script` file describes a terminal session to record: what to type, what to wait for, and how to
-split it into scenes. The planned way to run one is `shellshot record --script FILE`; that flag does
-not exist yet. Everything below is the design. The reasoning behind it is in
+split it into scenes. Run one with `shellshot record --script FILE`. The reasoning behind the design is in
 [research/script-format.md](research/script-format.md) and [research/script-scenes.md](research/script-scenes.md).
 
 A script has top-level settings, then steps and blocks. It has no conditions, loops, variables or
 functions. The whole file is parsed and validated before anything starts (exit 2 on error).
+
+## Running a script
+
+```
+shellshot record --script FILE [-o out.shot] [--cols N] [--rows N] [--record-input] [--watch]
+shellshot record --script FILE --list
+```
+
+- `--script FILE` replaces the interactive shell: the script's `shell` is started on a PTY, typed into
+  and recorded. It cannot be combined with `-c` or a command after `--`; put the command in the script
+  with `shell` and `run`.
+- `--list` parses and validates the script and prints what it would do (settings, estimated duration per
+  scene, one line per step) without starting or creating anything. It exits 2 with
+  `file:line:col: message` lines on stderr if the script is invalid, else 0. Waits count as "up to
+  `timeout`", so the range is a minimum and a maximum.
+- `--watch` shows the terminal output on stdout while the script runs. Off by default: a scripted run
+  forwards no stdin and prints only a summary line.
+- Explicit flags beat the script, which beats the defaults. `-o` beats `output`; `--cols` and `--rows`
+  beat `size`, each on its own. `--record-input`, `--codec`, `--coalesce` and `--ignore-exit-status`
+  work as in an interactive `record`; input is not recorded unless `--record-input` is set.
+- The script starts once the shell has drawn its first screen (at most 1 s after launch), so the first
+  typed characters do not race the first prompt. That interval is part of the recording.
+- At the end of the script the shell is always exited (Ctrl-D, then closed after 2 s). A program that
+  ignores Ctrl-D is closed and `shellshot: child did not exit; closed by shellshot` is printed; that is
+  not a failure. Leave the prompt empty at the end: text typed and not submitted stops Ctrl-D working.
+- The recording header holds the shell argv, and the script's file name (not its content) as meta `script`.
+- On a script failure the recording is kept at its path, scenes are closed and `EXIT` is written, so
+  `info`, `replay` and `export` work on it. A cancelled run (Ctrl-C) keeps the file, closes the scenes
+  and writes no `EXIT`, so `info` calls it interrupted.
 
 ## Syntax rules
 
@@ -129,14 +157,16 @@ paste screenshot resize hide show theme font caption cleanup fresh export expect
 
 | Code | Meaning |
 |---|---|
-| 0 | The script completed and the shell exited 0 |
-| child's status | The script completed and the shell exited non-zero (`--ignore-exit-status` makes it 0) |
-| 1 | Runtime error, including a program that cannot be started |
-| 2 | Parse or validation error; nothing started |
+| 0 | The script completed and the shell exited 0 (also `--list` on a valid script) |
+| child's status | The script completed and the shell exited non-zero (`--ignore-exit-status` makes it 0); `128+N` for a signal |
+| 1 | Runtime error, including a program that cannot be started, and a bad flag combination |
+| 2 | Parse or validation error; nothing started, no file written |
 | 3 | Script failure: a `wait` or assertion failed, a `run` did not settle, or the child exited when input was needed |
 | 130 | Cancelled |
 
-On a script failure the final screen goes to stderr and the recording is kept.
+The script's own codes (1, 2, 3, 130) win over a child status. On a script failure stderr gets the
+final screen and `shellshot: script failed: file:line:col: scene "NAME": message; partial recording
+kept at FILE`.
 
 ## Examples
 

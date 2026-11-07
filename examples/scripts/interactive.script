@@ -1,6 +1,5 @@
-# Not runnable until `record --script` ships.
 # Types a few harmless commands at a prompt, the way a person would.
-# Planned use, from the repository root:
+# Run from the repository root:
 #   shellshot record --script examples/scripts/interactive.script
 size 80x24
 shell /bin/sh
