@@ -60,6 +60,16 @@ jobs:
         if: steps.libs.outputs.cache-hit != 'true'
         run: make release-libs
 
+      # The .pc files hold the absolute prefix of the build, so point them at this workspace
+      # (a cache restored under another path would otherwise leave them pointing nowhere).
+      - name: Check the libghostty pkg-config files
+        run: |
+          for dir in build/libghostty-*; do
+            sed -i.bak "s|^prefix=.*|prefix=$GITHUB_WORKSPACE/$dir|" "$dir"/lib/pkgconfig/*.pc
+            rm -f "$dir"/lib/pkgconfig/*.bak
+            PKG_CONFIG_PATH="$GITHUB_WORKSPACE/$dir/lib/pkgconfig" pkg-config --exists libghostty-vt-static || { echo "::error::libghostty-vt-static not found in $dir: the libghostty cache is stale, delete it and rerun"; exit 1; }
+          done
+
       - name: Find the macOS SDK
         run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> "$GITHUB_ENV"
 
