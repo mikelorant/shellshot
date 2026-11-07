@@ -8,7 +8,7 @@
 # Works for linux/amd64 and linux/arm64 (each platform builds natively or under emulation).
 
 # ---- build: zig -> libghostty-vt -> shellshot binary ----
-FROM golang:1.26-bookworm AS build
+FROM golang:1.27-bookworm AS build
 
 ARG VERSION=dev
 

@@ -24,7 +24,7 @@ The Go binary links libghostty-vt through cgo. libghostty is built from the pinn
 | `make clean` | Removes `bin/` and `dist/` |
 | `make distclean` | Removes `bin/`, `dist/` and `build/`; run `make deps` again afterwards |
 
-Requirements: Go 1.26 or newer with cgo, a C toolchain, `git`, `pkg-config`, and zig 0.17.x (the
+Requirements: Go 1.27.3 or newer with cgo, a C toolchain, `git`, `pkg-config`, and zig 0.17.x (the
 submodule's `build.zig.zon` sets `minimum_zig_version`). The first `make deps` downloads zig
 dependencies and takes several minutes; later runs take about a minute or less.
 
