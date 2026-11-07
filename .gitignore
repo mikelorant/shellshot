@@ -1,4 +1,4 @@
 /bin/
-/third_party/
+/build/
 /.worktrees/
 *.shot
