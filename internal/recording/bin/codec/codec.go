@@ -1,8 +1,7 @@
 // Package codec defines the block compression interface used by the binary
-// recording format, with a small registry and the stdlib codecs (none and
-// flate). The wire ids are fixed by the format: 0 none, 1 flate, 2 zstd.
-//
-// Zstd (ID 2) is reserved here and is not registered by this package.
+// recording format, with a small registry and the none, flate (stdlib) and zstd
+// (github.com/klauspost/compress) codecs. The wire ids are fixed by the
+// format: 0 none, 1 flate, 2 zstd.
 package codec
 
 import "errors"
@@ -15,7 +14,7 @@ const (
 	None ID = 0
 	// Flate is raw DEFLATE (RFC 1951) from the standard library.
 	Flate ID = 1
-	// Zstd is reserved for a later task and is not registered yet.
+	// Zstd is zstd via github.com/klauspost/compress/zstd.
 	Zstd ID = 2
 )
 

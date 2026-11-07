@@ -17,15 +17,19 @@ func NewRegistry() *Registry {
 	return &Registry{codecs: make(map[ID]Codec)}
 }
 
-// DefaultRegistry returns a new registry holding the none and flate codecs
-// (flate at flate.DefaultCompression). Each call returns an independent value.
+// DefaultRegistry returns a new registry holding the none, flate and zstd codecs
+// (flate at flate.DefaultCompression, zstd at zstd.SpeedDefault). Each call returns an independent value.
 func DefaultRegistry() *Registry {
 	r := NewRegistry()
 	flateCodec, err := NewFlateCodec(DefaultFlateOptions())
 	if err != nil {
 		panic(err) // DefaultFlateOptions is always valid
 	}
-	for _, c := range []Codec{NoneCodec{}, flateCodec} {
+	zstdCodec, err := NewZstdCodec(ZstdOptions{})
+	if err != nil {
+		panic(err) // the zero ZstdOptions is always valid
+	}
+	for _, c := range []Codec{NoneCodec{}, flateCodec, zstdCodec} {
 		if err := r.Register(c); err != nil {
 			panic(err)
 		}
