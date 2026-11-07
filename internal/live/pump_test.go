@@ -126,9 +126,48 @@ func TestPumpWithSkipsOnEOFOnReadError(t *testing.T) {
 	}
 }
 
+// failOnWrite succeeds until its nth write (1-based), which fails with boom.
+type failOnWrite struct{ n, calls int }
+
+func (f *failOnWrite) Write(b []byte) (int, error) {
+	f.calls++
+	if f.calls == f.n {
+		return 0, errors.New("boom")
+	}
+	return len(b), nil
+}
+
 func TestPumpWithReturnsOnEOFWriteError(t *testing.T) {
-	ch := PumpWith(context.Background(), strings.NewReader(""), &failingWriter{}, PumpOptions{OnEOF: []byte{0x04}})
+	ch := PumpWith(context.Background(), strings.NewReader("x"), &failOnWrite{n: 2}, PumpOptions{OnEOF: []byte{0x04}})
 	if err := receive(t, ch); err == nil || err.Error() != "boom" {
 		t.Fatalf("err = %v; want boom", err)
+	}
+}
+
+func TestPumpWithSkipsOnEOFWhenNothingForwarded(t *testing.T) {
+	var dst writeRecorder
+	called := false
+	opts := PumpOptions{OnEOF: []byte{0x04}, BeforeOnEOF: func() { called = true }}
+	ch := PumpWith(context.Background(), strings.NewReader(""), &dst, opts)
+	if err := receive(t, ch); err != nil {
+		t.Fatalf("err = %v; want nil", err)
+	}
+	if len(dst.writes) != 0 {
+		t.Fatalf("writes = %q; want none for empty input", dst.writes)
+	}
+	if called {
+		t.Fatal("BeforeOnEOF called although no EOT was written")
+	}
+}
+
+func TestPumpWithCallsBeforeOnEOFBetweenInputAndEOT(t *testing.T) {
+	var dst writeRecorder
+	opts := PumpOptions{OnEOF: []byte{0x04}, BeforeOnEOF: func() { dst.writes = append(dst.writes, "<before>") }}
+	ch := PumpWith(context.Background(), strings.NewReader("x"), &dst, opts)
+	if err := receive(t, ch); err != nil {
+		t.Fatalf("err = %v; want nil", err)
+	}
+	if got := strings.Join(dst.writes, "|"); got != "x|<before>|\x04" {
+		t.Fatalf("writes = %q; want input, hook, then EOT", dst.writes)
 	}
 }

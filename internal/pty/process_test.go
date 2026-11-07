@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -173,5 +174,82 @@ func TestWriteAfterCloseFails(t *testing.T) {
 	n, err := p.Write([]byte("x"))
 	if err == nil || !errors.Is(err, os.ErrClosed) || n != 0 {
 		t.Errorf("Write after Close = (%d, %v), want (0, error wrapping os.ErrClosed)", n, err)
+	}
+}
+
+// readAll reads p until EOF or the deadline and returns what it saw.
+func readAll(t *testing.T, p *Process) string {
+	t.Helper()
+	type result struct {
+		out string
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		var got []byte
+		buf := make([]byte, 256)
+		for {
+			n, err := p.Read(buf)
+			got = append(got, buf[:n]...)
+			if err != nil {
+				done <- result{string(got), err}
+				return
+			}
+		}
+	}()
+	select {
+	case r := <-done:
+		if r.err != io.EOF {
+			t.Fatalf("Read: %v", r.err)
+		}
+		return r.out
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out reading until EOF")
+		return ""
+	}
+}
+
+func TestEOTIsEchoedAsCaretDByDefault(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("only BSD ttys echo Ctrl-D in canonical mode")
+	}
+	p := start(t, context.Background(), Config{Command: "cat"})
+	if _, err := p.Write([]byte{0x04}); err != nil {
+		t.Fatalf("Write EOT: %v", err)
+	}
+	if out := readAll(t, p); !strings.Contains(out, "^D") {
+		t.Fatalf("output = %q; want the default ^D echo (premise of DisableEOTEcho)", out)
+	}
+}
+
+func TestDisableEOTEchoSuppressesEOTEcho(t *testing.T) {
+	p := start(t, context.Background(), Config{Command: "cat"})
+	if _, err := p.Write([]byte("hi\n")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	// Let cat answer, so the call below runs with output still unread: it
+	// must not discard that output.
+	time.Sleep(200 * time.Millisecond)
+	if err := p.DisableEOTEcho(); err != nil {
+		t.Fatalf("DisableEOTEcho: %v", err)
+	}
+	if _, err := p.Write([]byte{0x04}); err != nil {
+		t.Fatalf("Write EOT: %v", err)
+	}
+	if out, want := readAll(t, p), "hi\r\nhi\r\n"; out != want {
+		t.Fatalf("output = %q; want %q (typed echo, then cat's output, no EOT echo)", out, want)
+	}
+	if code, err := p.Wait(); code != 0 || err != nil {
+		t.Fatalf("Wait = (%d, %v); want cat to exit 0 on EOT", code, err)
+	}
+}
+
+func TestDisableEOTEchoAfterCloseFails(t *testing.T) {
+	p := start(t, context.Background(), Config{Command: "cat"})
+	if err := p.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := p.DisableEOTEcho(); err == nil {
+		t.Fatal("DisableEOTEcho after Close = nil, want error")
 	}
 }
