@@ -20,6 +20,38 @@
 // once, always, stamped with the time of the last event, so a recording ends
 // with the terminal's final state (this mirrors session.Run).
 //
+// # Boundaries
+//
+// Options.Boundaries lists recording times at which a frame is forced, for
+// example the begin and end of a hidden span, so the screen state at exactly
+// that time reaches the consumer even when nothing was written near it. For
+// each boundary t, in ascending order, the iterator emits one frame stamped
+// exactly t whose snapshot has every event with a timestamp at or before t
+// applied and none after. The rules are:
+//
+//   - The frame is forced: it is emitted even when its screen equals the
+//     previously emitted one. (The grid rule above still decides the other
+//     frames, which are compared against the latest emitted frame, forced or
+//     not.)
+//   - A boundary on a grid tick that closes a group of events is that group's
+//     frame: one frame is emitted, stamped at the tick, and forced. A boundary
+//     inside a group splits it: the forced frame comes first and the group's
+//     own grid frame follows if the screen changed again.
+//   - Frames never go backwards in time; forced frames interleave with grid
+//     frames in timestamp order.
+//   - Work stays proportional to the number of events and boundaries. A
+//     forced frame on a clean terminal reuses the last snapshot and calls the
+//     terminal not at all, so a five minute idle gap with three boundaries
+//     costs three frames and no extra Snapshot calls.
+//   - A boundary at 0 is satisfied by the initial frame, unless an event at
+//     time 0 changed the screen, in which case a second frame at 0 follows.
+//   - A boundary before the first event shows the screen as it was
+//     (blank). A boundary at or after the last event is emitted after the
+//     final frame (which is stamped at the last event, see above) and shows
+//     the final screen; a boundary exactly at the last event is the final
+//     frame itself. With OmitFinal, boundaries after the last event are still
+//     emitted, interleaved with the last group's grid frame in time order.
+//
 // # Size changes
 //
 // RESIZE events resize the terminal, so the Snapshot inside a Frame carries its
@@ -76,6 +108,11 @@ type Options struct {
 	// sampled like any other (emitted only if the screen changed, stamped with
 	// its grid boundary). The zero value keeps the final frame.
 	OmitFinal bool
+	// Boundaries are recording times at which a frame is forced; see the
+	// package documentation. They may be unsorted and contain duplicates; the
+	// iterator sorts and deduplicates a copy. A negative time is an error from
+	// New. Empty leaves the frame stream unchanged.
+	Boundaries []time.Duration
 }
 
 // Mark is a MARK event: a labelled point in the recording.
@@ -90,6 +127,11 @@ type Iterator struct {
 	term     vt.Terminal
 	interval time.Duration
 	omitFin  bool
+
+	bounds  []time.Duration // sorted, deduplicated forced-frame times
+	nextB   int             // index of the first boundary not yet handled
+	finalOK bool            // the final frame has been emitted (or is omitted)
+	eof     bool            // the source is exhausted; Next is draining finish
 
 	first bool              // the t=0 frame has not been returned yet
 	prev  snapshot.Snapshot // last emitted snapshot; equals the screen unless dirty
@@ -114,6 +156,14 @@ func New(src Source, o Options) (*Iterator, error) {
 	if o.Factory == nil {
 		return nil, errors.New("frames: Options.Factory is required")
 	}
+	bounds := slices.Clone(o.Boundaries)
+	for _, b := range bounds {
+		if b < 0 {
+			return nil, fmt.Errorf("frames: negative boundary %v", b)
+		}
+	}
+	slices.Sort(bounds)
+	bounds = slices.Compact(bounds)
 	h := src.Head()
 	term, err := o.Factory(h.Cols, h.Rows)
 	if err != nil {
@@ -129,6 +179,7 @@ func New(src Source, o Options) (*Iterator, error) {
 		term:     term,
 		interval: period(o.FPS),
 		omitFin:  o.OmitFinal,
+		bounds:   bounds,
 		first:    true,
 		prev:     snap,
 	}
@@ -158,9 +209,13 @@ func (it *Iterator) Next() (snapshot.Frame, error) {
 		it.first = false
 		return snapshot.Frame{At: 0, Snapshot: it.prev}, nil
 	}
+	if it.eof {
+		return it.finish()
+	}
 	for {
 		ev, err := it.read()
 		if err == io.EOF {
+			it.eof = true
 			return it.finish()
 		}
 		if err != nil {
@@ -168,9 +223,26 @@ func (it *Iterator) Next() (snapshot.Frame, error) {
 		}
 		at := max(ev.At, it.lastAt)
 		b := it.boundary(at)
-		if it.open && b != it.groupB {
+		closeGroup := it.open && b != it.groupB
+		// Events at or before a boundary are applied before its frame, so a
+		// boundary is only due once an event strictly after it arrives.
+		bt, due := it.pendingBoundary()
+		due = due && bt < at
+		if closeGroup || due {
 			it.deferEvent(ev, at)
-			f, emit, err := it.sample(it.groupB, false)
+			var (
+				f    snapshot.Frame
+				emit bool
+			)
+			switch {
+			case closeGroup && due && bt == it.groupB:
+				it.nextB++
+				f, emit, err = it.sample(it.groupB, true)
+			case due && (!closeGroup || bt < it.groupB):
+				f, emit, err = it.sampleBoundary(bt)
+			default:
+				f, emit, err = it.sample(it.groupB, false)
+			}
 			if err != nil {
 				return snapshot.Frame{}, it.fail(err)
 			}
@@ -277,15 +349,9 @@ func (it *Iterator) apply(ev bin.Event, at time.Duration) error {
 func (it *Iterator) sample(at time.Duration, force bool) (snapshot.Frame, bool, error) {
 	it.open = false
 	it.lastB = it.groupB
-	changed := false
-	snap := it.prev
-	if it.dirty {
-		var err error
-		if snap, err = it.term.Snapshot(); err != nil {
-			return snapshot.Frame{}, false, fmt.Errorf("frames: snapshot at %v: %w", at, err)
-		}
-		it.dirty = false
-		changed = !snap.Equal(it.prev)
+	snap, changed, err := it.refresh(at)
+	if err != nil {
+		return snapshot.Frame{}, false, err
 	}
 	if !changed && !force {
 		return snapshot.Frame{}, false, nil
@@ -294,33 +360,96 @@ func (it *Iterator) sample(at time.Duration, force bool) (snapshot.Frame, bool, 
 	return snapshot.Frame{At: at, Snapshot: snap}, true, nil
 }
 
-// finish handles the end of the log: it emits the last group (or just the
-// final frame), then closes the terminal. The following Next returns io.EOF.
-func (it *Iterator) finish() (snapshot.Frame, error) {
-	var (
-		f    snapshot.Frame
-		emit bool
-		err  error
-	)
-	switch {
-	case it.open && it.omitFin:
-		f, emit, err = it.sample(it.groupB, false)
-	case it.open:
-		f, emit, err = it.sample(it.lastAt, true)
-	case !it.omitFin:
-		f, emit = snapshot.Frame{At: it.lastAt, Snapshot: it.prev}, true
+// refresh returns the current screen, taking a new snapshot only if the
+// terminal changed since the last one, and reports whether it differs from the
+// last emitted snapshot.
+func (it *Iterator) refresh(at time.Duration) (snapshot.Snapshot, bool, error) {
+	if !it.dirty {
+		return it.prev, false, nil
 	}
+	snap, err := it.term.Snapshot()
 	if err != nil {
-		return snapshot.Frame{}, it.fail(err)
+		return snapshot.Snapshot{}, false, fmt.Errorf("frames: snapshot at %v: %w", at, err)
 	}
-	it.err = io.EOF
-	if cerr := it.closeTerm(); cerr != nil {
-		it.err = cerr
+	it.dirty = false
+	return snap, !snap.Equal(it.prev), nil
+}
+
+// pendingBoundary returns the earliest boundary not yet handled.
+func (it *Iterator) pendingBoundary() (time.Duration, bool) {
+	if it.nextB >= len(it.bounds) {
+		return 0, false
 	}
-	if !emit {
-		return snapshot.Frame{}, it.err
+	return it.bounds[it.nextB], true
+}
+
+// sampleBoundary handles the pending boundary at, which must be pending: it
+// emits a forced frame stamped at with the current screen, without closing the
+// open group. The initial frame already stands for a boundary at 0 while no
+// event has touched the terminal, so none is emitted then.
+func (it *Iterator) sampleBoundary(at time.Duration) (snapshot.Frame, bool, error) {
+	it.nextB++
+	if at == 0 && !it.dirty {
+		return snapshot.Frame{}, false, nil
 	}
-	return f, nil
+	snap, _, err := it.refresh(at)
+	if err != nil {
+		return snapshot.Frame{}, false, err
+	}
+	it.prev = snap
+	return snapshot.Frame{At: at, Snapshot: snap}, true, nil
+}
+
+// finish emits what remains once the log has ended, one frame per call: the
+// final frame (unless OmitFinal), the last group (with OmitFinal) and the
+// boundaries not yet reached, in time order. When nothing is left it closes the
+// terminal and the call returns io.EOF.
+func (it *Iterator) finish() (snapshot.Frame, error) {
+	for {
+		var (
+			f    snapshot.Frame
+			emit bool
+			err  error
+		)
+		bt, has := it.pendingBoundary()
+		switch {
+		case !it.omitFin && !it.finalOK:
+			it.finalOK = true
+			if it.open {
+				f, emit, err = it.sample(it.lastAt, true)
+			} else {
+				f, emit = snapshot.Frame{At: it.lastAt, Snapshot: it.prev}, true
+			}
+			if has && bt == it.lastAt { // the final frame is this boundary's frame
+				it.nextB++
+			}
+		case it.omitFin && it.open && has && bt == it.groupB:
+			it.nextB++
+			f, emit, err = it.sample(it.groupB, true)
+		case it.omitFin && it.open && (!has || it.groupB < bt):
+			f, emit, err = it.sample(it.groupB, false)
+		case has:
+			f, emit, err = it.sampleBoundary(bt)
+		default:
+			emit = false
+		}
+		if err != nil {
+			return snapshot.Frame{}, it.fail(err)
+		}
+		if it.nextB >= len(it.bounds) && (it.omitFin && !it.open || !it.omitFin && it.finalOK) {
+			// Nothing remains: the following Next returns io.EOF.
+			it.err = io.EOF
+			if cerr := it.closeTerm(); cerr != nil {
+				it.err = cerr
+			}
+			if !emit {
+				return snapshot.Frame{}, it.err
+			}
+		}
+		if emit {
+			return f, nil
+		}
+	}
 }
 
 // fail records err as the sticky error and closes the terminal.
