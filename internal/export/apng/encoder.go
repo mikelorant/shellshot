@@ -66,9 +66,12 @@ type Encoder struct {
 	loops  uint32
 	level  png.CompressionLevel
 
-	frames   []frame
-	closed   bool
-	closeErr error
+	frames []frame
+	// defaultIDAT is the compressed default image set by SetDefaultImage,
+	// nil if there is none.
+	defaultIDAT []byte
+	closed      bool
+	closeErr    error
 
 	// base is the canvas a decoder starts the next frame from: the previous
 	// frame rendered, then disposed. shown is the canvas as the previous
@@ -100,6 +103,31 @@ func NewEncoder(w io.Writer, width, height int, opts Options) (*Encoder, error) 
 // returned error wraps ErrDelay. The frame uses BlendSource and DisposeNone.
 func (e *Encoder) AddFrame(img image.Image, delay time.Duration) error {
 	return e.AddFrameRect(img, image.Rect(0, 0, e.width, e.height), delay, BlendSource, DisposeNone)
+}
+
+// SetDefaultImage sets the default image: the picture a viewer without
+// animation support shows, written as the IDAT image that is not part of the
+// animation. Without one, the first frame is both the default image and the
+// first animation frame, and that is what such a viewer shows. The default
+// image is not counted in the frame count of the animation, and costs as much
+// as a full-canvas frame. img must be exactly width×height pixels (its origin
+// may be non-zero). Calling it again replaces the image. Errors wrap
+// ErrFrameSize or are ErrClosed.
+func (e *Encoder) SetDefaultImage(img image.Image) error {
+	if e.closed {
+		return ErrClosed
+	}
+	if size := img.Bounds().Size(); size.X != e.width || size.Y != e.height {
+		return fmt.Errorf("%w: default image got %dx%d, want %dx%d", ErrFrameSize, size.X, size.Y, e.width, e.height)
+	}
+	region := image.NewNRGBA(image.Rect(0, 0, e.width, e.height))
+	draw.Draw(region, region.Bounds(), img, img.Bounds().Min, draw.Src)
+	idat, err := encodeFrameIDAT(region, e.width, e.height, e.level)
+	if err != nil {
+		return err
+	}
+	e.defaultIDAT = idat
+	return nil
 }
 
 // AddFrameRect appends a frame that updates only rect, shown for delay. img
@@ -291,7 +319,7 @@ func (e *Encoder) Close() error {
 	}
 	e.closed = true
 	e.closeErr = e.write()
-	e.frames, e.base, e.shown = nil, nil, nil
+	e.frames, e.base, e.shown, e.defaultIDAT = nil, nil, nil, nil
 	return e.closeErr
 }
 
@@ -305,12 +333,17 @@ func (e *Encoder) write() error {
 	cw.writeChunk(chunkIHDR, ihdrData(e.width, e.height))
 	cw.writeChunk(chunkACTL, actlData(uint32(len(e.frames)), e.loops))
 
+	// A default image is the IDAT image with no fcTL before it, so every
+	// animation frame, the first too, is fdAT.
+	if e.defaultIDAT != nil {
+		cw.writeChunk(chunkIDAT, e.defaultIDAT)
+	}
 	// Sequence numbers are shared by fcTL and fdAT chunks, counting from 0.
 	var seq uint32
 	for i, f := range e.frames {
 		cw.writeChunk(chunkFCTL, fctlData(seq, f.rect, f.delayMillis, f.dispose, f.blend))
 		seq++
-		if i == 0 {
+		if i == 0 && e.defaultIDAT == nil {
 			cw.writeChunk(chunkIDAT, f.idat)
 			continue
 		}

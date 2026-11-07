@@ -58,16 +58,16 @@ func compose(t *testing.T, a kettek.APNG, n int) *image.RGBA {
 	return canvas
 }
 
+// decodeAPNG decodes the animation in the file at path. An APNG's default
+// image (the default --poster) is not part of the animation and is left out;
+// the poster tests look at it.
 func decodeAPNG(t *testing.T, path string) kettek.APNG {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := kettek.DecodeAll(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
+	a, _ := animationOf(decodeAPNGBytes(t, data))
 	return a
 }
 

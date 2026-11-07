@@ -30,6 +30,13 @@ func APNGSinkFactory(loops int, compression png.CompressionLevel) SinkFactory {
 	}
 }
 
+var (
+	_ Sink         = (*APNGSink)(nil)
+	_ DelayLimiter = (*APNGSink)(nil)
+	_ AutoFrame    = (*APNGSink)(nil)
+	_ PosterSetter = (*APNGSink)(nil)
+)
+
 // AddFrame adds img as a full frame.
 func (s *APNGSink) AddFrame(img *image.RGBA, delay time.Duration) error {
 	return s.enc.AddFrame(img, delay)
@@ -40,6 +47,10 @@ func (s *APNGSink) AddFrame(img *image.RGBA, delay time.Duration) error {
 func (s *APNGSink) AddFrameAuto(img image.Image, delay time.Duration) error {
 	return s.enc.AddFrameAuto(img, delay)
 }
+
+// SetPoster makes img the default image of the APNG: the picture viewers
+// without animation support show. The animation itself is unchanged.
+func (s *APNGSink) SetPoster(img image.Image) error { return s.enc.SetDefaultImage(img) }
 
 // MaxDelay is the longest delay one APNG frame can carry, 65535 ms.
 func (s *APNGSink) MaxDelay() time.Duration { return maxAPNGDelay }

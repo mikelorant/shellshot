@@ -42,8 +42,10 @@ type exportFlags struct {
 	// keepLeadingBlank is --keep-leading-blank: do not drop a blank first
 	// frame.
 	keepLeadingBlank bool
-	cursor           string
-	fps              int
+	// poster is the --poster value.
+	poster string
+	cursor string
+	fps    int
 	// fallbackFonts are --fallback-font files, in the order given.
 	fallbackFonts []string
 	systemFonts   bool
@@ -88,6 +90,7 @@ func newExportCmd() *cobra.Command {
 	fl.IntVar(&f.loops, "loops", 0, "number of times the animation plays (0 for forever)")
 	fl.DurationVar(&f.minDelay, "min-delay", 20*time.Millisecond, "shortest frame delay; shorter frames are merged into the previous one (0 to keep all)")
 	fl.BoolVar(&f.keepLeadingBlank, "keep-leading-blank", false, "keep a blank first frame; without it a blank screen shown for at most "+defaultLeadingBlank.String()+" at the start is dropped, so viewers that show only the first frame do not show an empty terminal")
+	fl.StringVar(&f.poster, "poster", defaultPoster, "apng only: the frame viewers without animation support show (Preview, Quick Look, chat previews): first, last, none or a time such as 12s on the output clock. A poster other than the first frame adds one full frame to the file")
 	addFPSFlag(cmd, &f.fps)
 	fl.StringVar(&f.cursor, "cursor", "block", "cursor shape: block, bar, underline or none")
 	fl.StringArrayVar(&f.fallbackFonts, "fallback-font", nil, "TTF/OTF/TTC `file` for glyphs the built-in fonts lack (repeatable; tried in order, after the built-in fonts)")
@@ -235,6 +238,10 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	if err != nil {
 		return err
 	}
+	poster, err := posterOption(cmd, flags.poster, outFormat)
+	if err != nil {
+		return err
+	}
 	if output == "" {
 		output = defaultExportPath(input, outFormat)
 		if sameFile(input, output) {
@@ -300,6 +307,7 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 
 			TrimLeadingBlank: trimBlank,
 		},
+		Poster:   poster,
 		Progress: func(_, total int) { steps = total },
 	}
 	write := func(f *os.File) error {

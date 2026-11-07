@@ -10,6 +10,9 @@
 // images into the previous frame's delay). All frames are written as 8-bit non-premultiplied RGBA
 // (PNG colour type 6) so they share one IHDR.
 //
+// SetDefaultImage gives the file a default image that is not part of the
+// animation (a poster for viewers that show a single frame).
+//
 // Memory tradeoff: acTL must precede the first IDAT and carries the frame
 // count, which is unknown while frames stream in. The Encoder therefore keeps
 // every frame's compressed data in memory and writes the whole file in Close.
