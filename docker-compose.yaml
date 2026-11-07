@@ -1,0 +1,51 @@
+# shellshot in a container. Build the image first:
+#
+#   git submodule update --init --depth 1 third_party/ghostty
+#   docker compose build
+#
+# shellshot allocates its own PTY, so `record -c` needs no `-t`. Files land in ./recordings.
+#
+#   mkdir -p recordings
+#   docker compose run --rm shellshot record -o demo.shot -c 'echo hello'
+#   docker compose run --rm shellshot export demo.shot -o demo.png
+#
+# An interactive session needs a terminal:
+#
+#   docker compose run --rm -it shellshot record -o session.shot
+#
+# The example demos, recorded and exported in one go (profile `demo`, writes showcase.png):
+#
+#   docker compose run --rm demo
+#
+# File ownership: the image runs as uid 1000. Docker Desktop and OrbStack map bind-mount owners
+# to your user, so nothing more is needed on macOS. On Linux, files created in ./recordings are
+# owned by uid 1000; to make them yours, pass your ids:
+#
+#   SHELLSHOT_UID=$(id -u) SHELLSHOT_GID=$(id -g) docker compose run --rm shellshot record -o demo.shot -c 'echo hello'
+
+services:
+  shellshot:
+    image: shellshot:dev
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
+    user: "${SHELLSHOT_UID:-1000}:${SHELLSHOT_GID:-1000}"
+    working_dir: /work
+    volumes:
+      - ./recordings:/work
+    init: true
+
+  # docker compose run --rm demo
+  demo:
+    profiles: [demo]
+    extends: shellshot
+    environment:
+      EXAMPLES_SPEED: fast
+    volumes:
+      - ./contrib/examples:/examples:ro
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        shellshot record -o showcase.shot --cols 80 --rows 24 -c 'sh /examples/showcase.sh' >/dev/null
+        && shellshot export showcase.shot -o showcase.png
