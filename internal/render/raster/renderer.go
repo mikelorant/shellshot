@@ -66,6 +66,7 @@ type Renderer struct {
 	theme   theme.Theme
 	fonts   Fonts
 	sizePx  float64       // em size of the faces: FontSize * Scale, exactly
+	scale   int           // Options.Scale
 	pad     int           // Padding * Scale
 	metrics font.Metrics  // cell geometry in final pixels (Scale and adjustments applied)
 	glyphDX fixed.Int26_6 // glyph offset inside the cell, see font.Metrics.GlyphOffsetX
@@ -100,6 +101,7 @@ func New(f Fonts, o Options) (*Renderer, error) {
 		theme:  o.Theme,
 		fonts:  f,
 		pad:    o.Padding * o.Scale,
+		scale:  o.Scale,
 		cursor: o.Cursor,
 	}
 	r.sizePx = o.FontSize * float64(o.Scale)

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 124 76" width="124" height="76" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="15" fill="#d4d4d4">
+<style>.a0{animation:a0 1.4s steps(1,end) 2 forwards}
+.a1{animation:a1 1.4s steps(1,end) 2 forwards}
+.a2{animation:a2 1.4s steps(1,end) 2 forwards}
+@keyframes a0{0%{transform:translateY(0)}14.29%{transform:translateY(-20px)}100%{transform:translateY(-20px)}}
+@keyframes a1{0%{transform:translateY(0)}28.57%{transform:translateY(-20px)}100%{transform:translateY(-20px)}}
+@keyframes a2{0%{transform:translate(0,0);visibility:visible}14.29%{transform:translate(9px,0);visibility:visible}28.57%{transform:translate(-27px,40px);visibility:visible}100%{transform:translate(-27px,40px);visibility:visible}}</style>
+<rect width="124" height="76" fill="#1e1e1e"/>
+<svg y="8" width="124" height="20">
+<g class="a0">
+<text y="16" xml:space="preserve">
+<tspan x="8" fill="#0dbc79">$</tspan>
+<tspan x="26">l</tspan>
+</text>
+<text y="36" xml:space="preserve">
+<tspan x="8" fill="#0dbc79">$</tspan>
+<tspan x="26 35">ls</tspan>
+</text>
+</g>
+</svg>
+<svg y="28" width="124" height="20">
+<g class="a1">
+<text y="36" xml:space="preserve">
+<tspan x="8 17 26 35 44">a.txt</tspan>
+</text>
+</g>
+</svg>
+<svg y="48" width="124" height="20">
+<g class="a1">
+<text y="36" xml:space="preserve">
+<tspan x="8" font-weight="bold">b</tspan>
+</text>
+</g>
+</svg>
+<rect class="a2" x="35" y="8" width="1" height="20" fill="#aeafad"/>
+</svg>

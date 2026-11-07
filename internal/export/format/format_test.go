@@ -9,10 +9,16 @@ import (
 	"github.com/michaellorant/shellshot/internal/export/pipeline"
 )
 
-func TestDefaultRegistersAPNG(t *testing.T) {
+func TestDefaultRegistersAPNGAndSVG(t *testing.T) {
 	r := Default()
-	if got := r.Names(); !slices.Equal(got, []string{"apng", "gif", "webp"}) {
-		t.Errorf("Names = %v, want [apng gif webp]", got)
+	if got := r.Names(); !slices.Equal(got, []string{"apng", "gif", "svg", "webp"}) {
+		t.Errorf("Names = %v, want [apng gif svg webp]", got)
+	}
+	if f, ok := r.ByExtension("shot.SVG"); !ok || f.Name != "svg" || f.New != nil || f.NewSteps == nil {
+		t.Errorf("ByExtension(shot.SVG) = %+v, %v; want the steps format svg", f, ok)
+	}
+	if f, _ := r.Lookup("apng"); f.NewSteps != nil || f.New == nil {
+		t.Error("apng must be a sink format")
 	}
 	f, ok := r.Lookup("apng")
 	if !ok || f.Name != "apng" {

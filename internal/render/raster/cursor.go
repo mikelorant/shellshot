@@ -54,7 +54,7 @@ func (r *Renderer) drawCursorShape(img *image.RGBA, b cursorBox) {
 	w, h := b.width*r.metrics.CellWidth, r.metrics.CellHeight
 	switch r.cursor {
 	case CursorBar:
-		fillRect(img, image.Rect(o.X, o.Y, o.X+max(1, r.metrics.CellWidth/8), o.Y+h), r.theme.Cursor)
+		fillRect(img, image.Rect(o.X, o.Y, o.X+r.barWidth(), o.Y+h), r.theme.Cursor)
 	case CursorUnderline:
 		fillRect(img, image.Rect(o.X, o.Y+h-r.thickness(), o.X+w, o.Y+h), r.theme.Cursor)
 	}
@@ -64,3 +64,6 @@ func (r *Renderer) drawCursorShape(img *image.RGBA, b cursorBox) {
 func (r *Renderer) blockCursorAt(b cursorBox, row, col int) bool {
 	return b.ok && r.cursor == CursorBlock && b.row == row && b.col == col
 }
+
+// barWidth is the width in pixels of the bar cursor.
+func (r *Renderer) barWidth() int { return max(1, r.metrics.CellWidth/8) }

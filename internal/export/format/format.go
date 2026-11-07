@@ -1,15 +1,20 @@
 // Package format is the registry of export output formats. Each format is a
 // name, the file extensions it owns and a constructor for the
-// pipeline.SinkFactory that encodes it, so a new raster format is one small
-// package plus one line in Default. It is pure Go (no cgo, no cobra).
+// pipeline.SinkFactory that encodes it (a raster format) or for the
+// StepsWriter that writes it (a vector format that works from snapshots), so
+// a new format is one small package plus one line in Default. It is pure Go
+// (no cgo, no cobra).
 package format
 
 import (
 	"image/png"
+	"io"
 	"path/filepath"
 	"strings"
 
 	"github.com/michaellorant/shellshot/internal/export/pipeline"
+	"github.com/michaellorant/shellshot/internal/export/svg"
+	"github.com/michaellorant/shellshot/internal/export/timeline"
 	"github.com/michaellorant/shellshot/internal/export/webp"
 )
 
@@ -20,12 +25,22 @@ type Settings struct {
 	Loops int
 	// Compression is the PNG compression level of an APNG's frames.
 	Compression png.CompressionLevel
+	// SVG holds the SVG writer's options; Loops is taken from the field
+	// above.
+	SVG svg.Options
 	// GIFColors is the largest number of picture colours of a GIF palette,
 	// 2 to 255; 0 means 255.
 	GIFColors int
 	// GIFDither makes a GIF diffuse colour error when the palette is
 	// quantised.
 	GIFDither bool
+}
+
+// StepsWriter writes an export from the timeline steps themselves, for a
+// format that draws snapshots as vectors instead of encoding rendered frames.
+// cols and rows are the screen size every step has.
+type StepsWriter interface {
+	WriteSteps(w io.Writer, cols, rows int, steps []timeline.Step) error
 }
 
 // Format describes one output format.
@@ -36,7 +51,11 @@ type Format struct {
 	// leading dot. The first is the one used for a default output name.
 	Extensions []string
 	// New returns the factory of the format's pipeline.Sink for settings s.
+	// It is nil for a format with NewSteps.
 	New func(s Settings) pipeline.SinkFactory
+	// NewSteps returns the format's StepsWriter for settings s. It is nil for
+	// a raster format, which has New.
+	NewSteps func(s Settings) StepsWriter
 }
 
 // Registry is an ordered set of formats.
@@ -60,6 +79,7 @@ func Default() *Registry {
 			},
 		},
 		gifFormat(),
+		Format{Name: "svg", Extensions: []string{".svg"}, NewSteps: newSVG},
 		Format{Name: "webp", Extensions: []string{".webp"}, New: func(s Settings) pipeline.SinkFactory { return webp.SinkFactory(s.Loops) }},
 	)
 }
@@ -99,4 +119,11 @@ func (r *Registry) Names() []string {
 		names[i] = f.Name
 	}
 	return names
+}
+
+// newSVG returns the SVG writer for s.
+func newSVG(s Settings) StepsWriter {
+	o := s.SVG
+	o.Loops = s.Loops
+	return svg.NewWriter(o)
 }
