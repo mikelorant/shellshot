@@ -13,7 +13,7 @@ image. A script can drive the session so that a recording does not depend on you
 
 ## Install
 
-Requirements: Go 1.26 or newer with cgo, a C toolchain (Xcode command line tools),
+Requirements: Go 1.27.3 or newer with cgo, a C toolchain (Xcode command line tools),
 `git`, `pkg-config` and [zig](https://ziglang.org) 0.17.x (`brew install zig`). Only macOS on
 Apple silicon is tested; other platforms are not supported.
 
