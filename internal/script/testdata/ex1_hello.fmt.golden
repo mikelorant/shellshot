@@ -1,0 +1,6 @@
+shell /bin/bash --noprofile --norc
+env PS1="$ "
+size 60x10
+linger 1s
+
+run echo hello, world

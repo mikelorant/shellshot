@@ -1,0 +1,32 @@
+size 110x30
+shell /bin/sh
+env CI=1
+env PS1="$ "
+timeout 120s
+typing 30ms
+hold 1s
+
+hidden {
+  run lines {
+    cd ~/src/app
+    make clean > /dev/null 2>&1
+    clear
+  }
+}
+
+scene build {
+  speed 8x
+  idle 2s
+  settle off
+
+  run make build; echo BUILD-STATUS=$?
+  wait /^BUILD-STATUS=0$/ 5m
+  mark built
+}
+
+scene check {
+  linger 2s
+
+  run ./bin/app --version
+  wait /v[0-9]+\.[0-9]+/
+}

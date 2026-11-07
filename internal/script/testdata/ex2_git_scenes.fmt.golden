@@ -1,0 +1,39 @@
+size 100x28
+shell /bin/sh
+cwd /tmp/demo-repo
+env PS1="\\w $ "
+output git-demo.shot
+typing 40ms
+
+hidden {
+  run lines {
+    rm -rf .git README.md
+    clear
+  }
+}
+
+scene init {
+  linger 800ms
+
+  run git init -q
+  run git status -s
+}
+
+scene commit {
+  typing 70ms
+  linger 1s
+
+  run echo 'hi' > README.md
+  run git add README.md
+
+  run lines {
+    git commit -q -F - <<'EOF'
+    initial commit
+    EOF
+  }
+
+  run git log --oneline
+  wait /^[0-9a-f]{7,} .*initial commit$/ 10s
+}
+
+mark done
