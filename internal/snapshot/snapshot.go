@@ -5,6 +5,7 @@ package snapshot
 
 import (
 	"fmt"
+	"sort"
 	"time"
 	"unicode/utf8"
 )
@@ -19,10 +20,24 @@ type Snapshot struct {
 	// or exactly Rows entries, one slice per line. Each line's spans cover
 	// only non-zero styles, are sorted by Start and do not overlap.
 	Spans [][]Span
+	// Widths records, sparsely, the runes of Lines that do not occupy exactly
+	// one terminal cell: either nil/empty (every rune is one cell) or exactly
+	// Rows entries, one slice per line. See Wide.
+	Widths [][]Wide
 	// Cursor is the cursor position (0-based) and visibility.
 	Cursor Cursor
 	// Title is the window title last set by the program, if any.
 	Title string
+}
+
+// Wide marks one rune of a line that does not occupy exactly one cell.
+// Rune is a rune index into the line (not a byte index and not a cell
+// column); Cells is the number of terminal cells the rune occupies: 2 for a
+// wide rune, 0 for a zero-width rune such as a combining mark. Runes without
+// an entry occupy exactly one cell.
+type Wide struct {
+	Rune  int
+	Cells uint8
 }
 
 // Cursor describes the cursor state.
@@ -69,7 +84,72 @@ func (s Snapshot) Equal(o Snapshot) bool {
 			return false
 		}
 	}
+	n = max(len(s.Widths), len(o.Widths))
+	for i := 0; i < n; i++ {
+		if !widesEqual(widesAt(s.Widths, i), widesAt(o.Widths, i)) {
+			return false
+		}
+	}
 	return true
+}
+
+// widesAt returns line i's width entries, treating a missing line as all
+// single-cell.
+func widesAt(widths [][]Wide, i int) []Wide {
+	if i < len(widths) {
+		return widths[i]
+	}
+	return nil
+}
+
+func widesEqual(a, b []Wide) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// Columns returns, for each rune of Lines[row], the cell column where that
+// rune starts (a prefix sum of the runes' widths). Spans and Widths index
+// runes, so Columns converts a rune index to a cell column. It returns nil
+// if row is out of range.
+func (s Snapshot) Columns(row int) []int {
+	if row < 0 || row >= len(s.Lines) {
+		return nil
+	}
+	cols := make([]int, 0, len(s.Lines[row]))
+	wides := widesAt(s.Widths, row)
+	col, next := 0, 0
+	idx := 0
+	for range s.Lines[row] {
+		cols = append(cols, col)
+		w := 1
+		for next < len(wides) && wides[next].Rune < idx {
+			next++
+		}
+		if next < len(wides) && wides[next].Rune == idx {
+			w = int(wides[next].Cells)
+		}
+		col += w
+		idx++
+	}
+	return cols
+}
+
+// CellWidth returns the number of cells the rune at runeIdx of Lines[row]
+// occupies: the Widths entry if there is one, otherwise 1.
+func (s Snapshot) CellWidth(row, runeIdx int) int {
+	wides := widesAt(s.Widths, row)
+	i := sort.Search(len(wides), func(i int) bool { return wides[i].Rune >= runeIdx })
+	if i < len(wides) && wides[i].Rune == runeIdx {
+		return int(wides[i].Cells)
+	}
+	return 1
 }
 
 // spansAt returns line i's spans, treating a missing line as unstyled.
@@ -95,11 +175,20 @@ func spansEqual(a, b []Span) bool {
 // Validate checks the snapshot's invariants: Lines has Rows entries; Spans is
 // empty or has Rows entries; and each line's spans are non-empty ranges
 // within the line's rune count, with non-zero styles, sorted and not
-// overlapping.
+// overlapping. Widths is empty or has Rows entries, and each line's entries
+// have rune indexes within the line's rune count, sorted and unique, with
+// Cells of 0 or 2.
 func (s Snapshot) Validate() error {
 	if len(s.Lines) != s.Rows {
 		return fmt.Errorf("snapshot: %d lines for %d rows", len(s.Lines), s.Rows)
 	}
+	if err := s.validateSpans(); err != nil {
+		return err
+	}
+	return s.validateWidths()
+}
+
+func (s Snapshot) validateSpans() error {
 	if len(s.Spans) == 0 {
 		return nil
 	}
@@ -121,6 +210,31 @@ func (s Snapshot) Validate() error {
 				return fmt.Errorf("snapshot: line %d span %d: zero style", y, i)
 			}
 			prevEnd = sp.End
+		}
+	}
+	return nil
+}
+
+func (s Snapshot) validateWidths() error {
+	if len(s.Widths) == 0 {
+		return nil
+	}
+	if len(s.Widths) != s.Rows {
+		return fmt.Errorf("snapshot: %d width lines for %d rows", len(s.Widths), s.Rows)
+	}
+	for y, wides := range s.Widths {
+		runes := utf8.RuneCountInString(s.Lines[y])
+		prev := -1
+		for i, w := range wides {
+			switch {
+			case w.Rune < 0 || w.Rune >= runes:
+				return fmt.Errorf("snapshot: line %d width %d: rune %d outside %d runes", y, i, w.Rune, runes)
+			case w.Rune <= prev:
+				return fmt.Errorf("snapshot: line %d width %d: unsorted or duplicate rune %d", y, i, w.Rune)
+			case w.Cells != 0 && w.Cells != 2:
+				return fmt.Errorf("snapshot: line %d width %d: %d cells (want 0 or 2)", y, i, w.Cells)
+			}
+			prev = w.Rune
 		}
 	}
 	return nil
