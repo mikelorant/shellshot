@@ -1,0 +1,10 @@
+bad_duration.script:1:7: bad duration "5" (a duration needs a unit: ms, s or m (for example 5s))
+bad_duration.script:2:7: bad duration "1h" (unknown duration unit "h": use ms, s or m)
+bad_duration.script:3:7: bad duration "1.2.3s" (malformed number "1.2.3")
+bad_duration.script:4:7: expected a duration, found "5s" (a duration is a number with a unit, like 500ms, 1.5s or 2m, without quotes)
+bad_duration.script:5:6: sleep needs a duration (for example sleep 500ms)
+bad_duration.script:6:10: unexpected "2s"
+bad_duration.script:7:10: bad duration "10" (a duration needs a unit: ms, s or m (for example 10s))
+bad_duration.script:8:11: bad duration ".5s" (malformed number ".5")
+bad_duration.script:9:10: bad duration "99999999999999999999s" (duration "99999999999999999999s" is too large)
+bad_duration.script:10:13: unexpected "2s"

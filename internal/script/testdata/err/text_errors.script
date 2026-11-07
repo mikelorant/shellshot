@@ -1,0 +1,6 @@
+run "hi" | wc
+run "unterminated
+type "bad \q escape"
+type "bad \xZZ"
+run
+mark "x

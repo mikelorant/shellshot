@@ -1,0 +1,17 @@
+require git
+expect "x"
+if ready {
+  run a
+  while x {
+    run b
+  }
+}
+run after
+caption "hello"
+cleanup {
+  run bye
+}
+hide
+export {
+}
+budget 5s

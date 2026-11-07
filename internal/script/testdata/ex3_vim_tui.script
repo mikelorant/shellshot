@@ -1,0 +1,29 @@
+size 90x24
+shell /bin/sh
+env PS1="$ "
+cwd /tmp
+timeout 10s
+
+scene open {
+  run vim --clean demo.txt
+  wait /^~/                     # vim's empty-line filler; the echoed command line starts with the prompt
+}
+
+scene edit {
+  typing 80ms
+  linger 1s
+  press i
+  type lines {
+    Hello from a scripted vim session.
+    Second line, typed by shellshot.
+  }
+  press esc
+  press left x5
+}
+
+scene save {
+  type :wq
+  mark saving
+  press enter
+  wait /^\$$/                   # a bare prompt: the shell is back
+}

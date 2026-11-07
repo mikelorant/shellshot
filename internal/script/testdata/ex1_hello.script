@@ -1,0 +1,8 @@
+#!/usr/bin/env -S shellshot record --script
+# hello.script: the smallest useful demo
+shell /bin/bash --noprofile --norc    # arguments follow the path; no startup files, so the prompt is ours
+env PS1="$ "
+size 60x10
+linger 1s              # the viewer gets a second on the final screen
+
+run echo hello, world

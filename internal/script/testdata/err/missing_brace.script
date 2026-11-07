@@ -1,0 +1,23 @@
+scene a
+  run x
+}
+
+scene {
+  run y
+}
+
+hidden extra {
+  run z
+}
+
+scene b c {
+  run w
+}
+
+scene "q" {
+  run v
+}
+
+scene d { run u
+  run t
+}

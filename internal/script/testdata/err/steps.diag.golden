@@ -1,0 +1,7 @@
+steps.script:1:5: wait needs a pattern (write wait "text", wait /regex/ or wait idle)
+steps.script:2:6: expected a "string", a /regex/ or idle after wait, found "foo" (to wait for text put it in quotes (wait "text") or in slashes (wait /regex/))
+steps.script:3:6: expected a "string", a /regex/ or idle after wait, found "idel" (did you mean "idle"?)
+steps.script:4:10: bad duration "/y/" (a duration is a number with a unit, like 500ms, 1.5s or 2m)
+steps.script:5:5: mark needs a label (for example mark done)
+steps.script:6:8: unexpected "b" (a label with spaces needs quotes: mark "a b")
+steps.script:7:6: sleep needs a duration (for example sleep 500ms)

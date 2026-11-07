@@ -1,0 +1,9 @@
+env
+env FOO
+env =x
+env A = b
+env A=b c
+env A= b
+shell
+shell "/bin/sh
+shell /bin/sh --x="\q"

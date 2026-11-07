@@ -1,0 +1,6 @@
+scene a {
+	run lines {
+		echo a
+    }
+		echo b
+}

@@ -1,0 +1,3 @@
+settings_value.script:1:5: size needs a value
+settings_value.script:2:11: unexpected "2s" (a setting takes one value; put a value with spaces in quotes)
+settings_value.script:3:5: unterminated string (add a closing quote)

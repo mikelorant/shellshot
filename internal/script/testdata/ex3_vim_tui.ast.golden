@@ -1,0 +1,27 @@
+Script
+  Settings
+    size "90x24" at=0 @1:1
+    shell argv=["/bin/sh"] at=0 raw="/bin/sh" @2:1
+    env "PS1=$ " at=0 @3:1
+    cwd "/tmp" at=0 @4:1
+    timeout "10s" at=0 @5:1
+  Items
+    Block scene "open" @7:1-10:1
+      Items
+        Step run raw "vim --clean demo.txt" @8:3
+        Step wait regex "^~" @9:3
+    Block scene "edit" @12:1-22:1
+      Settings
+        typing "80ms" at=0 @13:3
+        linger "1s" at=0 @14:3
+      Items
+        Step press i*1 @15:3
+        Step type lines "Hello from a scripted vim session.\nSecond line, typed by shellshot." @16:3
+        Step press esc*1 @20:3
+        Step press left*5 @21:3
+    Block scene "save" @24:1-29:1
+      Items
+        Step type raw ":wq" @25:3
+        Step mark "saving" @26:3
+        Step press enter*1 @27:3
+        Step wait regex "^\\$$" @28:3

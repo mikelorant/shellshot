@@ -1,0 +1,53 @@
+Script
+  Settings
+    size "100x28" at=0 @2:1
+    shell argv=["/bin/bash" "--noprofile" "--norc" "--rcfile=/my dir/rc" "" "-c" "echo \"hi\" # not a comment"] at=0 raw="/bin/bash --noprofile --norc --rcfile=\"/my dir/rc\" \"\" -c \"echo \\\"hi\\\" # not a comment\"" @3:1
+    env "A=1" at=0 @4:1
+    env "B=two words" at=0 @5:1
+    env "C=" at=0 @6:1
+    env "D=a=b" at=0 @7:1
+    cwd "/tmp/my dir" at=0 @8:1
+    seed "42" at=0 @9:1
+    output "out.shot" at=0 @10:1
+    typing "40ms" at=0 @11:1
+    jitter "25%" at=0 @12:1
+    timeout "1.5s" at=0 @13:1
+    settle "off" at=0 @14:1
+    linger "800ms" at=0 @15:1
+    speed "8x" at=0 @16:1
+    idle "2s" at=0 @17:1
+    hold "1s" at=0 @18:1
+  Items
+    Step run raw "echo hello # the # is part of the text" @20:1
+    Step run quoted "echo \"hi\"\n" @21:1
+    Step type raw ":wq" @22:1
+    Step type quoted "tab\there \\ \x1b[0m A" @23:1
+    Step run quoted "" @24:1
+    Step press enter*1 @25:1
+    Step press ctrl+c*1 alt+shift+left*1 up*3 f12*1 x*1 5*2 @26:1
+    Step wait string "Usage:" @27:1
+    Step wait string "Usage:" 0s @28:1
+    Step wait regex "^\\$$" 5s @29:1
+    Step wait regex "a/b\\\\" @30:1
+    Step wait idle @31:1
+    Step wait idle 250ms @32:1
+    Step sleep 500ms @33:1
+    Step sleep 2m @34:1
+    Step mark "done" @35:1
+    Step mark "two words" @36:1
+    Step run lines "echo a\n  echo b\n\necho c\n" @38:1
+    Step type lines "one" @44:1
+    Step run paragraphs "a long line wrapped\n\nsecond   paragraph\n" @47:1
+    Step type paragraphs "single" @53:1
+    Block scene "intro-1" @57:1-66:1
+      Settings
+        typing "10ms" at=0 @58:3
+        linger "1s" at=2 @65:3
+      Items
+        Block hidden "" @59:3-63:3
+          Items
+            Step run lines "setup\n" @60:5
+        Step press enter*1 @64:3
+    Block hidden "" @68:1-70:1
+      Items
+        Step type quoted "x" @69:3

@@ -1,0 +1,5 @@
+unknown_keyword.script:2:1: unknown command "rn" (did you mean "run"?)
+unknown_keyword.script:3:1: unknown command "tipe" (did you mean "type"?)
+unknown_keyword.script:4:1: unknown command "sleeep" (did you mean "sleep"?)
+unknown_keyword.script:5:1: unknown command "Sleep" (did you mean "sleep"?)
+unknown_keyword.script:6:1: unknown command "foo"

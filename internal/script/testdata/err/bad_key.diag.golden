@@ -1,0 +1,10 @@
+bad_key.script:1:7: unknown key "entr" (did you mean "enter", "end"?)
+bad_key.script:2:7: duplicate modifier "ctrl" in "ctrl+ctrl+c"
+bad_key.script:3:7: repeat count "x0" is out of range (a repeat is x1 to x999)
+bad_key.script:4:7: repeat "x3" has no key before it (write the key first, for example press down x3)
+bad_key.script:5:13: repeat "x3" follows another repeat (a key takes one repeat)
+bad_key.script:6:12: repeat count "x1000" is out of range (a repeat is x1 to x999)
+bad_key.script:7:7: expected a key, found "enter" (key names are written without quotes; to type text use type)
+bad_key.script:8:6: press needs a key (for example press enter, press ctrl+c or press down x3)
+bad_key.script:9:7: missing key after "shift+"
+bad_key.script:10:7: unknown modifier "meta" in "meta+a" (modifiers: ctrl, alt, shift)

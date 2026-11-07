@@ -1,0 +1,5 @@
+stray_brace.script:2:1: unexpected "}" (no block is open here; a text block header is exactly "run lines {" or "run paragraphs {" (also with type))
+stray_brace.script:6:1: unexpected "}" (no block is open here; a text block header is exactly "run lines {" or "run paragraphs {" (also with type))
+stray_brace.script:8:3: unknown command "echo"
+stray_brace.script:9:1: unexpected "}" (no block is open here; a text block header is exactly "run lines {" or "run paragraphs {" (also with type))
+stray_brace.script:12:3: unexpected "extra" after "}" (only a comment may follow a closing brace)
