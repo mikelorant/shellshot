@@ -141,8 +141,9 @@ Output is written atomically (a failed run leaves no partial file).
   ```
 - **Next: a compressed binary format.** It is designed in
   [docs/research/binary-format.md](docs/research/binary-format.md). Building blocks
-  (`internal/recording/bin/{varint,codec,head,event,chunk}`, with zstd) are in
-  progress and not yet wired into `record`, `replay` or `export`.
+  (`internal/recording/bin/{varint,codec,head,event,chunk}`, with zstd) and a
+  binary writer and reader (`internal/recording/bin`) exist, but nothing uses them
+  yet: `record` still writes JSON and `replay` and `export` read JSON only.
 - Full JSON field reference: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#recording-format-json-lines-extension-shot).
 
 ## Why libghostty is a pinned submodule
@@ -195,6 +196,8 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
 - Text is drawn with an **embedded JetBrains Mono** (Regular, Bold, Italic, Bold
   Italic; licence in `internal/render/font/assets/OFL.txt`). Box-drawing, block,
   braille and powerline characters are drawn as sprites.
+  Symbols Nerd Font Mono is bundled as a fallback for icon glyphs the main font
+  lacks.
 - Idle gaps are capped by `--idle-limit`; very short frames are merged.
 
 ## Known limitations
@@ -205,9 +208,12 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
   background colour painted on trailing spaces (e.g. a full-width status bar's
   empty part) is lost.
 - **CJK, emoji and other glyphs missing from JetBrains Mono are not drawn.** Wide
-  characters are recorded and keep their two-cell column positions, but there is
-  only an icon fallback font (Symbols Nerd Font Mono) is bundled, so those cells render blank in `export`. (`snap` and
-  `replay` print them as text.)
+  characters are recorded and keep their two-cell column positions, but the only
+  fallback font bundled is Symbols Nerd Font Mono (icons and Powerline/Nerd Font
+  symbols), so CJK and emoji cells render blank in `export`. (`snap` and `replay`
+  print them as text.)
+- **Nerd Font icons are clipped to their cell.** Icons from the fallback font are
+  not yet scaled to fit, so oversized ones are cut off at the cell edge.
 - JSON recordings are large and store full-screen text per frame; there is no compression yet.
 - Stable only on macOS; no input events or resize events are recorded.
 
