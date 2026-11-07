@@ -193,3 +193,27 @@ func TestPlayColor(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderStyledTrailingBlanks(t *testing.T) {
+	blue := snapshot.Style{Bg: snapshot.Color{Kind: snapshot.ColorPalette, Index: 4}}
+	s := snapshot.Snapshot{
+		Cols: 10, Rows: 2,
+		Lines: []string{"ab   ", "cd"},
+		Spans: [][]snapshot.Span{{{Start: 2, End: 5, Style: blue}}, nil},
+	}
+
+	if got, want := Render(s, RenderOptions{Color: true}), "ab\x1b[44m   \x1b[0m\ncd\n"; got != want {
+		t.Errorf("colour = %q, want %q", got, want)
+	}
+	if got, want := Render(s, RenderOptions{Color: true, Clear: true}),
+		ansiHomeClear+"ab\x1b[44m   \x1b[0m\r\ncd\x1b[1;1H"+ansiHideCursor; got != want {
+		t.Errorf("colour with clear = %q, want %q", got, want)
+	}
+	// Without colour the blanks show nothing, so they are not written.
+	if got, want := Render(s, RenderOptions{}), "ab\ncd\n"; got != want {
+		t.Errorf("plain = %q, want %q", got, want)
+	}
+	if got, want := Render(s, RenderOptions{Clear: true}), ansiHomeClear+"ab\r\ncd\x1b[1;1H"+ansiHideCursor; got != want {
+		t.Errorf("plain with clear = %q, want %q", got, want)
+	}
+}

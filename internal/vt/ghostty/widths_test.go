@@ -257,9 +257,21 @@ func TestWidthsAlignWithSpansOnStyledWideCharacters(t *testing.T) {
 	wantCursorAtLineEnd(t, s, 0)
 }
 
-func TestWidthsNotReportedForTrailingBlanks(t *testing.T) {
+func TestWidthsTrailingBlanksAreSingleCell(t *testing.T) {
 	term := newTerminal(t, 20, 1)
 	write(t, term, "世\x1b[41m   \x1b[0m")
+
+	s := snap(t, term)
+	wantLines(t, s, 1, "世   ")
+	wantWidths(t, s, 0, snapshot.Wide{Rune: 0, Cells: 2})
+	if got, want := s.Columns(0), []int{0, 2, 3, 4}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Columns = %v, want %v", got, want)
+	}
+}
+
+func TestWidthsUnstyledTrailingBlanksAreTrimmed(t *testing.T) {
+	term := newTerminal(t, 20, 1)
+	write(t, term, "世\x1b[31m   \x1b[0m")
 
 	s := snap(t, term)
 	wantLines(t, s, 1, "世")

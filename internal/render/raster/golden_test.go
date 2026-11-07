@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mikelorant/shellshot/internal/snapshot"
@@ -128,6 +129,35 @@ func TestGoldenStyleBasic(t *testing.T) {
 	}
 	s.Widths = [][]snapshot.Wide{nil, nil, nil, {{Rune: 19, Cells: 2}}, {{Rune: 3, Cells: 2}}}
 	compareGolden(t, "style_basic.png", mustRender(t, r, s))
+}
+
+// TestGoldenStyledBlanks draws lines that end in styled blanks: a status bar
+// filled to the last column, a row of 16 colour swatches made only of blanks,
+// a reverse-video bar, and underlined and struck-through trailing blanks.
+func TestGoldenStyledBlanks(t *testing.T) {
+	r, _ := newTestRenderer(t, Options{})
+	const cols = 32
+	swatches := strings.Repeat(" ", 2*16)
+	s := plainSnapshot(cols,
+		" status bar"+strings.Repeat(" ", cols-len(" status bar")),
+		swatches,
+		"reverse"+strings.Repeat(" ", cols-len("reverse")),
+		"under   ",
+		"strike   ")
+	s.Spans = [][]snapshot.Span{
+		{{Start: 0, End: cols, Style: snapshot.Style{Fg: palette(7), Bg: palette(4)}}},
+		nil,
+		{{Start: 0, End: cols, Style: snapshot.Style{Attrs: snapshot.Inverse}}},
+		{{Start: 5, End: 8, Style: snapshot.Style{Attrs: snapshot.Underline, Fg: palette(2)}}},
+		{{Start: 6, End: 9, Style: snapshot.Style{Attrs: snapshot.Strike, Fg: palette(1)}}},
+	}
+	for i := 0; i < 16; i++ {
+		s.Spans[1] = append(s.Spans[1], snapshot.Span{Start: 2 * i, End: 2*i + 2, Style: snapshot.Style{Bg: palette(uint8(i))}})
+	}
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	compareGolden(t, "styled_blanks.png", mustRender(t, r, s))
 }
 
 // TestGoldenCursorShapes stacks one render per cursor style (block, bar,

@@ -149,8 +149,6 @@ for f in recordings/*.shot; do shellshot export "$f" --scale 2; done
 
 - The terminal size is fixed for a whole recording. Resizing your terminal while recording does
   not change it; set `--cols` and `--rows` instead.
-- Lines are right-trimmed, so a background colour painted on trailing spaces is lost in replay and
-  export.
 - Export draws emoji up to Emoji 18.0 and a subset of CJK characters. Others are blank unless you
   pass `--emoji-font` (emoji) or `--fallback-font`. See [docs/export.md](docs/export.md#fonts-emoji-and-cjk).
 - Emoji are drawn with Apple-derived artwork by default, with Noto Color Emoji as fallback
