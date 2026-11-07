@@ -44,6 +44,8 @@ type Config struct {
 	Clock func() time.Time
 	// Ticker creates the sampling ticker. Nil means a time.Ticker.
 	Ticker Ticker
+	// Events, if non-nil, receives the raw process output. See EventSink.
+	Events EventSink
 }
 
 // withDefaults returns c with zero values replaced by their defaults.

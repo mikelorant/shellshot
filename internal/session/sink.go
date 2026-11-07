@@ -1,6 +1,10 @@
 package session
 
-import "github.com/michaellorant/shellshot/internal/snapshot"
+import (
+	"time"
+
+	"github.com/michaellorant/shellshot/internal/snapshot"
+)
 
 // Sink receives the frames produced by a session, in order. Frame is always
 // called from the goroutine that called Run, so implementations need no
@@ -14,3 +18,21 @@ type SinkFunc func(snapshot.Frame) error
 
 // Frame calls f(frame).
 func (f SinkFunc) Frame(frame snapshot.Frame) error { return f(frame) }
+
+// EventSink receives the raw event stream of a session. It is optional (see
+// Config.Events). Output and Exit are always called from the goroutine that
+// called Run, so implementations need no locking for session calls. Returning
+// an error aborts the session. Times are offsets from the start of Run.
+//
+// Output is called for every chunk read from the process, in order, before the
+// chunk is written to the terminal. The sink must not retain p after the call
+// returns. Exit is called once, after the final frame, with the process exit
+// code. Nothing is called while the process is idle.
+//
+// Resize is part of the interface for event writers (such as the binary
+// recording writer's adapter) but is not called by session today.
+type EventSink interface {
+	Output(at time.Duration, p []byte) error
+	Resize(at time.Duration, cols, rows int) error
+	Exit(at time.Duration, status int) error
+}

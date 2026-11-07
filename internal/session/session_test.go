@@ -32,6 +32,7 @@ type fakeTerm struct {
 	written   chan struct{} // receives one value per Write
 	snapErr   error
 	snapshots atomic.Int32
+	onWrite   func(p []byte) // called on each successful Write, if set
 }
 
 func (f *fakeTerm) Write(p []byte) (int, error) {
@@ -41,6 +42,9 @@ func (f *fakeTerm) Write(p []byte) (int, error) {
 	f.mu.Lock()
 	f.text.WriteString(strings.ReplaceAll(string(p), ignoredByte, ""))
 	f.mu.Unlock()
+	if f.onWrite != nil {
+		f.onWrite(p)
+	}
 	f.written <- struct{}{}
 	return len(p), nil
 }
@@ -170,6 +174,7 @@ type harness struct {
 	factory vt.Factory
 	cols    int
 	rows    int
+	events  EventSink // Config.Events; nil by default
 }
 
 type runResult struct {
@@ -212,6 +217,7 @@ func startRun(t *testing.T, failOnFrame int, failErr error, mutate func(*harness
 	cfg := Config{
 		Cols:   h.cols,
 		Rows:   h.rows,
+		Events: h.events,
 		Clock:  h.clock.now,
 		Ticker: func(time.Duration) (<-chan time.Time, func()) { return h.ticks, func() { h.stopped.Store(true) } },
 	}
