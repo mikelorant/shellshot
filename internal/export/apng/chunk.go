@@ -3,6 +3,7 @@ package apng
 import (
 	"encoding/binary"
 	"hash/crc32"
+	"image"
 	"io"
 )
 
@@ -18,10 +19,30 @@ const (
 	chunkFDAT = "fdAT"
 )
 
-// APNG frame operations used by this package.
+// BlendOp is the APNG blend_op of a frame: how its pixels combine with the
+// canvas.
+type BlendOp uint8
+
 const (
-	disposeOpNone = 0
-	blendOpSource = 0
+	// BlendSource replaces the canvas region with the frame's pixels,
+	// including alpha.
+	BlendSource BlendOp = 0
+	// BlendOver alpha-composites the frame over the canvas region.
+	BlendOver BlendOp = 1
+)
+
+// DisposeOp is the APNG dispose_op of a frame: how the canvas region is
+// treated after the frame's delay has elapsed.
+type DisposeOp uint8
+
+const (
+	// DisposeNone leaves the canvas as is.
+	DisposeNone DisposeOp = 0
+	// DisposeBackground clears the frame's region to transparent black.
+	DisposeBackground DisposeOp = 1
+	// DisposePrevious restores the frame's region to its content before the
+	// frame was rendered.
+	DisposePrevious DisposeOp = 2
 )
 
 // chunkWriter writes PNG chunks to w and remembers the first write error.
@@ -84,18 +105,18 @@ func actlData(numFrames, numPlays uint32) []byte {
 	return b
 }
 
-// fctlData returns the fcTL payload for a full-canvas frame at offset (0,0)
-// with BLEND_OP_SOURCE and DISPOSE_OP_NONE.
-func fctlData(seq uint32, width, height int, delayNum uint16) []byte {
+// fctlData returns the fcTL payload for the frame region rect.
+func fctlData(seq uint32, rect image.Rectangle, delayNum uint16, dispose DisposeOp, blend BlendOp) []byte {
 	b := make([]byte, 26)
 	binary.BigEndian.PutUint32(b[0:4], seq)
-	binary.BigEndian.PutUint32(b[4:8], uint32(width))
-	binary.BigEndian.PutUint32(b[8:12], uint32(height))
-	// x_offset and y_offset (b[12:20]) stay zero.
+	binary.BigEndian.PutUint32(b[4:8], uint32(rect.Dx()))
+	binary.BigEndian.PutUint32(b[8:12], uint32(rect.Dy()))
+	binary.BigEndian.PutUint32(b[12:16], uint32(rect.Min.X))
+	binary.BigEndian.PutUint32(b[16:20], uint32(rect.Min.Y))
 	binary.BigEndian.PutUint16(b[20:22], delayNum)
 	binary.BigEndian.PutUint16(b[22:24], delayDenominator)
-	b[24] = disposeOpNone
-	b[25] = blendOpSource
+	b[24] = byte(dispose)
+	b[25] = byte(blend)
 	return b
 }
 
