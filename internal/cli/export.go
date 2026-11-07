@@ -182,7 +182,7 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	if err != nil {
 		return err
 	}
-	src.warnTruncated(cmd.ErrOrStderr())
+	src.warnIncomplete(cmd.ErrOrStderr())
 	fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d frames (%.1f KB) to %s\n", steps, float64(size)/1024, output)
 	return nil
 }

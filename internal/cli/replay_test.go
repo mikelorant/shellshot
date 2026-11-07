@@ -146,6 +146,30 @@ func TestReplayTruncatedPlaysValidPrefix(t *testing.T) {
 	}
 }
 
+// A recording with no EXIT event ends cleanly but its recorder died: replay
+// plays everything, exits 0 and says so on stderr.
+func TestReplayInterruptedWarns(t *testing.T) {
+	path := writeFile(t, "killed.shot", interruptedRecording(t))
+	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr %q", code, stderr)
+	}
+	if want := "shellshot: recording is incomplete (no exit event; recorder was interrupted)\n"; stderr != want {
+		t.Errorf("stderr = %q, want %q", stderr, want)
+	}
+	if !strings.Contains(stdout, "one") || !strings.Contains(stdout, "two") {
+		t.Errorf("stdout = %q, want both blocks", stdout)
+	}
+}
+
+// A finished recording gets no note.
+func TestReplayCompleteHasNoWarning(t *testing.T) {
+	path := writeFile(t, "done.shot", simpleRecording(t))
+	if code, _, stderr := runReplayCmd(t, path, "--speed", "1000"); code != 0 || stderr != "" {
+		t.Errorf("exit %d, stderr %q, want 0 and no output", code, stderr)
+	}
+}
+
 func TestReplayCorruptIsFatal(t *testing.T) {
 	data, firstEnd := twoBlockRecording(t)
 	bad := append([]byte(nil), data...)

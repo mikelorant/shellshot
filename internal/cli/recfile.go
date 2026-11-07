@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/michaellorant/shellshot/internal/recording/bin"
+	"github.com/michaellorant/shellshot/internal/recording/bin/event"
 	"github.com/michaellorant/shellshot/internal/recording/bin/head"
 	"github.com/michaellorant/shellshot/internal/recording/frames"
 	"github.com/michaellorant/shellshot/internal/session"
@@ -41,37 +42,54 @@ func addFPSFlag(cmd *cobra.Command, fps *int) {
 	cmd.Flags().IntVar(fps, "fps", session.DefaultFPS, "frame sampling rate in frames per second")
 }
 
+// incompleteNote is the stderr line for a recording that ends cleanly but has
+// no EXIT event: its recorder was killed or crashed.
+const incompleteNote = "shellshot: recording is incomplete (no exit event; recorder was interrupted)"
+
 // prefixSource is a frames.Source over a bin.Reader that reports a torn tail
 // (bin.ErrTruncated) as a clean end, so the valid prefix of a crashed
-// recording is still played. truncated tells the caller
-// afterwards whether that happened.
+// recording is still played. truncated and interrupted tell the caller
+// afterwards what happened.
 type prefixSource struct {
 	r         *bin.Reader
-	truncated bool
+	truncated bool // the file has a torn tail
+	sawExit   bool // an EXIT event was read
+	ended     bool // the file ended at a chunk boundary
 }
 
 func (s *prefixSource) Head() head.Head { return s.r.Head() }
 
 func (s *prefixSource) Next() (bin.Event, error) {
 	ev, err := s.r.Next()
-	if errors.Is(err, bin.ErrTruncated) {
+	switch {
+	case err == nil:
+		if ev.Kind == event.KindExit {
+			s.sawExit = true
+		}
+	case errors.Is(err, bin.ErrTruncated):
 		s.truncated = true
 		return bin.Event{}, io.EOF
+	case errors.Is(err, io.EOF):
+		s.ended = true
 	}
 	return ev, err
 }
 
-// warnTruncated writes the standard note about a torn recording to w when src
-// stopped at one.
-func (s *prefixSource) warnTruncated(w io.Writer) {
-	if s.truncated {
+// warnIncomplete writes the note about an interrupted or torn recording to w
+// when the source stopped at the end of such a file: a torn tail is reported
+// with its valid length, a clean end without an EXIT event as interrupted.
+func (s *prefixSource) warnIncomplete(w io.Writer) {
+	switch {
+	case s.truncated:
 		fmt.Fprintf(w, "shellshot: recording is truncated (%d bytes valid)\n", s.r.ValidBytes())
+	case s.ended && !s.sawExit:
+		fmt.Fprintln(w, incompleteNote)
 	}
 }
 
 // openFrames opens the recording at path and returns a frame iterator over
 // it, sampled at fps and rendered with libghostty, together with the source
-// (for the truncation note) and a function that closes everything.
+// (for the incomplete-recording note) and a function that closes everything.
 func openFrames(path string, fps int) (*frames.Iterator, *prefixSource, func() error, error) {
 	f, err := os.Open(path)
 	if err != nil {

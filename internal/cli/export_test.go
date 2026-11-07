@@ -36,6 +36,7 @@ func writeExportFixture(t *testing.T) string {
 	data := buildRecording(t, head.Head{Cols: exportFixtureCols, Rows: exportFixtureRows}, bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
 		must(t, w.Output(100*time.Millisecond, []byte("\x1b[31mred\x1b[0m ok\r\n\u4e16\x1b[41mX\x1b[0m")))
 		must(t, w.Output(500*time.Millisecond, []byte("\x1b[1;1H\x1b[31mred\x1b[0m done")))
+		must(t, w.Exit(500*time.Millisecond, 0))
 	})
 	return writeFile(t, "fixture.shot", data)
 }
@@ -413,6 +414,23 @@ func TestExportTruncatedExportsValidPrefix(t *testing.T) {
 	}
 }
 
+// A recording without an EXIT event exports in full and says its recorder was
+// interrupted.
+func TestExportInterruptedWarns(t *testing.T) {
+	in := writeFile(t, "killed.shot", interruptedRecording(t))
+	out := filepath.Join(t.TempDir(), "out.apng")
+	code, stderr := runExportCmd(t, in, "-o", out)
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	if want := "shellshot: recording is incomplete (no exit event; recorder was interrupted)\n"; !strings.HasPrefix(stderr, want) {
+		t.Errorf("stderr = %q, want it to start with %q", stderr, want)
+	}
+	if a := decodeAPNG(t, out); len(a.Frames) < 2 {
+		t.Errorf("%d frames exported, want both blocks", len(a.Frames))
+	}
+}
+
 // Idle time costs one step: a five minute pause exports a handful of frames,
 // and the pause is capped by --idle-limit.
 func TestExportIdleGap(t *testing.T) {
@@ -445,6 +463,7 @@ func TestExportFPSChangesFrameCount(t *testing.T) {
 	data := buildRecording(t, head.Head{Cols: 10, Rows: 2}, bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
 		must(t, w.Output(10*time.Millisecond, []byte("a")))
 		must(t, w.Output(30*time.Millisecond, []byte("b")))
+		must(t, w.Exit(30*time.Millisecond, 0))
 	})
 	in := writeFile(t, "fps.shot", data)
 	for fps, want := range map[string]string{"10": "wrote 2 frames", "1000": "wrote 3 frames"} {
