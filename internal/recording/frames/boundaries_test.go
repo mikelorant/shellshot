@@ -21,6 +21,7 @@ func mark(at time.Duration, label string) bin.Event {
 // TestBoundarySampling checks forced frames against an exact expected stream.
 // The grid is 100ms (FPS 10).
 func TestBoundarySampling(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name       string
 		evs        []bin.Event
@@ -170,6 +171,7 @@ func TestBoundarySampling(t *testing.T) {
 }
 
 func TestBoundariesDoNotMutateOption(t *testing.T) {
+	t.Parallel()
 	in := []time.Duration{300 * ms, 100 * ms, 300 * ms}
 	run(t, newSrc(out(10*ms, "a")), Options{Boundaries: in})
 	if !slices.Equal(in, []time.Duration{300 * ms, 100 * ms, 300 * ms}) {
@@ -178,6 +180,7 @@ func TestBoundariesDoNotMutateOption(t *testing.T) {
 }
 
 func TestNegativeBoundaryIsError(t *testing.T) {
+	t.Parallel()
 	var ft *fakeTerm
 	_, err := New(newSrc(), Options{Factory: fakeFactory(&ft), Boundaries: []time.Duration{ms, -ms}})
 	if err == nil || !strings.Contains(err.Error(), "negative boundary") {
@@ -189,6 +192,7 @@ func TestNegativeBoundaryIsError(t *testing.T) {
 }
 
 func TestBoundariesInIdleGapAreConstantWork(t *testing.T) {
+	t.Parallel()
 	src := newSrc(out(50*ms, "a"), out(5*time.Minute, "b"))
 	got, ft, _ := run(t, src, Options{Boundaries: []time.Duration{time.Minute, 2*time.Minute + 17*ms, 4 * time.Minute}})
 	check(t, got, "0s:", "100ms:a", "1m0s:a", "2m0.017s:a", "4m0s:a", "5m0s:ab")
@@ -200,6 +204,7 @@ func TestBoundariesInIdleGapAreConstantWork(t *testing.T) {
 }
 
 func TestBoundariesInIdleGapOmitFinal(t *testing.T) {
+	t.Parallel()
 	src := newSrc(out(50*ms, "a"), out(5*time.Minute+30*ms, "b"))
 	got, ft, _ := run(t, src, Options{OmitFinal: true, Boundaries: []time.Duration{time.Minute, 2 * time.Minute, 3 * time.Minute}})
 	check(t, got, "0s:", "100ms:a", "1m0s:a", "2m0s:a", "3m0s:a", "5m0.1s:ab")
@@ -209,6 +214,7 @@ func TestBoundariesInIdleGapOmitFinal(t *testing.T) {
 }
 
 func TestBoundaryInsideDirtyGroupSnapshotsOncePerForcedFrame(t *testing.T) {
+	t.Parallel()
 	// Three boundaries inside one group, each after new output: one snapshot
 	// each, plus the initial and the closing group.
 	src := newSrc(out(10*ms, "a"), out(20*ms, "b"), out(30*ms, "c"), out(40*ms, "d"), out(900*ms, "e"))
@@ -220,6 +226,7 @@ func TestBoundaryInsideDirtyGroupSnapshotsOncePerForcedFrame(t *testing.T) {
 }
 
 func TestBoundariesWithResize(t *testing.T) {
+	t.Parallel()
 	got, _, _ := run(t, newSrc(
 		out(10*ms, "a"),
 		resize(150*ms, 20, 5),
@@ -235,6 +242,7 @@ func TestBoundariesWithResize(t *testing.T) {
 }
 
 func TestBoundariesWithMarks(t *testing.T) {
+	t.Parallel()
 	evs := []bin.Event{
 		out(10*ms, "a"), mark(120*ms, "one"), out(130*ms, "b"), mark(300*ms, "two"), out(400*ms, "c"),
 	}
@@ -253,6 +261,7 @@ func TestBoundariesWithMarks(t *testing.T) {
 }
 
 func TestBoundaryMarksSoFar(t *testing.T) {
+	t.Parallel()
 	var ft *fakeTerm
 	it, err := New(newSrc(mark(20*ms, "one"), out(900*ms, "b")),
 		Options{Factory: fakeFactory(&ft), Boundaries: []time.Duration{500 * ms}})
@@ -271,6 +280,7 @@ func TestBoundaryMarksSoFar(t *testing.T) {
 }
 
 func TestBoundaryTerminalClosedAfterLastFrame(t *testing.T) {
+	t.Parallel()
 	_, ft, it := run(t, newSrc(out(10*ms, "a")), Options{Boundaries: []time.Duration{time.Second}})
 	if ft.closes != 1 {
 		t.Fatalf("closes = %d", ft.closes)
@@ -281,6 +291,7 @@ func TestBoundaryTerminalClosedAfterLastFrame(t *testing.T) {
 }
 
 func TestBoundarySnapshotErrorAborts(t *testing.T) {
+	t.Parallel()
 	var ft *fakeTerm
 	it, _ := New(newSrc(out(10*ms, "a"), out(500*ms, "b")),
 		Options{Factory: fakeFactory(&ft), Boundaries: []time.Duration{50 * ms}})
@@ -417,6 +428,7 @@ func randomBoundaries(r *rand.Rand, evs []bin.Event, interval time.Duration) []t
 // TestRandomWithoutBoundariesMatchesGridModel compares the iterator with a
 // naive model of the unchanged sampling grid.
 func TestRandomWithoutBoundariesMatchesGridModel(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	for i := range 500 {
 		evs := randomEvents(r)
@@ -451,6 +463,7 @@ func framesEqual(a, b []snapshot.Frame) bool {
 // showing the screen at that time, the final screen is last, and the cost in
 // Snapshot calls is bounded by the events and boundaries.
 func TestRandomBoundaryInvariants(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(2))
 	for i := range 1000 {
 		evs := randomEvents(r)
@@ -500,6 +513,7 @@ func TestRandomBoundaryInvariants(t *testing.T) {
 // TestRandomBoundariesInOrderAndDeduplicated checks that the order and
 // duplicates of the option do not matter.
 func TestRandomBoundariesInOrderAndDeduplicated(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(3))
 	for range 200 {
 		evs := randomEvents(r)

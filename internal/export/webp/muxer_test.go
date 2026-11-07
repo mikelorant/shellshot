@@ -9,6 +9,7 @@ import (
 // TestMuxerByteExact writes a file from hand-built frames (fake VP8L
 // payloads, one of odd length) and compares every byte.
 func TestMuxerByteExact(t *testing.T) {
+	t.Parallel()
 	s, buf := newSink(t, 300, 200, Options{Loops: 3})
 	s.alpha = true
 	s.frames = []frame{
@@ -55,6 +56,7 @@ func TestMuxerByteExact(t *testing.T) {
 }
 
 func TestMuxerChunkSizes(t *testing.T) {
+	t.Parallel()
 	for n := 0; n < 6; n++ {
 		payload := bytes.Repeat([]byte{0x2f}, n)
 		var buf bytes.Buffer
@@ -73,6 +75,7 @@ func TestMuxerChunkSizes(t *testing.T) {
 }
 
 func TestVP8LPayload(t *testing.T) {
+	t.Parallel()
 	good := []byte("RIFF\x10\x00\x00\x00WEBPVP8L\x03\x00\x00\x00abc\x00")
 	if got, err := vp8lPayload(good); err != nil || string(got) != "abc" {
 		t.Errorf("vp8lPayload = %q, %v", got, err)

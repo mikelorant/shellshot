@@ -34,6 +34,7 @@ func wroteLine(n int) string { return fmt.Sprintf("wrote %d frames (", n) }
 // The frame count export prints is the number of frames in the file, not the
 // number of timeline steps: steps that render the same picture are one frame.
 func TestExportReportsTheFramesInTheFile(t *testing.T) {
+	t.Parallel()
 	in := writeCursorMovesFixture(t)
 	dir := t.TempDir()
 	flags := []string{"--cursor", "none", "--min-delay", "0", "--keep-leading-blank", "--hold", "1s"}

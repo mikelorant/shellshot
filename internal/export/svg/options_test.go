@@ -12,6 +12,7 @@ import (
 )
 
 func TestParseFrame(t *testing.T) {
+	t.Parallel()
 	for in, want := range map[string]Frame{
 		"first": {Kind: FrameFirst}, "last": {Kind: FrameLast},
 		"1.5s": {Kind: FrameAt, At: 1500 * time.Millisecond}, "800ms": {Kind: FrameAt, At: 800 * time.Millisecond}, "0s": {Kind: FrameAt},
@@ -28,6 +29,7 @@ func TestParseFrame(t *testing.T) {
 }
 
 func TestParseTextMode(t *testing.T) {
+	t.Parallel()
 	if m, err := ParseTextMode("text"); err != nil || m != TextText || m.String() != "text" {
 		t.Errorf("text: %v, %v", m, err)
 	}
@@ -40,6 +42,7 @@ func TestParseTextMode(t *testing.T) {
 }
 
 func TestWriteStepsRejectsBadInput(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
 	good := screen(t, 10, "ok")
 	bad := snapshot.Snapshot{Cols: 10, Rows: 2, Lines: []string{"only one line"}}
@@ -65,6 +68,7 @@ func TestWriteStepsRejectsBadInput(t *testing.T) {
 }
 
 func TestPathsModeDefinesEachGlyphOnce(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
 	s := screen(t, 20, "aaa "+esc+"1mabab"+reset, "世世 世")
 	doc := write(t, Options{Geometry: g, Text: TextPaths, Frame: Frame{Kind: FrameLast}}, 20, 2, step(s, time.Second))
@@ -81,6 +85,7 @@ func TestPathsModeDefinesEachGlyphOnce(t *testing.T) {
 }
 
 func TestPathsModeLeavesAbsentGlyphsBlank(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
 	s := screen(t, 10, "a\U0010FFFEb")
 	doc := write(t, Options{Geometry: g, Text: TextPaths, Frame: Frame{Kind: FrameLast}}, 10, 1, step(s, time.Second))

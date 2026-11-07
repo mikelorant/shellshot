@@ -117,6 +117,7 @@ func notoFontFile(t *testing.T) string {
 // (which the apple set takes from Noto), and differ in artwork; the text is
 // the same.
 func TestExportEmojiSets(t *testing.T) {
+	t.Parallel()
 	in := writeEmojiRecording(t)
 	apple := exportLastFrame(t, in, "--emoji-set", "apple")
 	noto := exportLastFrame(t, in, "--emoji-set", "noto")
@@ -149,6 +150,7 @@ func TestExportEmojiSets(t *testing.T) {
 // A user emoji font goes first: Noto given as --emoji-font over the apple
 // set draws exactly what --emoji-set noto draws.
 func TestExportEmojiFontComesFirst(t *testing.T) {
+	t.Parallel()
 	in := writeEmojiRecording(t)
 	noto := exportLastFrame(t, in, "--emoji-set", "noto")
 	user := exportLastFrame(t, in, "--emoji-set", "apple", "--emoji-font", notoFontFile(t))
@@ -158,6 +160,7 @@ func TestExportEmojiFontComesFirst(t *testing.T) {
 }
 
 func TestExportEmojiFlagErrors(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	garbage := filepath.Join(dir, "garbage.ttf")
@@ -195,6 +198,7 @@ func TestExportEmojiFlagErrors(t *testing.T) {
 }
 
 func TestExportHelpExplainsEmojiSets(t *testing.T) {
+	t.Parallel()
 	cmd := newExportCmd()
 	usage := cmd.Flags().FlagUsages()
 	for _, want := range []string{

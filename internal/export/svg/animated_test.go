@@ -47,6 +47,7 @@ func session(t testing.TB) []timeline.Step {
 }
 
 func TestSessionHasThirtySteps(t *testing.T) {
+	t.Parallel()
 	if n := len(session(t)); n != 30 {
 		t.Fatalf("session has %d steps, want 30", n)
 	}
@@ -183,6 +184,7 @@ func readStrips(t testing.TB, doc string, cellH int) (strips map[int]*playedRow)
 }
 
 func TestAnimatedKeyframesFollowTheStepTimes(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{Cursor: raster.CursorNone})
 	lay := r.Layout()
 	lines := func(a, b, c string) snapshot.Snapshot { return screen(t, 20, a, b, c) }
@@ -256,6 +258,7 @@ func floatsNear(a, b []float64, eps float64) bool {
 }
 
 func TestAnimatedBaseStateIsTheFirstFrame(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{Cursor: raster.CursorBar})
 	lay := r.Layout()
 	steps := []timeline.Step{
@@ -277,6 +280,7 @@ func TestAnimatedBaseStateIsTheFirstFrame(t *testing.T) {
 }
 
 func TestAnimatedFiniteLoopsEndOnTheLastFrame(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{Cursor: raster.CursorNone})
 	steps := stepsOf(t, []timelineStep{{"a", time.Second}, {"b", time.Second}})
 	doc := write(t, Options{Geometry: g, Loops: 3}, 10, 1, steps...)
@@ -296,6 +300,7 @@ func TestAnimatedFiniteLoopsEndOnTheLastFrame(t *testing.T) {
 }
 
 func TestAnimatedSingleStepAndZeroDurationAreStatic(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
 	one := write(t, Options{Geometry: g}, 10, 1, stepsOf(t, []timelineStep{{"only", time.Second}})...)
 	zero := write(t, Options{Geometry: g}, 10, 1, stepsOf(t, []timelineStep{{"a", 0}, {"b", 0}})...)
@@ -310,6 +315,7 @@ func TestAnimatedSingleStepAndZeroDurationAreStatic(t *testing.T) {
 }
 
 func TestAnimatedRowsWithEqualKeyframesShareOneAnimation(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{Cursor: raster.CursorNone})
 	mk := func(a, b string) snapshot.Snapshot { return screen(t, 10, a, b) }
 	doc := write(t, Options{Geometry: g}, 10, 2,
@@ -320,6 +326,7 @@ func TestAnimatedRowsWithEqualKeyframesShareOneAnimation(t *testing.T) {
 }
 
 func TestAnimatedUnderlineCursorHasARectanglePerWidth(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{Cursor: raster.CursorUnderline})
 	lay := r.Layout()
 	narrow := withCursor(screen(t, 10, "ab世"), 1, 0)
@@ -342,6 +349,7 @@ func TestAnimatedUnderlineCursorHasARectanglePerWidth(t *testing.T) {
 }
 
 func TestAnimatedKeyframePercentsKeepMillisecondPrecisionOnLongSessions(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{Cursor: raster.CursorNone})
 	var steps []timeline.Step
 	for i := 0; i < 400; i++ {
@@ -374,6 +382,7 @@ func TestAnimatedKeyframePercentsKeepMillisecondPrecisionOnLongSessions(t *testi
 }
 
 func TestOutputIsDeterministic(t *testing.T) {
+	t.Parallel()
 	steps := session(t)
 	var first []byte
 	for i := 0; i < 3; i++ {
@@ -391,6 +400,7 @@ func TestOutputIsDeterministic(t *testing.T) {
 }
 
 func TestAnimatedGolden(t *testing.T) {
+	t.Parallel()
 	_, g := newRenderer(t, raster.Options{Cursor: raster.CursorBar})
 	steps := []timeline.Step{
 		step(withCursor(screen(t, 12, esc+"32m$"+reset+" l", "", ""), 3, 0), 200*time.Millisecond),
@@ -407,6 +417,7 @@ func TestAnimatedGolden(t *testing.T) {
 // the prompt row and eight lines of output, so it is smaller than a screen
 // full of text that changes at every step.
 func TestSessionSize(t *testing.T) {
+	t.Parallel()
 	const (
 		measuredText   = 10941 // animation, text mode
 		measuredPaths  = 35683 // animation, paths mode

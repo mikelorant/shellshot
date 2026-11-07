@@ -9,6 +9,7 @@ import (
 )
 
 func TestExportHelpListsFormat(t *testing.T) {
+	t.Parallel()
 	usage := newExportCmd().Flags().FlagUsages()
 	for _, want := range []string{"--format", "apng", "from the extension of -o"} {
 		if !strings.Contains(usage, want) {
@@ -19,6 +20,7 @@ func TestExportHelpListsFormat(t *testing.T) {
 
 // Every way of choosing apng writes the same bytes.
 func TestExportFormatAPNGIsChosenByNameExtensionOrDefault(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	cases := []struct {
@@ -53,6 +55,7 @@ func TestExportFormatAPNGIsChosenByNameExtensionOrDefault(t *testing.T) {
 }
 
 func TestExportFormatFlagWithoutOutputUsesFormatExtension(t *testing.T) {
+	t.Parallel()
 	in := writeFile(t, "y.shot", mustRead(t, writeExportFixture(t)))
 	if code, stderr := runExportCmd(t, in, "--format", "apng"); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
@@ -63,6 +66,7 @@ func TestExportFormatFlagWithoutOutputUsesFormatExtension(t *testing.T) {
 }
 
 func TestExportRejectsUnknownFormat(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	cases := []struct {

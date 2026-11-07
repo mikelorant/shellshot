@@ -11,6 +11,7 @@ import (
 )
 
 func TestExitErrorMessageAndAs(t *testing.T) {
+	t.Parallel()
 	err := fmt.Errorf("wrapped: %w", ExitError{Code: 3})
 	var exit ExitError
 	if !errors.As(err, &exit) || exit.Code != 3 {
@@ -22,6 +23,7 @@ func TestExitErrorMessageAndAs(t *testing.T) {
 }
 
 func TestRecordPassesThroughSignalExitCode(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "signal.shot")
 	args := []string{"record", "-o", path, "--cols", "40", "--rows", "5", "-c", "kill -TERM $$"}
 	code, _, stderr := runRecordWithTimeout(t, args, "")
@@ -31,6 +33,7 @@ func TestRecordPassesThroughSignalExitCode(t *testing.T) {
 }
 
 func TestRecordPropagatesChildExitStatusAfterWritingRecording(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "exit.shot")
 	args := []string{"record", "-o", path, "--cols", "40", "--rows", "5", "-c", "echo before; exit 3"}
 	code, _, stderr := runRecordWithTimeout(t, args, "")
@@ -47,6 +50,7 @@ func TestRecordPropagatesChildExitStatusAfterWritingRecording(t *testing.T) {
 }
 
 func TestRecordIgnoreExitStatusExitsZero(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "exit0.shot")
 	args := []string{"record", "--ignore-exit-status", "-o", path, "--cols", "40", "--rows", "5", "-c", "exit 3"}
 	code, _, stderr := runRecordWithTimeout(t, args, "")
@@ -56,6 +60,7 @@ func TestRecordIgnoreExitStatusExitsZero(t *testing.T) {
 }
 
 func TestRunOtherCommandsKeepExitCodeConvention(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	if code := Run(context.Background(), []string{"version"}, &stdout, &stderr); code != 0 {
 		t.Errorf("version exit code = %d, want 0", code)

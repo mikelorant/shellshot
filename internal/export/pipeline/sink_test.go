@@ -104,6 +104,7 @@ func sameDurations(a, b []time.Duration) bool {
 }
 
 func TestExportUsesNewSinkAndPassesSize(t *testing.T) {
+	t.Parallel()
 	var sink *fakeSink
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a"), frame(time.Second, "b")}}
 	var buf bytes.Buffer
@@ -122,6 +123,7 @@ func TestExportUsesNewSinkAndPassesSize(t *testing.T) {
 }
 
 func TestExportSplitsLongHoldAtMaxDelay(t *testing.T) {
+	t.Parallel()
 	var sink *fakeSink
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a")}}
 	wrap := func(f *fakeSink) Sink { return limitedSink{f, 10 * time.Second} }
@@ -138,6 +140,7 @@ func TestExportSplitsLongHoldAtMaxDelay(t *testing.T) {
 }
 
 func TestExportDelayEqualToMaxDelayIsNotSplit(t *testing.T) {
+	t.Parallel()
 	var sink *fakeSink
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a")}}
 	wrap := func(f *fakeSink) Sink { return limitedSink{f, 10 * time.Second} }
@@ -150,6 +153,7 @@ func TestExportDelayEqualToMaxDelayIsNotSplit(t *testing.T) {
 }
 
 func TestExportZeroMaxDelayIsUnlimited(t *testing.T) {
+	t.Parallel()
 	for name, wrap := range map[string]func(*fakeSink) Sink{
 		"MaxDelay 0":          func(f *fakeSink) Sink { return limitedSink{f, 0} },
 		"no DelayLimiter":     plain,
@@ -169,6 +173,7 @@ func TestExportZeroMaxDelayIsUnlimited(t *testing.T) {
 }
 
 func TestExportPrefersAddFrameAuto(t *testing.T) {
+	t.Parallel()
 	var sink *fakeSink
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a"), frame(time.Second, "b")}}
 	if err := exportWith(t, src, &fakeRenderer{}, io.Discard, time.Second, factoryFor(&sink, func(f *fakeSink) Sink { return autoSink{f} })); err != nil {
@@ -185,6 +190,7 @@ func TestExportPrefersAddFrameAuto(t *testing.T) {
 }
 
 func TestExportUsesAddFrameWithoutAutoFrame(t *testing.T) {
+	t.Parallel()
 	var sink *fakeSink
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a")}}
 	if err := exportWith(t, src, &fakeRenderer{}, io.Discard, time.Second, factoryFor(&sink, plain)); err != nil {
@@ -196,6 +202,7 @@ func TestExportUsesAddFrameWithoutAutoFrame(t *testing.T) {
 }
 
 func TestExportClosesSinkOnceAndWritesNothingOnFailure(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("boom")
 	cases := map[string]struct {
 		src  Source
@@ -233,6 +240,7 @@ func TestExportClosesSinkOnceAndWritesNothingOnFailure(t *testing.T) {
 }
 
 func TestExportClosesSinkOnceOnCancellation(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	var sink *fakeSink
 	var buf bytes.Buffer
@@ -262,6 +270,7 @@ func (c *cancelRenderer) Render(s snapshot.Snapshot) (*image.RGBA, error) {
 }
 
 func TestExportReportsCloseError(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("boom")
 	factory := func(w io.Writer, width, height int) (Sink, error) {
 		return &fakeSink{w: w, closeErr: boom}, nil
@@ -274,6 +283,7 @@ func TestExportReportsCloseError(t *testing.T) {
 }
 
 func TestExportReportsSinkFactoryError(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("boom")
 	factory := func(io.Writer, int, int) (Sink, error) { return nil, boom }
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a")}}
@@ -285,6 +295,7 @@ func TestExportReportsSinkFactoryError(t *testing.T) {
 }
 
 func TestAPNGSinkLimitsDelayTo65535Milliseconds(t *testing.T) {
+	t.Parallel()
 	s, err := APNGSinkFactory(0, 0)(io.Discard, 1, 1)
 	if err != nil {
 		t.Fatal(err)

@@ -23,6 +23,7 @@ func webpChunks(t *testing.T, b []byte) []string {
 }
 
 func TestExportWebP(t *testing.T) {
+	t.Parallel()
 	in := writeExportFixture(t)
 	dir := t.TempDir()
 	for _, tc := range []struct {
@@ -44,6 +45,7 @@ func TestExportWebP(t *testing.T) {
 }
 
 func TestExportWebPDefaultOutputName(t *testing.T) {
+	t.Parallel()
 	in := writeFile(t, "z.shot", mustRead(t, writeExportFixture(t)))
 	if code, stderr := runExportCmd(t, in, "--format", "webp"); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)

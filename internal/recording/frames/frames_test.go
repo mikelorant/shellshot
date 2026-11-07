@@ -146,6 +146,7 @@ func check(t *testing.T, got []snapshot.Frame, want ...string) {
 }
 
 func TestSamplingGrid(t *testing.T) {
+	t.Parallel()
 	got, _, _ := run(t, newSrc(
 		out(10*ms, "a"), out(40*ms, "b"), // boundary 100ms
 		out(100*ms, "c"),  // exactly on the boundary: same group
@@ -162,11 +163,13 @@ func TestSamplingGrid(t *testing.T) {
 }
 
 func TestSamplingGridOmitFinal(t *testing.T) {
+	t.Parallel()
 	got, _, _ := run(t, newSrc(out(10*ms, "a"), out(130*ms, "b")), Options{OmitFinal: true})
 	check(t, got, "0s:", "100ms:a", "200ms:ab")
 }
 
 func TestUnchangedScreenNotEmitted(t *testing.T) {
+	t.Parallel()
 	// The group at 200ms writes nothing visible (empty OUT), so no frame.
 	got, _, _ := run(t, newSrc(
 		out(10*ms, "a"), out(150*ms, ""), out(250*ms, "b")), Options{OmitFinal: true})
@@ -174,6 +177,7 @@ func TestUnchangedScreenNotEmitted(t *testing.T) {
 }
 
 func TestFinalFrameAlwaysEmittedOnce(t *testing.T) {
+	t.Parallel()
 	// Only an IN event after the last change: the final frame is still emitted
 	// even though it equals the previous one.
 	got, _, _ := run(t, newSrc(
@@ -183,6 +187,7 @@ func TestFinalFrameAlwaysEmittedOnce(t *testing.T) {
 }
 
 func TestNoEventsEmitsInitialAndFinal(t *testing.T) {
+	t.Parallel()
 	got, _, _ := run(t, newSrc(), Options{})
 	check(t, got, "0s:", "0s:")
 	got, _, _ = run(t, newSrc(), Options{OmitFinal: true})
@@ -190,6 +195,7 @@ func TestNoEventsEmitsInitialAndFinal(t *testing.T) {
 }
 
 func TestIdleGapIsConstantWork(t *testing.T) {
+	t.Parallel()
 	src := newSrc(out(50*ms, "a"), out(5*time.Minute, "b"))
 	got, ft, _ := run(t, src, Options{})
 	check(t, got, "0s:", "100ms:a", "5m0s:ab")
@@ -200,6 +206,7 @@ func TestIdleGapIsConstantWork(t *testing.T) {
 }
 
 func TestIdleGapOmitFinal(t *testing.T) {
+	t.Parallel()
 	src := newSrc(out(50*ms, "a"), out(5*time.Minute+30*ms, "b"))
 	got, ft, _ := run(t, src, Options{OmitFinal: true})
 	check(t, got, "0s:", "100ms:a", "5m0.1s:ab")
@@ -209,6 +216,7 @@ func TestIdleGapOmitFinal(t *testing.T) {
 }
 
 func TestResizeMidStream(t *testing.T) {
+	t.Parallel()
 	got, ft, _ := run(t, newSrc(
 		out(10*ms, "hi"),
 		resize(150*ms, 40, 5),
@@ -235,6 +243,7 @@ func TestResizeMidStream(t *testing.T) {
 }
 
 func TestResizeAloneChangesScreen(t *testing.T) {
+	t.Parallel()
 	got, _, _ := run(t, newSrc(resize(50*ms, 20, 3), out(250*ms, "x")), Options{OmitFinal: true})
 	if len(got) != 3 || got[1].Snapshot.Cols != 20 || got[1].At != 100*ms {
 		t.Fatalf("frames: %q", summary(got))
@@ -242,6 +251,7 @@ func TestResizeAloneChangesScreen(t *testing.T) {
 }
 
 func TestInvalidResize(t *testing.T) {
+	t.Parallel()
 	for name, ev := range map[string]bin.Event{
 		"zero":      resize(10*ms, 0, 5),
 		"malformed": {At: 10 * ms, Kind: event.KindResize, Data: []byte{0x80}},
@@ -263,6 +273,7 @@ func TestInvalidResize(t *testing.T) {
 }
 
 func TestMarksCollected(t *testing.T) {
+	t.Parallel()
 	var ft *fakeTerm
 	it, err := New(newSrc(
 		out(10*ms, "a"),
@@ -292,6 +303,7 @@ func TestMarksCollected(t *testing.T) {
 }
 
 func TestMarksSoFar(t *testing.T) {
+	t.Parallel()
 	var ft *fakeTerm
 	it, _ := New(newSrc(
 		bin.Event{At: 20 * ms, Kind: event.KindMark, Data: []byte("one")},
@@ -311,6 +323,7 @@ func TestMarksSoFar(t *testing.T) {
 }
 
 func TestInputExitAndAncillaryIgnored(t *testing.T) {
+	t.Parallel()
 	exit := event.NewExit(0, 3)
 	got, ft, _ := run(t, newSrc(
 		bin.Event{At: 10 * ms, Kind: event.KindIn, Data: []byte("secret\r")},
@@ -324,6 +337,7 @@ func TestInputExitAndAncillaryIgnored(t *testing.T) {
 }
 
 func TestBackwardsTimestampClamped(t *testing.T) {
+	t.Parallel()
 	got, _, _ := run(t, newSrc(
 		out(250*ms, "a"),
 		out(100*ms, "b"), // goes backwards: treated as 250ms
@@ -332,12 +346,14 @@ func TestBackwardsTimestampClamped(t *testing.T) {
 }
 
 func TestBackwardsTimestampAcrossGroupBoundary(t *testing.T) {
+	t.Parallel()
 	got, _, _ := run(t, newSrc(
 		out(250*ms, "a"), out(310*ms, "b"), out(20*ms, "c")), Options{OmitFinal: true})
 	check(t, got, "0s:", "300ms:a", "400ms:abc")
 }
 
 func TestFPSDefault(t *testing.T) {
+	t.Parallel()
 	// Not positive selects 60 fps: a period of 16.667ms (rounded to the
 	// microsecond), so 1ms lands on 16.667ms and 20ms on 33.334ms.
 	for _, fps := range []int{0, -5} {
@@ -355,12 +371,14 @@ func TestFPSDefault(t *testing.T) {
 }
 
 func TestCustomFPS(t *testing.T) {
+	t.Parallel()
 	got, _, _ := run(t, newSrc(out(1*ms, "a"), out(60*ms, "b"), out(1001*ms, "c")),
 		Options{FPS: 20, OmitFinal: true})
 	check(t, got, "0s:", "50ms:a", "100ms:ab", "1.05s:abc")
 }
 
 func TestPeriodRounding(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		fps  int
 		want time.Duration
@@ -378,11 +396,13 @@ func TestPeriodRounding(t *testing.T) {
 }
 
 func TestEventAtZero(t *testing.T) {
+	t.Parallel()
 	got, _, _ := run(t, newSrc(out(0, "a"), out(0, "b")), Options{OmitFinal: true})
 	check(t, got, "0s:", "100ms:ab")
 }
 
 func TestDeferredEventDataSurvivesSourceReuse(t *testing.T) {
+	t.Parallel()
 	// fakeSource overwrites its buffer on every Next; the event that closes a
 	// group is read before the group is sampled and must still be intact.
 	got, _, _ := run(t, newSrc(out(10*ms, "aaaa"), out(150*ms, "bb"), out(260*ms, "cccccc")), Options{OmitFinal: true})
@@ -390,6 +410,7 @@ func TestDeferredEventDataSurvivesSourceReuse(t *testing.T) {
 }
 
 func TestCloseIdempotent(t *testing.T) {
+	t.Parallel()
 	var ft *fakeTerm
 	it, err := New(newSrc(out(10*ms, "a")), Options{Factory: fakeFactory(&ft)})
 	if err != nil {
@@ -410,6 +431,7 @@ func TestCloseIdempotent(t *testing.T) {
 }
 
 func TestTerminalClosedAtEOF(t *testing.T) {
+	t.Parallel()
 	_, ft, it := run(t, newSrc(out(10*ms, "a")), Options{})
 	if ft.closes != 1 {
 		t.Fatalf("closes after Collect = %d", ft.closes)
@@ -426,6 +448,7 @@ func TestTerminalClosedAtEOF(t *testing.T) {
 }
 
 func TestSourceErrorPropagates(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("boom")
 	src := newSrc(out(10*ms, "a"))
 	src.err = boom
@@ -449,6 +472,7 @@ func TestSourceErrorPropagates(t *testing.T) {
 }
 
 func TestTruncatedSourceErrorPropagates(t *testing.T) {
+	t.Parallel()
 	src := newSrc(out(10*ms, "a"))
 	src.err = bin.ErrTruncated
 	var ft *fakeTerm
@@ -459,6 +483,7 @@ func TestTruncatedSourceErrorPropagates(t *testing.T) {
 }
 
 func TestFactoryError(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("no terminal")
 	_, err := New(newSrc(), Options{Factory: func(c, r int) (vt.Terminal, error) { return nil, boom }})
 	if !errors.Is(err, boom) {
@@ -470,6 +495,7 @@ func TestFactoryError(t *testing.T) {
 }
 
 func TestFactoryReceivesHeadSize(t *testing.T) {
+	t.Parallel()
 	src := newSrc()
 	src.h.Cols, src.h.Rows = 132, 43
 	var gc, gr int
@@ -483,6 +509,7 @@ func TestFactoryReceivesHeadSize(t *testing.T) {
 }
 
 func TestInitialSnapshotErrorClosesTerminal(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("snap")
 	ft := &fakeTerm{cols: 1, rows: 1, snapErr: boom}
 	_, err := New(newSrc(), Options{Factory: func(c, r int) (vt.Terminal, error) { return ft, nil }})
@@ -492,6 +519,7 @@ func TestInitialSnapshotErrorClosesTerminal(t *testing.T) {
 }
 
 func TestWriteAndSnapshotErrorsAbort(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("vt")
 	var ft *fakeTerm
 	it, _ := New(newSrc(out(10*ms, "a")), Options{Factory: fakeFactory(&ft)})
@@ -509,6 +537,7 @@ func TestWriteAndSnapshotErrorsAbort(t *testing.T) {
 }
 
 func TestManyEventsInOneGroupSnapshotOnce(t *testing.T) {
+	t.Parallel()
 	var evs []bin.Event
 	for i := range 500 {
 		evs = append(evs, out(time.Duration(i)*100*time.Microsecond, strconv.Itoa(i%10)))

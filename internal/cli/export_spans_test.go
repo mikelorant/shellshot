@@ -127,6 +127,7 @@ func checkDelays(t *testing.T, a kettek.APNG, wantMS ...int) {
 }
 
 func TestExportSceneSpeedHintShortensTheScene(t *testing.T) {
+	t.Parallel()
 	in := sceneHintRecording(t, event.SpanHints{Speed: 4000}, true)
 
 	// Screens: blank, "a", "ab", "abc", "abcd". Without hints the delays are
@@ -144,6 +145,7 @@ func TestExportSceneSpeedHintShortensTheScene(t *testing.T) {
 }
 
 func TestExportSceneIdleAndHoldHints(t *testing.T) {
+	t.Parallel()
 	in := sceneHintRecording(t, event.SpanHints{Speed: 4000, Idle: ms(200), Hold: ms(500)}, true)
 	// "ab" is shown 700ms in the scene, capped to 200 and quartered: 50. The
 	// hold lands on "abc", the last screen before the scene end.
@@ -152,6 +154,7 @@ func TestExportSceneIdleAndHoldHints(t *testing.T) {
 }
 
 func TestExportFlagsBeatTheirHints(t *testing.T) {
+	t.Parallel()
 	in := sceneHintRecording(t, event.SpanHints{Speed: 4000, Idle: ms(200), Hold: ms(500)}, true)
 	tests := []struct {
 		name  string
@@ -176,6 +179,7 @@ func TestExportFlagsBeatTheirHints(t *testing.T) {
 }
 
 func TestExportNoHintsIgnoresSceneHintsButNotHiddenSpans(t *testing.T) {
+	t.Parallel()
 	in := spanRecording(t, func(w *bin.Writer) {
 		out(t, w, 100, "a")
 		span(t, w, 200, spanBegin(1, event.SpanScene, 0, "main", event.SpanHints{Speed: 4000, Hold: sec}))
@@ -197,6 +201,7 @@ func TestExportNoHintsIgnoresSceneHintsButNotHiddenSpans(t *testing.T) {
 const sec = time.Second
 
 func TestExportHiddenSpanIsCutAndNextFrameShowsPostSpanScreen(t *testing.T) {
+	t.Parallel()
 	in := hiddenRecording(t)
 
 	// blank 100, "a" 100 (100..200), then the hidden 200..600 is cut and
@@ -227,6 +232,7 @@ func TestExportHiddenSpanIsCutAndNextFrameShowsPostSpanScreen(t *testing.T) {
 func samePixels(a, b *image.RGBA) bool { return a.Rect == b.Rect && bytes.Equal(a.Pix, b.Pix) }
 
 func TestExportHiddenInsideScene(t *testing.T) {
+	t.Parallel()
 	in := spanRecording(t, func(w *bin.Writer) {
 		out(t, w, 100, "a")
 		span(t, w, 200, spanBegin(1, event.SpanScene, 0, "main", event.SpanHints{Speed: 2000}))
@@ -251,6 +257,7 @@ func TestExportHiddenInsideScene(t *testing.T) {
 
 // A recorder that was killed leaves a scene open: it ends at the last event.
 func TestExportOpenSpanEndsAtLastEvent(t *testing.T) {
+	t.Parallel()
 	in := spanRecording(t, func(w *bin.Writer) {
 		out(t, w, 100, "a")
 		span(t, w, 200, spanBegin(1, event.SpanScene, 0, "main", event.SpanHints{Speed: 4000}))
@@ -267,6 +274,7 @@ func TestExportOpenSpanEndsAtLastEvent(t *testing.T) {
 }
 
 func TestExportSpanFlagsAreAccepted(t *testing.T) {
+	t.Parallel()
 	in := hiddenRecording(t)
 	for _, flag := range []string{"--no-hints", "--show-hidden"} {
 		exportSpans(t, in, flag)
@@ -280,6 +288,7 @@ func TestExportSpanFlagsAreAccepted(t *testing.T) {
 // Without spans (or with every span effect switched off) the output is the
 // same bytes as before: no segments, no forced frames.
 func TestExportWithoutSpansIsUnchanged(t *testing.T) {
+	t.Parallel()
 	plain := sceneHintRecording(t, event.SpanHints{}, false)
 	base := mustRead(t, exportTo(t, plain))
 	for _, flags := range [][]string{{"--no-hints"}, {"--show-hidden"}, {"--no-hints", "--show-hidden"}} {
@@ -322,6 +331,7 @@ func exportTo(t *testing.T, in string, flags ...string) string {
 
 // A malformed SPAN payload ends the span list; the export still succeeds.
 func TestExportMalformedSpanWarns(t *testing.T) {
+	t.Parallel()
 	in := spanRecording(t, func(w *bin.Writer) {
 		out(t, w, 100, "a")
 		must(t, w.WriteEvent(ms(200), event.KindSpan, []byte{1, 1}))

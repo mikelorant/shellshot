@@ -67,6 +67,7 @@ func pixelScreen(t testing.TB) (rows []string) {
 }
 
 func TestSVGPathsMatchesRasterRenderer(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name string
 		o    raster.Options
@@ -109,6 +110,7 @@ func TestSVGPathsMatchesRasterRenderer(t *testing.T) {
 // TestSVGSpritesAreIdenticalToRaster compares box, block and braille cells
 // only: their geometry is shared, so the pixels must match exactly.
 func TestSVGSpritesAreIdenticalToRaster(t *testing.T) {
+	t.Parallel()
 	r, g := newRenderer(t, raster.Options{})
 	s := screen(t, 30,
 		"┌─┬─┐╔═╦═╗ ━┃┏┓┗┛ ╭─╮╰─╯ ╱╲╳",

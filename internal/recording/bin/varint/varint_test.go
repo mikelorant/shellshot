@@ -40,6 +40,7 @@ var svarintGoldens = []struct {
 }
 
 func TestUvarintGoldens(t *testing.T) {
+	t.Parallel()
 	for _, tc := range uvarintGoldens {
 		if got := AppendUvarint(nil, tc.v); !bytes.Equal(got, tc.enc) {
 			t.Errorf("AppendUvarint(%d) = %x, want %x", tc.v, got, tc.enc)
@@ -57,6 +58,7 @@ func TestUvarintGoldens(t *testing.T) {
 }
 
 func TestSvarintGoldens(t *testing.T) {
+	t.Parallel()
 	for _, tc := range svarintGoldens {
 		if got := AppendSvarint(nil, tc.v); !bytes.Equal(got, tc.enc) {
 			t.Errorf("AppendSvarint(%d) = %x, want %x", tc.v, got, tc.enc)
@@ -69,6 +71,7 @@ func TestSvarintGoldens(t *testing.T) {
 }
 
 func TestAppendPreservesPrefix(t *testing.T) {
+	t.Parallel()
 	got := AppendSvarint(AppendUvarint([]byte{0xaa}, 300), -1)
 	want := []byte{0xaa, 0xac, 0x02, 0x01}
 	if !bytes.Equal(got, want) {
@@ -77,6 +80,7 @@ func TestAppendPreservesPrefix(t *testing.T) {
 }
 
 func TestDecodeErrors(t *testing.T) {
+	t.Parallel()
 	ten80 := bytes.Repeat([]byte{0x80}, 10)
 	tests := []struct {
 		name string
@@ -111,6 +115,7 @@ func TestDecodeErrors(t *testing.T) {
 }
 
 func TestRoundTripRandom(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(1))
 	for i := 0; i < 20000; i++ {
 		u := rng.Uint64() >> uint(rng.Intn(64))
@@ -141,6 +146,7 @@ func TestDecodeDoesNotAllocate(t *testing.T) {
 }
 
 func TestReaderSequence(t *testing.T) {
+	t.Parallel()
 	var b []byte
 	b = AppendUvarint(b, 1000)
 	b = AppendSvarint(b, -5)
@@ -178,6 +184,7 @@ func TestReaderSequence(t *testing.T) {
 }
 
 func TestReaderErrorsLeaveCursor(t *testing.T) {
+	t.Parallel()
 	r := NewReader([]byte{0x80, 0x00, 0x05})
 	if _, err := r.Uvarint(); !errors.Is(err, ErrNonCanonical) {
 		t.Fatalf("Uvarint err = %v", err)
@@ -205,6 +212,7 @@ func TestReaderErrorsLeaveCursor(t *testing.T) {
 }
 
 func TestReaderUvarintMax(t *testing.T) {
+	t.Parallel()
 	r := NewReader(AppendUvarint(nil, 100))
 	if _, err := r.UvarintMax(99); !errors.Is(err, ErrLimit) {
 		t.Fatalf("err = %v, want ErrLimit", err)
@@ -223,6 +231,7 @@ func TestReaderUvarintMax(t *testing.T) {
 }
 
 func TestReaderBytesBounds(t *testing.T) {
+	t.Parallel()
 	r := NewReader([]byte{1, 2, 3})
 	for _, n := range []int{4, math.MaxInt, -1, math.MinInt} {
 		if s, err := r.Bytes(n); !errors.Is(err, ErrTruncated) || s != nil {
@@ -251,6 +260,7 @@ func TestReaderBytesBounds(t *testing.T) {
 }
 
 func TestZeroReader(t *testing.T) {
+	t.Parallel()
 	var r Reader
 	if r.Remaining() != 0 {
 		t.Fatal("zero Reader not empty")

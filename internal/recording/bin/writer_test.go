@@ -25,6 +25,7 @@ func mustWriter(t *testing.T, w io.Writer, h head.Head, o WriterOptions) *Writer
 }
 
 func TestRoundTripCodecsAndDictionary(t *testing.T) {
+	t.Parallel()
 	dict := bytes.Repeat([]byte("\x1b[0m\x1b[32mprompt\x1b[0m$ "), 16)
 	for _, tc := range []struct {
 		name string
@@ -102,6 +103,7 @@ func TestRoundTripCodecsAndDictionary(t *testing.T) {
 }
 
 func TestNewWriterWritesHeaderInOneWrite(t *testing.T) {
+	t.Parallel()
 	rw := newRecordingWriter()
 	th := goldenTheme()
 	w := mustWriter(t, rw, goldenHead(), WriterOptions{Dict: goldenDict, Theme: th, Meta: map[string]string{"a": "b"}})
@@ -122,6 +124,7 @@ func TestNewWriterWritesHeaderInOneWrite(t *testing.T) {
 }
 
 func TestOneWritePerChunk(t *testing.T) {
+	t.Parallel()
 	rw := newRecordingWriter()
 	clk := newFakeClock()
 	w := mustWriter(t, rw, goldenHead(), goldenOptions(clk))
@@ -140,6 +143,7 @@ func TestOneWritePerChunk(t *testing.T) {
 }
 
 func TestFlushBySize(t *testing.T) {
+	t.Parallel()
 	rw := newRecordingWriter()
 	clk := newFakeClock()
 	w := mustWriter(t, rw, testHead(), WriterOptions{Uncompressed: true, FlushBytes: 100, FlushInterval: -1, Now: clk.Now})
@@ -173,6 +177,7 @@ func TestFlushBySize(t *testing.T) {
 }
 
 func TestFlushByTime(t *testing.T) {
+	t.Parallel()
 	rw := newRecordingWriter()
 	clk := newFakeClock()
 	w := mustWriter(t, rw, testHead(), WriterOptions{Uncompressed: true, FlushInterval: 2 * time.Second, Now: clk.Now})
@@ -234,6 +239,7 @@ func TestFlushByTime(t *testing.T) {
 }
 
 func TestIdleWritesZeroBytes(t *testing.T) {
+	t.Parallel()
 	for _, coalesce := range []uint64{0, 10} {
 		t.Run(fmt.Sprintf("coalesce=%d", coalesce), func(t *testing.T) {
 			rw := newRecordingWriter()
@@ -293,6 +299,7 @@ func TestIdleWritesZeroBytes(t *testing.T) {
 }
 
 func TestInputRefusedWithoutFlag(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := mustWriter(t, &buf, testHead(), WriterOptions{})
 	size := buf.Len()
@@ -329,6 +336,7 @@ func TestInputRefusedWithoutFlag(t *testing.T) {
 }
 
 func TestBackwardsTimestampClamped(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := mustWriter(t, &buf, testHead(), WriterOptions{})
 	for _, at := range []time.Duration{time.Second, 500 * time.Millisecond, -time.Second, 2 * time.Second} {
@@ -358,6 +366,7 @@ func TestBackwardsTimestampClamped(t *testing.T) {
 }
 
 func TestCoalescing(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := mustWriter(t, &buf, testHead(), WriterOptions{CoalesceTicks: 20}) // 2ms at 100µs
 	for i, s := range []string{"a", "b", "c"} {
@@ -386,6 +395,7 @@ func TestCoalescing(t *testing.T) {
 }
 
 func TestSyncOnFlush(t *testing.T) {
+	t.Parallel()
 	for _, on := range []bool{false, true} {
 		sw := &syncingWriter{recordingWriter: *newRecordingWriter()}
 		w := mustWriter(t, sw, testHead(), WriterOptions{SyncOnFlush: on})
@@ -410,6 +420,7 @@ func TestSyncOnFlush(t *testing.T) {
 }
 
 func TestCloseIdempotentAndErrClosed(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := mustWriter(t, &buf, testHead(), WriterOptions{})
 	_ = w.Output(0, []byte("x"))
@@ -432,6 +443,7 @@ func TestCloseIdempotentAndErrClosed(t *testing.T) {
 }
 
 func TestWriteErrorIsSticky(t *testing.T) {
+	t.Parallel()
 	rw := newRecordingWriter()
 	w := mustWriter(t, rw, testHead(), WriterOptions{})
 	rw.limit = rw.buf.Len() + 5 // dies inside the first block
@@ -452,6 +464,7 @@ func TestWriteErrorIsSticky(t *testing.T) {
 }
 
 func TestWriterOptionErrors(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	empty := codec.NewRegistry()
 	if _, err := NewWriter(&buf, testHead(), WriterOptions{Registry: empty}); !errors.Is(err, codec.ErrUnknownCodec) {
@@ -485,6 +498,7 @@ func TestWriterOptionErrors(t *testing.T) {
 }
 
 func TestWriterDoesNotRetainCallerBuffer(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := mustWriter(t, &buf, testHead(), WriterOptions{Uncompressed: true})
 	p := []byte("first")
@@ -500,6 +514,7 @@ func TestWriterDoesNotRetainCallerBuffer(t *testing.T) {
 }
 
 func TestStats(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := mustWriter(t, &buf, testHead(), WriterOptions{Codec: codec.Flate})
 	_ = w.Output(0, bytes.Repeat([]byte("abc"), 1000))
@@ -558,6 +573,7 @@ func BenchmarkWriteEventSmall(b *testing.B) {
 // original bytes: for every event kind, merged and unmerged OUT, with
 // coalescing on and off, flushed mid-way and at close.
 func TestWriterOwnsEventData(t *testing.T) {
+	t.Parallel()
 	resize := event.ResizePayload{Cols: 80, Rows: 24, CellPxW: 8, CellPxH: 16}.Append(nil)
 	exit := event.NewExit(0, 3).Data
 	ms := time.Millisecond

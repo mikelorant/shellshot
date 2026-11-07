@@ -40,6 +40,21 @@ go test ./internal/recording/...
 
 - `make test` runs everything. Run `go vet` (`make vet`) and `make build` before committing.
 - Race detector: `go test -race ./...`.
+- Tests run in parallel. Packages run side by side (`go test -p N`, default `GOMAXPROCS`), and
+  the tests of `internal/cli`, `internal/recording` and `internal/export` call `t.Parallel()`
+  (`go test -parallel N` caps them, default `GOMAXPROCS`). A parallel-safe test:
+  - calls `t.Parallel()` first and uses nothing shared that it mutates: no package variables
+    (`cli.Version`), no `t.Setenv`, `os.Setenv` or `t.Chdir` (these panic or race), no fixed
+    ports, PTY names or file paths. Use `t.TempDir()` and pass absolute paths.
+  - drives time with a fake clock. A real deadline must leave generous slack for a loaded
+    machine. Measure delays from an event the test observes, not from when the test started.
+  - does not measure allocation (`testing.AllocsPerRun`, `runtime.MemStats`): other tests
+    allocate meanwhile, and `AllocsPerRun` panics in a parallel test.
+
+  Tests that cannot follow these rules stay serial. The serial tests of a package run first, then
+  the parallel ones together, so keep the serial ones cheap. To split a long loop, use
+  `t.Run` subtests that call `t.Parallel()`; do not call `t.Fatal` from your own goroutines.
+  `-cpu 1,4` checks that a package does not depend on `GOMAXPROCS`.
 - Fuzz targets cover the format and script parsers. List them with `grep -rn 'func Fuzz' internal`.
   Run one for a short time; `-fuzzminimizetime 0` skips minimisation of new inputs:
 

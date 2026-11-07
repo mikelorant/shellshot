@@ -3,6 +3,7 @@ package bin
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"sync/atomic"
 	"testing"
@@ -63,6 +64,7 @@ func goldenBlockEnds(t *testing.T, data []byte) (ends []int, counts []int) {
 }
 
 func TestTruncationAtEveryOffset(t *testing.T) {
+	t.Parallel()
 	data := readGolden(t)
 	full := goldenWant()
 	ends, counts := goldenBlockEnds(t, data)
@@ -123,6 +125,7 @@ func TestTruncationAtEveryOffset(t *testing.T) {
 }
 
 func TestEmptyAndBadMagic(t *testing.T) {
+	t.Parallel()
 	for _, op := range openers {
 		if _, err := op.open(nil, ReaderOptions{}); !errors.Is(err, ErrTruncated) {
 			t.Fatalf("%s: empty = %v", op.name, err)
@@ -139,6 +142,7 @@ func TestEmptyAndBadMagic(t *testing.T) {
 }
 
 func TestLastChunkCRCFailureIsTruncation(t *testing.T) {
+	t.Parallel()
 	data := append([]byte(nil), readGolden(t)...)
 	spans := chunkSpans(t, data)
 	last := spans[len(spans)-1]
@@ -156,6 +160,7 @@ func TestLastChunkCRCFailureIsTruncation(t *testing.T) {
 }
 
 func TestMidFileCorruptionIsErrCorrupt(t *testing.T) {
+	t.Parallel()
 	orig := readGolden(t)
 	spans := chunkSpans(t, orig)
 	ends, counts := goldenBlockEnds(t, orig)
@@ -194,6 +199,7 @@ func TestMidFileCorruptionIsErrCorrupt(t *testing.T) {
 }
 
 func TestEveryBitFlipIsDetected(t *testing.T) {
+	t.Parallel()
 	orig := readGolden(t)
 	full := goldenWant()
 	known := []error{ErrCorrupt, ErrTruncated, ErrUnsupported, ErrLimit, ErrBadMagic}
@@ -224,11 +230,12 @@ func TestEveryBitFlipIsDetected(t *testing.T) {
 }
 
 func TestKillSimulation(t *testing.T) {
+	t.Parallel()
 	golden := readGolden(t)
 	ends, counts := goldenBlockEnds(t, golden)
 	full := goldenWant()
 	headEnd := ends[0]
-	for limit := 0; limit <= len(golden); limit++ {
+	killAt := func(t *testing.T, limit int) {
 		clk := newFakeClock()
 		rw := newRecordingWriter()
 		rw.limit = limit
@@ -252,7 +259,7 @@ func TestKillSimulation(t *testing.T) {
 			if !errors.Is(err, ErrTruncated) {
 				t.Fatalf("limit=%d: open = %v", limit, err)
 			}
-			continue
+			return
 		}
 		if err != nil {
 			t.Fatalf("limit=%d: open: %v", limit, err)
@@ -278,9 +285,22 @@ func TestKillSimulation(t *testing.T) {
 			t.Fatalf("limit=%d: end = %v", limit, endErr)
 		}
 	}
+	// The limits are independent; check them in shards that run in parallel.
+	const shards = 16
+	per := (len(golden) + shards) / shards
+	for lo := 0; lo <= len(golden); lo += per {
+		hi := min(lo+per, len(golden)+1)
+		t.Run(fmt.Sprintf("limits %d-%d", lo, hi-1), func(t *testing.T) {
+			t.Parallel()
+			for limit := lo; limit < hi; limit++ {
+				killAt(t, limit)
+			}
+		})
+	}
 }
 
 func TestUnknownAncillaryChunkSkipped(t *testing.T) {
+	t.Parallel()
 	golden := readGolden(t)
 	spans := chunkSpans(t, golden)
 	var evnt []chunkSpan
@@ -314,6 +334,7 @@ func TestUnknownAncillaryChunkSkipped(t *testing.T) {
 }
 
 func TestUnknownCriticalChunk(t *testing.T) {
+	t.Parallel()
 	golden := readGolden(t)
 	spans := chunkSpans(t, golden)
 	crit := rawChunkBytes(t, chunk.Type{'X', 'T', 'R', 'A'}, []byte("needed"))
@@ -348,6 +369,7 @@ func TestUnknownCriticalChunk(t *testing.T) {
 }
 
 func TestStructuralErrors(t *testing.T) {
+	t.Parallel()
 	golden := readGolden(t)
 	spans := chunkSpans(t, golden)
 	headChunk := golden[spans[0].start:spans[0].end]
@@ -426,6 +448,7 @@ func TestStructuralErrors(t *testing.T) {
 }
 
 func TestCopyData(t *testing.T) {
+	t.Parallel()
 	golden := readGolden(t)
 	for _, copyData := range []bool{false, true} {
 		r, err := NewReader(bytes.NewReader(golden), ReaderOptions{CopyData: copyData})
@@ -449,6 +472,7 @@ func TestCopyData(t *testing.T) {
 }
 
 func TestSeek(t *testing.T) {
+	t.Parallel()
 	data := readGolden(t)
 	full := goldenWant()
 	probes := []time.Duration{
@@ -503,6 +527,7 @@ func TestSeek(t *testing.T) {
 }
 
 func TestSeekOnTornFile(t *testing.T) {
+	t.Parallel()
 	data := readGolden(t)
 	spans := chunkSpans(t, data)
 	torn := data[:spans[len(spans)-1].end-3] // last block incomplete
@@ -559,6 +584,7 @@ func countingRegistry(t *testing.T) (*codec.Registry, *atomic.Int64) {
 }
 
 func TestSeekDoesNotDecompress(t *testing.T) {
+	t.Parallel()
 	data := readGolden(t)
 	reg, n := countingRegistry(t)
 	r, err := OpenAt(bytes.NewReader(data), int64(len(data)), ReaderOptions{Registry: reg})
@@ -596,6 +622,7 @@ func (c *countingReaderAt) ReadAt(p []byte, off int64) (int, error) {
 }
 
 func TestSeekReadsHeadersOnly(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	w := mustWriter(t, &buf, testHead(), WriterOptions{Uncompressed: true, FlushBytes: 64 << 10})
 	payload := make([]byte, 60<<10)
@@ -633,6 +660,7 @@ func TestSeekReadsHeadersOnly(t *testing.T) {
 }
 
 func TestMonotonicTicksAcrossBlocksEnforced(t *testing.T) {
+	t.Parallel()
 	// Two blocks written by hand, the second starting before the first ended.
 	var enc event.Encoder
 	reg := codec.DefaultRegistry()
@@ -704,6 +732,7 @@ func FuzzReader(f *testing.F) {
 }
 
 func TestReaderBlocks(t *testing.T) {
+	t.Parallel()
 	data := readGolden(t)
 	for _, o := range openers {
 		t.Run(o.name, func(t *testing.T) {

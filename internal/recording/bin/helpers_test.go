@@ -222,6 +222,7 @@ func TestGoldenRegenerates(t *testing.T) {
 }
 
 func TestGoldenReads(t *testing.T) {
+	t.Parallel()
 	data := readGolden(t)
 	r, err := NewReader(bytes.NewReader(data), ReaderOptions{})
 	if err != nil {

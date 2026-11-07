@@ -85,6 +85,7 @@ func sequence(rng *rand.Rand, w, h, count int, alpha bool) []*image.RGBA {
 }
 
 func TestRoundTripRandomDeltas(t *testing.T) {
+	t.Parallel()
 	sizes := [][2]int{{1, 1}, {1, 7}, {2, 2}, {3, 5}, {16, 9}, {33, 17}, {64, 40}}
 	for _, alpha := range []bool{false, true} {
 		for _, sz := range sizes {
@@ -135,6 +136,7 @@ func TestRoundTripRandomDeltas(t *testing.T) {
 }
 
 func TestFramesAreEvenAlignedNoBlendDeltas(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(7))
 	w, h := 40, 30
 	s, buf := newSink(t, w, h, Options{})
@@ -188,6 +190,7 @@ func TestFramesAreEvenAlignedNoBlendDeltas(t *testing.T) {
 }
 
 func TestIdenticalFramesMerge(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(1))
 	a := terminalLike(rng, 20, 10, false)
 	b := image.NewRGBA(a.Rect)
@@ -221,6 +224,7 @@ func TestIdenticalFramesMerge(t *testing.T) {
 }
 
 func TestMergeOverflowAddsOnePixelFrame(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(2))
 	a := terminalLike(rng, 9, 9, false)
 	s, buf := newSink(t, 9, 9, Options{})
@@ -259,6 +263,7 @@ func TestMergeOverflowAddsOnePixelFrame(t *testing.T) {
 }
 
 func TestDelays(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		delay time.Duration
 		want  uint32
@@ -294,6 +299,7 @@ func TestDelays(t *testing.T) {
 }
 
 func TestMaxDelayIs24BitMillis(t *testing.T) {
+	t.Parallel()
 	s, _ := newSink(t, 1, 1, Options{})
 	if got, want := s.MaxDelay(), 16777215*time.Millisecond; got != want {
 		t.Errorf("MaxDelay %v, want %v", got, want)
@@ -301,6 +307,7 @@ func TestMaxDelayIs24BitMillis(t *testing.T) {
 }
 
 func TestDelayOutOfRange(t *testing.T) {
+	t.Parallel()
 	for _, d := range []time.Duration{-1, (1<<24-1)*time.Millisecond + time.Millisecond} {
 		s, _ := newSink(t, 2, 2, Options{})
 		err := s.AddFrame(image.NewRGBA(image.Rect(0, 0, 2, 2)), d)
@@ -311,6 +318,7 @@ func TestDelayOutOfRange(t *testing.T) {
 }
 
 func TestLoopCount(t *testing.T) {
+	t.Parallel()
 	for _, loops := range []int{0, 1, 3, 65535} {
 		s, buf := newSink(t, 2, 2, Options{Loops: loops})
 		if err := s.AddFrame(image.NewRGBA(image.Rect(0, 0, 2, 2)), time.Second); err != nil {
@@ -333,6 +341,7 @@ func TestLoopCount(t *testing.T) {
 }
 
 func TestAlphaFlagOnlyWhenNeeded(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(3))
 	opaque := terminalLike(rng, 12, 12, false)
 	clear := image.NewRGBA(opaque.Rect)
@@ -376,6 +385,7 @@ func TestAlphaFlagOnlyWhenNeeded(t *testing.T) {
 }
 
 func TestDeterministic(t *testing.T) {
+	t.Parallel()
 	encode := func() []byte {
 		rng := rand.New(rand.NewSource(11))
 		s, buf := newSink(t, 48, 30, Options{Loops: 2})
@@ -398,6 +408,7 @@ func TestDeterministic(t *testing.T) {
 }
 
 func TestAddFrameDoesNotRetainOrModifyInput(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(5))
 	a := terminalLike(rng, 10, 10, false)
 	orig := append([]uint8(nil), a.Pix...)
@@ -425,6 +436,7 @@ func TestAddFrameDoesNotRetainOrModifyInput(t *testing.T) {
 }
 
 func TestAcceptsImageWithNonZeroOrigin(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(6))
 	a := terminalLike(rng, 8, 6, false)
 	shifted := a.SubImage(a.Rect).(*image.RGBA)
@@ -452,6 +464,7 @@ func TestAcceptsImageWithNonZeroOrigin(t *testing.T) {
 }
 
 func TestNewSinkValidation(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		w, h int
@@ -478,6 +491,7 @@ func TestNewSinkValidation(t *testing.T) {
 }
 
 func TestFrameSizeMismatch(t *testing.T) {
+	t.Parallel()
 	s, _ := newSink(t, 4, 4, Options{})
 	err := s.AddFrame(image.NewRGBA(image.Rect(0, 0, 4, 5)), time.Second)
 	if !errors.Is(err, ErrFrameSize) {
@@ -486,6 +500,7 @@ func TestFrameSizeMismatch(t *testing.T) {
 }
 
 func TestCloseWithoutFrames(t *testing.T) {
+	t.Parallel()
 	s, buf := newSink(t, 4, 4, Options{})
 	if err := s.Close(); !errors.Is(err, ErrNoFrames) {
 		t.Errorf("Close error %v, want ErrNoFrames", err)
@@ -496,6 +511,7 @@ func TestCloseWithoutFrames(t *testing.T) {
 }
 
 func TestCloseIdempotentAndBlocksAddFrame(t *testing.T) {
+	t.Parallel()
 	s, buf := newSink(t, 4, 4, Options{})
 	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
 	if err := s.AddFrame(img, time.Second); err != nil {
@@ -521,6 +537,7 @@ type failWriter struct{ err error }
 func (f failWriter) Write([]byte) (int, error) { return 0, f.err }
 
 func TestCloseReportsWriteError(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("boom")
 	s, err := NewSink(failWriter{boom}, 4, 4, Options{})
 	if err != nil {
@@ -538,6 +555,7 @@ func TestCloseReportsWriteError(t *testing.T) {
 }
 
 func TestNothingWrittenBeforeClose(t *testing.T) {
+	t.Parallel()
 	s, buf := newSink(t, 4, 4, Options{})
 	if err := s.AddFrame(image.NewRGBA(image.Rect(0, 0, 4, 4)), time.Second); err != nil {
 		t.Fatal(err)
@@ -548,6 +566,7 @@ func TestNothingWrittenBeforeClose(t *testing.T) {
 }
 
 func TestSinkFactory(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	sink, err := SinkFactory(4)(&buf, 6, 6)
 	if err != nil {
@@ -572,6 +591,7 @@ func TestSinkFactory(t *testing.T) {
 }
 
 func TestFramesCountsTheFramesWritten(t *testing.T) {
+	t.Parallel()
 	s, buf := newSink(t, 8, 8, Options{})
 	a, b := image.NewRGBA(image.Rect(0, 0, 8, 8)), image.NewRGBA(image.Rect(0, 0, 8, 8))
 	b.Pix[0], b.Pix[3] = 0xff, 0xff

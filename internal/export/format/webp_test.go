@@ -9,6 +9,7 @@ import (
 )
 
 func TestDefaultRegistersWebP(t *testing.T) {
+	t.Parallel()
 	r := Default()
 	if !slices.Contains(r.Names(), "webp") {
 		t.Fatalf("Names = %v, want webp among them", r.Names())
@@ -28,6 +29,7 @@ func TestDefaultRegistersWebP(t *testing.T) {
 }
 
 func TestWebPSinkHonoursLoops(t *testing.T) {
+	t.Parallel()
 	f, _ := Default().Lookup("webp")
 	var buf bytes.Buffer
 	sink, err := f.New(Settings{Loops: 5})(&buf, 4, 4)

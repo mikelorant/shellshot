@@ -3,6 +3,7 @@ package gif_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	stdgif "image/gif"
@@ -15,6 +16,7 @@ import (
 )
 
 func TestExactPaletteRoundTripsPixelExact(t *testing.T) {
+	t.Parallel()
 	for _, colours := range []int{1, 2, 17, 200, 254, 255} {
 		rng := rand.New(rand.NewSource(int64(colours)))
 		pool := colourPool(rng, colours)
@@ -51,6 +53,7 @@ func assertPlayback(t *testing.T, g *stdgif.GIF, frames []*image.RGBA, id any) {
 }
 
 func TestEveryFrameIsRecompositedFromDeltas(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(7))
 	pool := colourPool(rng, 100)
 	frames := evolve(rng, 64, 48, 40, pool)
@@ -92,6 +95,7 @@ func samePixels(a, b *image.RGBA) bool {
 }
 
 func TestDeltaFrameCoversOnlyTheChangedRectangle(t *testing.T) {
+	t.Parallel()
 	a := solid(30, 20, color.RGBA{10, 20, 30, 255})
 	b := clone(a)
 	b.SetRGBA(5, 4, color.RGBA{200, 0, 0, 255})
@@ -121,6 +125,7 @@ func TestDeltaFrameCoversOnlyTheChangedRectangle(t *testing.T) {
 }
 
 func TestIdenticalFramesMergeDelays(t *testing.T) {
+	t.Parallel()
 	a := solid(8, 8, color.RGBA{1, 2, 3, 255})
 	b := clone(a)
 	b.SetRGBA(0, 0, color.RGBA{9, 9, 9, 255})
@@ -136,6 +141,7 @@ func TestIdenticalFramesMergeDelays(t *testing.T) {
 }
 
 func TestQuantisedFrameChangeInvisibleAfterMappingIsMerged(t *testing.T) {
+	t.Parallel()
 	// Two colours of a gradient too close to differ in the palette: the second
 	// frame changes the RGBA pixels but not the GIF indices.
 	grad := gradient(300, 200, 0)
@@ -150,6 +156,7 @@ func TestQuantisedFrameChangeInvisibleAfterMappingIsMerged(t *testing.T) {
 }
 
 func TestQuantisedPaletteStaysWithinMeasuredError(t *testing.T) {
+	t.Parallel()
 	frames := []*image.RGBA{gradient(240, 180, 0), gradient(240, 180, 40)}
 	distinct := countColours(frames)
 	if distinct <= 255 {
@@ -168,6 +175,7 @@ func TestQuantisedPaletteStaysWithinMeasuredError(t *testing.T) {
 }
 
 func TestColorsOptionLimitsThePalette(t *testing.T) {
+	t.Parallel()
 	frames := []*image.RGBA{gradient(100, 80, 0)}
 	for _, n := range []int{2, 3, 16, 100} {
 		g := decodeGIF(t, encodeFrames(t, gif.Options{Colors: n}, frames, evenDelays(1, time.Second)))
@@ -182,6 +190,7 @@ func TestColorsOptionLimitsThePalette(t *testing.T) {
 }
 
 func TestDitherChangesQuantisedOutputAndIsIgnoredForExactPalettes(t *testing.T) {
+	t.Parallel()
 	grad := []*image.RGBA{gradient(120, 90, 0)}
 	plain := encodeFrames(t, gif.Options{Colors: 8}, grad, evenDelays(1, time.Second))
 	dithered := encodeFrames(t, gif.Options{Colors: 8, Dither: true}, grad, evenDelays(1, time.Second))
@@ -201,6 +210,7 @@ func TestDitherChangesQuantisedOutputAndIsIgnoredForExactPalettes(t *testing.T) 
 }
 
 func TestDitheredFramesRecomposite(t *testing.T) {
+	t.Parallel()
 	frames := []*image.RGBA{gradient(100, 80, 0), gradient(100, 80, 25), gradient(100, 80, 60)}
 	g := decodeGIF(t, encodeFrames(t, gif.Options{Colors: 16, Dither: true}, frames, evenDelays(3, 50*time.Millisecond)))
 	shown := referenceCompositor(g)
@@ -213,45 +223,56 @@ func TestDitheredFramesRecomposite(t *testing.T) {
 }
 
 func TestOutputIsDeterministic(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(11))
 	exact := evolve(rng, 50, 40, 20, colourPool(rng, 120))
 	many := []*image.RGBA{gradient(120, 90, 0), gradient(120, 90, 30)}
 	for name, frames := range map[string][]*image.RGBA{"exact": exact, "quantised": many} {
 		for _, o := range []gif.Options{{}, {Dither: true}} {
-			d := evenDelays(len(frames), 70*time.Millisecond)
-			first := encodeFrames(t, o, frames, d)
-			for range 4 {
-				if string(encodeFrames(t, o, frames, d)) != string(first) {
-					t.Fatalf("%s %+v: two encodes differ", name, o)
+			t.Run(fmt.Sprintf("%s %+v", name, o), func(t *testing.T) {
+				t.Parallel()
+				d := evenDelays(len(frames), 70*time.Millisecond)
+				first := encodeFrames(t, o, frames, d)
+				for range 4 {
+					if string(encodeFrames(t, o, frames, d)) != string(first) {
+						t.Fatalf("%s %+v: two encodes differ", name, o)
+					}
 				}
-			}
+			})
 		}
 	}
 }
 
 func TestOnePixelAndLargeCanvases(t *testing.T) {
-	one := []*image.RGBA{solid(1, 1, color.RGBA{4, 5, 6, 255}), solid(1, 1, color.RGBA{7, 8, 9, 255})}
-	g := decodeGIF(t, encodeFrames(t, gif.Options{}, one, evenDelays(2, 100*time.Millisecond)))
-	shown := referenceCompositor(g)
-	for i := range one {
-		if p, bad := firstDifference(shown[i], one[i]); bad {
-			t.Errorf("1x1 frame %d differs at %v", i, p)
+	t.Parallel()
+	t.Run("one pixel", func(t *testing.T) {
+		t.Parallel()
+		one := []*image.RGBA{solid(1, 1, color.RGBA{4, 5, 6, 255}), solid(1, 1, color.RGBA{7, 8, 9, 255})}
+		g := decodeGIF(t, encodeFrames(t, gif.Options{}, one, evenDelays(2, 100*time.Millisecond)))
+		shown := referenceCompositor(g)
+		for i := range one {
+			if p, bad := firstDifference(shown[i], one[i]); bad {
+				t.Errorf("1x1 frame %d differs at %v", i, p)
+			}
 		}
-	}
-
-	big := []*image.RGBA{gradient(1600, 1200, 0), gradient(1600, 1200, 9)}
-	g = decodeGIF(t, encodeFrames(t, gif.Options{}, big, evenDelays(2, 100*time.Millisecond)))
-	if g.Config.Width != 1600 || g.Config.Height != 1200 {
-		t.Errorf("canvas %dx%d", g.Config.Width, g.Config.Height)
-	}
-	shown = referenceCompositor(g)
-	mean, _ := colourError(shown[len(shown)-1], big[1])
-	if mean > 6 {
-		t.Errorf("large canvas mean error %.2f", mean)
-	}
+	})
+	t.Run("large canvas", func(t *testing.T) {
+		t.Parallel()
+		big := []*image.RGBA{gradient(1600, 1200, 0), gradient(1600, 1200, 9)}
+		g := decodeGIF(t, encodeFrames(t, gif.Options{}, big, evenDelays(2, 100*time.Millisecond)))
+		if g.Config.Width != 1600 || g.Config.Height != 1200 {
+			t.Errorf("canvas %dx%d", g.Config.Width, g.Config.Height)
+		}
+		shown := referenceCompositor(g)
+		mean, _ := colourError(shown[len(shown)-1], big[1])
+		if mean > 6 {
+			t.Errorf("large canvas mean error %.2f", mean)
+		}
+	})
 }
 
 func TestSourceImageWithOffsetOrigin(t *testing.T) {
+	t.Parallel()
 	// The image is a sub-image of a bigger one: its Rect.Min is not (0,0).
 	base := gradient(60, 40, 0)
 	sub := base.SubImage(image.Rect(10, 5, 40, 25)).(*image.RGBA)
@@ -266,6 +287,7 @@ func TestSourceImageWithOffsetOrigin(t *testing.T) {
 }
 
 func TestRandomSequencesMatchTheReferenceCompositor(t *testing.T) {
+	t.Parallel()
 	for seed := int64(0); seed < 30; seed++ {
 		rng := rand.New(rand.NewSource(seed))
 		w, h := 1+rng.Intn(70), 1+rng.Intn(50)
@@ -281,6 +303,7 @@ func TestRandomSequencesMatchTheReferenceCompositor(t *testing.T) {
 }
 
 func TestSinkErrors(t *testing.T) {
+	t.Parallel()
 	var sink discard
 	for _, c := range []struct {
 		name string
@@ -327,6 +350,7 @@ type discard struct{}
 func (discard) Write(p []byte) (int, error) { return len(p), nil }
 
 func TestNothingIsWrittenBeforeClose(t *testing.T) {
+	t.Parallel()
 	var w countingWriter
 	s, err := gif.NewSink(&w, 4, 4, gif.Options{})
 	if err != nil {
@@ -407,6 +431,7 @@ func colourError(got, want *image.RGBA) (mean, worst float64) {
 }
 
 func TestFramesCountsTheFramesWritten(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	s, err := gif.NewSink(&buf, 8, 8, gif.Options{})
 	if err != nil {

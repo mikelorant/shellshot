@@ -8,6 +8,7 @@ import (
 )
 
 func TestCaptureFlagsParsing(t *testing.T) {
+	t.Parallel()
 	var got captureOptions
 	cmd := &cobra.Command{
 		Use: "x",

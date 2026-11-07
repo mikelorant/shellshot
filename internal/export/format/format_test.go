@@ -10,6 +10,7 @@ import (
 )
 
 func TestDefaultRegistersAPNGAndSVG(t *testing.T) {
+	t.Parallel()
 	r := Default()
 	if got := r.Names(); !slices.Equal(got, []string{"apng", "gif", "svg", "webp"}) {
 		t.Errorf("Names = %v, want [apng gif svg webp]", got)
@@ -30,6 +31,7 @@ func TestDefaultRegistersAPNGAndSVG(t *testing.T) {
 }
 
 func TestDefaultReturnsIndependentRegistries(t *testing.T) {
+	t.Parallel()
 	a, b := Default(), Default()
 	if a == b {
 		t.Error("Default returned the same registry twice")
@@ -41,6 +43,7 @@ func TestDefaultReturnsIndependentRegistries(t *testing.T) {
 }
 
 func TestLookupIgnoresCaseAndRejectsUnknown(t *testing.T) {
+	t.Parallel()
 	r := Default()
 	if _, ok := r.Lookup("APNG"); !ok {
 		t.Error("Lookup(APNG) not found")
@@ -53,6 +56,7 @@ func TestLookupIgnoresCaseAndRejectsUnknown(t *testing.T) {
 }
 
 func TestByExtension(t *testing.T) {
+	t.Parallel()
 	r := Default()
 	for _, path := range []string{"a.png", "a.apng", "dir/a.PNG", "A.ApNg", "x.y.png", "/t/.png"} {
 		if f, ok := r.ByExtension(path); !ok || f.Name != "apng" {
@@ -67,6 +71,7 @@ func TestByExtension(t *testing.T) {
 }
 
 func TestNewRegistryKeepsOrderAndCopiesInput(t *testing.T) {
+	t.Parallel()
 	in := []Format{{Name: "one", Extensions: []string{".1"}}, {Name: "two", Extensions: []string{".2", ".two"}}}
 	r := NewRegistry(in...)
 	in[0].Name = "changed"
@@ -79,6 +84,7 @@ func TestNewRegistryKeepsOrderAndCopiesInput(t *testing.T) {
 }
 
 func TestAPNGFactoryBuildsAPNGSink(t *testing.T) {
+	t.Parallel()
 	f, _ := Default().Lookup("apng")
 	sink, err := f.New(Settings{Loops: 2})(io.Discard, 4, 4)
 	if err != nil {
@@ -94,6 +100,7 @@ func TestAPNGFactoryBuildsAPNGSink(t *testing.T) {
 }
 
 func TestGIFFormatIsRegistered(t *testing.T) {
+	t.Parallel()
 	r := Default()
 	for _, path := range []string{"a.gif", "dir/A.GIF"} {
 		if f, ok := r.ByExtension(path); !ok || f.Name != "gif" {
@@ -107,6 +114,7 @@ func TestGIFFormatIsRegistered(t *testing.T) {
 }
 
 func TestGIFFactoryPassesSettingsToTheSink(t *testing.T) {
+	t.Parallel()
 	f, _ := Default().Lookup("gif")
 	for _, s := range []Settings{{}, {Loops: 3, GIFColors: 16, GIFDither: true}} {
 		sink, err := f.New(s)(io.Discard, 4, 4)

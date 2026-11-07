@@ -35,6 +35,7 @@ func sumCentiseconds(delays []int) int {
 }
 
 func TestDelaysRoundToNearestCentisecond(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		ms   int
 		want int
@@ -47,6 +48,7 @@ func TestDelaysRoundToNearestCentisecond(t *testing.T) {
 }
 
 func TestDelaysBelowTwoCentisecondsAreClamped(t *testing.T) {
+	t.Parallel()
 	g := decodeGIF(t, encodeFrames(t, gif.Options{}, alternating(4),
 		[]time.Duration{0, time.Millisecond, 10 * time.Millisecond, 19 * time.Millisecond}))
 	for i, d := range g.Delay {
@@ -57,6 +59,7 @@ func TestDelaysBelowTwoCentisecondsAreClamped(t *testing.T) {
 }
 
 func TestRoundingErrorIsCarriedToTheNextFrame(t *testing.T) {
+	t.Parallel()
 	// 25 ms is 2.5 cs: alternate 3 and 2 so ten frames last exactly 250 ms.
 	g := decodeGIF(t, encodeFrames(t, gif.Options{}, alternating(10), evenDelays(10, 25*time.Millisecond)))
 	if got := sumCentiseconds(g.Delay); got != 25 {
@@ -70,6 +73,7 @@ func TestRoundingErrorIsCarriedToTheNextFrame(t *testing.T) {
 }
 
 func TestTotalDurationIsKeptWithinOneCentisecond(t *testing.T) {
+	t.Parallel()
 	for seed := int64(0); seed < 20; seed++ {
 		rng := rand.New(rand.NewSource(seed))
 		n := 1 + rng.Intn(60)
@@ -88,6 +92,7 @@ func TestTotalDurationIsKeptWithinOneCentisecond(t *testing.T) {
 }
 
 func TestMergedFramesSumTheirDelaysBeforeRounding(t *testing.T) {
+	t.Parallel()
 	a := solid(2, 2, color.RGBA{A: 255})
 	g := decodeGIF(t, encodeFrames(t, gif.Options{}, []*image.RGBA{a, a, a}, evenDelays(3, 15*time.Millisecond)))
 	if len(g.Image) != 1 || g.Delay[0] != 5 {
@@ -96,6 +101,7 @@ func TestMergedFramesSumTheirDelaysBeforeRounding(t *testing.T) {
 }
 
 func TestMaxDelayIsTheLongestGIFDelay(t *testing.T) {
+	t.Parallel()
 	s, err := gif.NewSink(io.Discard, 1, 1, gif.Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -106,6 +112,7 @@ func TestMaxDelayIsTheLongestGIFDelay(t *testing.T) {
 }
 
 func TestHoldsLongerThanTheLongestDelaySplitIntoTransparentFrames(t *testing.T) {
+	t.Parallel()
 	img := solid(3, 3, color.RGBA{9, 9, 9, 255})
 	var buf bytes.Buffer
 	s, err := gif.NewSink(&buf, 3, 3, gif.Options{})
@@ -168,6 +175,7 @@ func (s *sliceSource) Next() (snapshot.Frame, error) {
 }
 
 func TestPipelineSplitsLongHoldsAtMaxDelay(t *testing.T) {
+	t.Parallel()
 	at := func(d time.Duration, text string) snapshot.Frame {
 		return snapshot.Frame{At: d, Snapshot: snapshot.Snapshot{Cols: 4, Rows: 1, Lines: []string{text}}}
 	}
@@ -200,6 +208,7 @@ func TestPipelineSplitsLongHoldsAtMaxDelay(t *testing.T) {
 }
 
 func TestLoopCountMirrorsTheAPNGPlayCount(t *testing.T) {
+	t.Parallel()
 	// Loops is the number of plays, 0 forever; image/gif LoopCount is 0 for
 	// forever, -1 for once, and n for n repeats after the first play.
 	for _, c := range []struct {

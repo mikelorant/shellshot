@@ -28,6 +28,7 @@ func runCLI(t *testing.T, args ...string) (code int, stdout, stderr string) {
 }
 
 func TestRecordScriptFlags(t *testing.T) {
+	t.Parallel()
 	cmd := newRecordCmd()
 	for name, want := range map[string]string{"script": "", "list": "false", "watch": "false"} {
 		f := cmd.Flags().Lookup(name)
@@ -108,6 +109,7 @@ func TestRecordScriptDiagnostics(t *testing.T) {
 }
 
 func TestRecordScriptMissingFile(t *testing.T) {
+	t.Parallel()
 	code, _, stderr := runCLI(t, "record", "--script", filepath.Join(t.TempDir(), "nope.script"))
 	if code != 1 || !strings.Contains(stderr, "read script") {
 		t.Errorf("exit code = %d, stderr = %q, want 1 and a read script error", code, stderr)
@@ -174,6 +176,7 @@ func TestRecordScriptListGolden(t *testing.T) {
 }
 
 func TestResolveScriptSettings(t *testing.T) {
+	t.Parallel()
 	environ := []string{"HOME=/h", "SHELL=/bin/zsh", "PS1=old"}
 	tests := []struct {
 		name  string
@@ -240,6 +243,7 @@ func TestResolveScriptSettings(t *testing.T) {
 }
 
 func TestResolveScriptSettingsShellFallback(t *testing.T) {
+	t.Parallel()
 	got := resolveScriptSettings(run.Process{}, scriptFlags{}, []string{"HOME=/h"}, 80, 24)
 	if want := []string{"/bin/sh"}; !slices.Equal(got.Argv, want) {
 		t.Errorf("Argv = %q, want %q", got.Argv, want)
@@ -247,6 +251,7 @@ func TestResolveScriptSettingsShellFallback(t *testing.T) {
 }
 
 func TestMergeEnv(t *testing.T) {
+	t.Parallel()
 	base := []string{"A=1", "B=2", "C=3"}
 	got := mergeEnv(base, []string{"B=x", "D=4", "B=y", "E="})
 	want := []string{"A=1", "C=3", "D=4", "B=y", "E="}
@@ -259,6 +264,7 @@ func TestMergeEnv(t *testing.T) {
 }
 
 func TestReportScriptResult(t *testing.T) {
+	t.Parallel()
 	waitErr := &run.ScriptError{
 		Kind: run.WaitTimeout, File: "demo.script", Pos: script.Pos{Line: 12, Col: 3}, Scene: "build",
 		Message: `wait timed out after 1s waiting for "never"`, ExitCode: run.ExitScriptFailure,

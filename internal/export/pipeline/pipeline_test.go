@@ -91,6 +91,7 @@ func equalDurations(a, b []time.Duration) bool {
 }
 
 func TestExportMergesEqualFramesAndSetsDelays(t *testing.T) {
+	t.Parallel()
 	src := &sliceSource{frames: []snapshot.Frame{
 		frame(0, "a"),
 		frame(100*time.Millisecond, "a"), // equal: merged with the first
@@ -136,6 +137,7 @@ func TestExportMergesEqualFramesAndSetsDelays(t *testing.T) {
 }
 
 func TestExportTimelineOptionsApply(t *testing.T) {
+	t.Parallel()
 	src := &sliceSource{frames: []snapshot.Frame{
 		frame(0, "a"),
 		frame(10*time.Second, "b"),
@@ -156,6 +158,7 @@ func TestExportTimelineOptionsApply(t *testing.T) {
 // Segments reach timeline.Build: a hidden stretch costs no time and no
 // frames, and a scene segment scales its own part of the recording.
 func TestExportSegmentsCutHiddenAndScaleScenes(t *testing.T) {
+	t.Parallel()
 	src := &sliceSource{frames: []snapshot.Frame{
 		frame(0, "a"),
 		frame(time.Second, "b"),   // hidden
@@ -189,6 +192,7 @@ func TestExportSegmentsCutHiddenAndScaleScenes(t *testing.T) {
 }
 
 func TestExportRendersOnceWhenMinDelayFoldLeavesEqualSteps(t *testing.T) {
+	t.Parallel()
 	// a, b (10ms, folded into a), a: the folded timeline is a, a, which must
 	// render once and encode as one frame.
 	src := &sliceSource{frames: []snapshot.Frame{
@@ -215,6 +219,7 @@ func TestExportRendersOnceWhenMinDelayFoldLeavesEqualSteps(t *testing.T) {
 }
 
 func TestExportSplitsDelayLongerThanOneFrame(t *testing.T) {
+	t.Parallel()
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a")}}
 	var buf bytes.Buffer
 	err := Export(context.Background(), src, 4, 1, &fakeRenderer{}, &buf, Options{
@@ -233,6 +238,7 @@ func TestExportSplitsDelayLongerThanOneFrame(t *testing.T) {
 }
 
 func TestExportCancelledBeforeStartWritesNothing(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a")}}
@@ -247,6 +253,7 @@ func TestExportCancelledBeforeStartWritesNothing(t *testing.T) {
 }
 
 func TestExportCancelledBetweenFrames(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	src := &sliceSource{frames: []snapshot.Frame{
@@ -272,6 +279,7 @@ func TestExportCancelledBetweenFrames(t *testing.T) {
 }
 
 func TestExportWrapsSourceError(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("boom")
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a"), frame(time.Second, "b")}, err: boom}
 	var buf bytes.Buffer
@@ -288,6 +296,7 @@ func TestExportWrapsSourceError(t *testing.T) {
 }
 
 func TestExportWrapsRenderError(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("boom")
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a"), frame(time.Second, "b")}}
 	var buf bytes.Buffer
@@ -304,6 +313,7 @@ func TestExportWrapsRenderError(t *testing.T) {
 }
 
 func TestExportRejectsEmptySource(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	err := Export(context.Background(), &sliceSource{}, 4, 1, &fakeRenderer{}, &buf, Options{})
 	if err == nil || !strings.Contains(err.Error(), "no frames") {
@@ -312,6 +322,7 @@ func TestExportRejectsEmptySource(t *testing.T) {
 }
 
 func TestExportRejectsInvalidTimeline(t *testing.T) {
+	t.Parallel()
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a")}}
 	err := Export(context.Background(), src, 4, 1, &fakeRenderer{}, io.Discard, Options{
 		Timeline: timeline.Options{Speed: -1},
@@ -327,6 +338,7 @@ type wrongSizeRenderer struct{ fakeRenderer }
 func (wrongSizeRenderer) Size(cols, rows int) (int, int) { return 10, 10 }
 
 func TestExportRejectsRendererSizeMismatch(t *testing.T) {
+	t.Parallel()
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a")}}
 	err := Export(context.Background(), src, 4, 1, &wrongSizeRenderer{}, io.Discard, Options{})
 	if err == nil || !strings.Contains(err.Error(), "encode step 0 of 1") {

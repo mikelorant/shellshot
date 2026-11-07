@@ -12,6 +12,7 @@ import (
 )
 
 func TestReadStepsAppliesTimelineAndMergesEqualFrames(t *testing.T) {
+	t.Parallel()
 	src := &sliceSource{frames: []snapshot.Frame{
 		frame(0, "a"), frame(100*time.Millisecond, "b"), frame(300*time.Millisecond, "b"), frame(400*time.Millisecond, "c"),
 	}}
@@ -31,6 +32,7 @@ func TestReadStepsAppliesTimelineAndMergesEqualFrames(t *testing.T) {
 }
 
 func TestReadStepsErrors(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("boom")
 	for _, tc := range []struct {
 		name string

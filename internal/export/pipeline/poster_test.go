@@ -18,6 +18,7 @@ import (
 )
 
 func TestParsePoster(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		in      string
 		want    Poster
@@ -51,6 +52,7 @@ func TestParsePoster(t *testing.T) {
 }
 
 func TestPosterStep(t *testing.T) {
+	t.Parallel()
 	steps := []timeline.Step{{Delay: time.Second}, {Delay: 2 * time.Second}, {Delay: 3 * time.Second}}
 	tests := []struct {
 		name string
@@ -124,6 +126,7 @@ func samePicture(t *testing.T, got image.Image, want *image.RGBA) {
 // --poster none and --poster first write the file Export wrote before
 // posters existed: the first frame is the default image.
 func TestExportPosterNoneAndFirstMatchGolden(t *testing.T) {
+	t.Parallel()
 	want, err := os.ReadFile("testdata/apng_golden.apng")
 	if err != nil {
 		t.Fatal(err)
@@ -136,6 +139,7 @@ func TestExportPosterNoneAndFirstMatchGolden(t *testing.T) {
 }
 
 func TestExportPosterIsTheDefaultImage(t *testing.T) {
+	t.Parallel()
 	golden := decode(t, posterExport(t, Poster{}))
 	tests := []struct {
 		name  string
@@ -176,6 +180,7 @@ func kettekAnimation(a kettek.APNG) kettek.APNG {
 
 // A poster is only for sinks that have one.
 func TestExportPosterNeedsAPosterSink(t *testing.T) {
+	t.Parallel()
 	var sink *fakeSink
 	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a"), frame(time.Second, "b")}}
 	var buf bytes.Buffer
