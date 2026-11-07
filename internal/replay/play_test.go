@@ -228,7 +228,7 @@ func TestPlayClearOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Play() error = %v", err)
 	}
-	want := frameHead + "\x1b[Ja\x1b[1;1H" + ansiSyncEnd + frameHead + "\x1b[Jb\x1b[1;1H" + ansiSyncEnd
+	want := frameHead + "\x1b[Ja\x1b[1;1H" + ansiSyncEnd + frameHead + "\x1b[Jb\x1b[1;1H" + ansiSyncEnd + restoreTerminal(1)
 	if out.String() != want {
 		t.Errorf("output = %q, want %q", out.String(), want)
 	}
@@ -261,8 +261,9 @@ func TestPlayWritesOnceAndCropsFrames(t *testing.T) {
 		t.Fatalf("Play() error = %v", err)
 	}
 	want := len(frameHead + "mno\r\n\x1b[Jstu\x1b[1;1H" + ansiSyncEnd)
-	if !slices.Equal(w.sizes, []int{want, want}) {
-		t.Errorf("write sizes = %v, want one write of %d bytes per frame", w.sizes, want)
+	// The cropped frame is 2 rows tall; the last write restores the terminal.
+	if !slices.Equal(w.sizes, []int{want, want, len(restoreTerminal(2))}) {
+		t.Errorf("write sizes = %v, want one write of %d bytes per frame, then the restore", w.sizes, want)
 	}
 }
 
@@ -370,4 +371,126 @@ func (c *cancelAfterWrite) Write(p []byte) (int, error) {
 	c.writes++
 	c.cancel()
 	return len(p), nil
+}
+
+func noSleep(context.Context, time.Duration) error { return nil }
+
+func TestPlayWithStats(t *testing.T) {
+	ms := time.Millisecond
+	tests := []struct {
+		name   string
+		frames []snapshot.Frame
+		opts   Options
+		want   Stats
+	}{
+		{
+			name:   "planned follows speed, recorded is the last frame",
+			frames: []snapshot.Frame{frame(0, "a"), frame(400*ms, "b"), frame(1000*ms, "c")},
+			opts:   Options{Speed: 2},
+			want:   Stats{Steps: 3, Shown: 3, Planned: 500 * ms, Recorded: 1000 * ms},
+		},
+		{
+			name:   "idle limit counts the pauses it cuts",
+			frames: []snapshot.Frame{frame(0, "a"), frame(10*time.Second, "b"), frame(10*time.Second+ms, "c"), frame(30*time.Second, "d")},
+			opts:   Options{IdleLimit: time.Second},
+			want:   Stats{Steps: 4, Shown: 4, Planned: time.Second + ms + time.Second, Recorded: 30 * time.Second, IdleCapped: 2},
+		},
+		{
+			name:   "leading blank is trimmed from the steps",
+			frames: []snapshot.Frame{frame(0, ""), frame(ms, "a")},
+			opts:   Options{TrimLeadingBlank: true},
+			want:   Stats{Steps: 1, Shown: 1, Recorded: ms},
+		},
+		{
+			name:   "frames larger than the terminal are cropped",
+			frames: []snapshot.Frame{frame(0, "a", "b", "c")},
+			opts:   Options{Clear: true, Cols: 10, Rows: 2},
+			want:   Stats{Steps: 1, Shown: 1, Cropped: true},
+		},
+		{
+			name:   "frames that fit are not cropped",
+			frames: []snapshot.Frame{frame(0, "a", "b")},
+			opts:   Options{Clear: true, Cols: 10, Rows: 2},
+			want:   Stats{Steps: 1, Shown: 1},
+		},
+		{
+			name: "no frames",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.opts.Sleep = noSleep
+			var out bytes.Buffer
+			got, err := PlayWithStats(t.Context(), &sliceSource{frames: tt.frames}, &out, tt.opts)
+			if err != nil {
+				t.Fatalf("PlayWithStats() error = %v", err)
+			}
+			if got.Played < 0 {
+				t.Errorf("Played = %v, want it to be measured", got.Played)
+			}
+			got.Played = 0
+			if got != tt.want {
+				t.Errorf("stats = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Played is wall time, not the plan: with a sleep that really waits it grows.
+func TestPlayWithStatsPlayedIsWallTime(t *testing.T) {
+	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a"), frame(30*time.Millisecond, "b")}}
+	got, err := PlayWithStats(t.Context(), src, io.Discard, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Played < 30*time.Millisecond {
+		t.Errorf("Played = %v, want at least the 30ms wait", got.Played)
+	}
+}
+
+// Cancelling during a wait stops playback, reports it in the stats and still
+// restores the cursor and ends the update, so the terminal is usable.
+func TestPlayWithStatsCancelledMidwayRestoresTerminal(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	src := &sliceSource{frames: []snapshot.Frame{frame(0, "a", "b"), frame(time.Second, "c", "d"), frame(2*time.Second, "e", "f")}}
+	var out bytes.Buffer
+	stats, err := PlayWithStats(ctx, src, &out, Options{
+		Clear: true,
+		Sleep: func(ctx context.Context, _ time.Duration) error {
+			if strings.Contains(out.String(), "c") {
+				cancel()
+				return ctx.Err()
+			}
+			return nil
+		},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context.Canceled", err)
+	}
+	if !stats.Interrupted || stats.Shown != 2 || stats.Steps != 3 {
+		t.Errorf("stats = %+v, want interrupted after 2 of 3 frames", stats)
+	}
+	if !strings.HasSuffix(out.String(), ansiSyncEnd+ansiShowCursor+ansiReset+"\x1b[2;1H\r\n") {
+		t.Errorf("output ends with %q, want the cursor restore below row 2", out.String()[max(0, out.Len()-40):])
+	}
+}
+
+// A failure while drawing is not an interruption.
+func TestPlayWithStatsWriteFailure(t *testing.T) {
+	stats, err := PlayWithStats(t.Context(), &sliceSource{frames: []snapshot.Frame{frame(0, "a")}}, failWriter{errors.New("gone")}, Options{Clear: true})
+	if err == nil || stats.Interrupted || stats.Shown != 0 {
+		t.Errorf("stats = %+v, error = %v, want a plain failure with nothing shown", stats, err)
+	}
+}
+
+// Cancelled before anything is drawn, nothing is hidden, so nothing is written.
+func TestPlayWithStatsCancelledBeforeFirstFrame(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	var out bytes.Buffer
+	stats, err := PlayWithStats(ctx, &sliceSource{frames: []snapshot.Frame{frame(0, "a")}}, &out, Options{Clear: true})
+	if !errors.Is(err, context.Canceled) || !stats.Interrupted || out.Len() != 0 {
+		t.Errorf("stats = %+v, error = %v, output = %q", stats, err, out.String())
+	}
 }
