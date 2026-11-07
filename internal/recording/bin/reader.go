@@ -261,6 +261,10 @@ func (r *Reader) Theme() *head.Theme {
 // Meta returns the meta key/value pairs that preceded the first event, or nil.
 func (r *Reader) Meta() map[string]string { return maps.Clone(r.meta) }
 
+// Blocks returns the number of EVNT blocks decoded since NewReader, OpenAt or
+// the last Seek. After Next returns io.EOF it is the number of blocks read.
+func (r *Reader) Blocks() int { return r.nBlocks }
+
 // ValidBytes returns the file offset of the end of the last chunk that was
 // read and validated. After Next returns ErrTruncated it is where a recovering
 // writer should truncate the file.

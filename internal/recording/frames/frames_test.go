@@ -113,6 +113,9 @@ func run(t *testing.T, src Source, o Options) ([]snapshot.Frame, *fakeTerm, *Ite
 	t.Helper()
 	var ft *fakeTerm
 	o.Factory = fakeFactory(&ft)
+	if o.FPS == 0 {
+		o.FPS = 10 // a 100ms grid keeps the expected times round
+	}
 	it, err := New(src, o)
 	if err != nil {
 		t.Fatal(err)
@@ -334,17 +337,44 @@ func TestBackwardsTimestampAcrossGroupBoundary(t *testing.T) {
 	check(t, got, "0s:", "300ms:a", "400ms:abc")
 }
 
-func TestIntervalDefault(t *testing.T) {
-	for _, iv := range []time.Duration{0, -5 * ms} {
-		got, _, _ := run(t, newSrc(out(1*ms, "a"), out(120*ms, "b")), Options{Interval: iv, OmitFinal: true})
-		check(t, got, "0s:", "100ms:a", "200ms:ab")
+func TestFPSDefault(t *testing.T) {
+	// Not positive selects 60 fps: a period of 16.667ms (rounded to the
+	// microsecond), so 1ms lands on 16.667ms and 20ms on 33.334ms.
+	for _, fps := range []int{0, -5} {
+		var ft *fakeTerm
+		it, err := New(newSrc(out(1*ms, "a"), out(20*ms, "b")), Options{FPS: fps, OmitFinal: true, Factory: fakeFactory(&ft)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := Collect(it)
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(t, got, "0s:", "16.667ms:a", "33.334ms:ab")
 	}
 }
 
-func TestCustomInterval(t *testing.T) {
+func TestCustomFPS(t *testing.T) {
 	got, _, _ := run(t, newSrc(out(1*ms, "a"), out(60*ms, "b"), out(1001*ms, "c")),
-		Options{Interval: 50 * ms, OmitFinal: true})
+		Options{FPS: 20, OmitFinal: true})
 	check(t, got, "0s:", "50ms:a", "100ms:ab", "1.05s:abc")
+}
+
+func TestPeriodRounding(t *testing.T) {
+	for _, tc := range []struct {
+		fps  int
+		want time.Duration
+	}{
+		{0, 16667 * time.Microsecond},
+		{60, 16667 * time.Microsecond},
+		{10, 100 * ms},
+		{1000, ms},
+		{3_000_000, time.Microsecond}, // never zero
+	} {
+		if got := period(tc.fps); got != tc.want {
+			t.Errorf("period(%d) = %v, want %v", tc.fps, got, tc.want)
+		}
+	}
 }
 
 func TestEventAtZero(t *testing.T) {

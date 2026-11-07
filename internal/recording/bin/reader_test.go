@@ -702,3 +702,24 @@ func FuzzReader(f *testing.F) {
 		}
 	})
 }
+
+func TestReaderBlocks(t *testing.T) {
+	data := readGolden(t)
+	for _, o := range openers {
+		t.Run(o.name, func(t *testing.T) {
+			r, err := o.open(data, ReaderOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := r.Blocks(); got != 0 {
+				t.Errorf("Blocks() before reading = %d, want 0", got)
+			}
+			if _, err := drain(t, r); err != io.EOF {
+				t.Fatal(err)
+			}
+			if got := r.Blocks(); got != 4 {
+				t.Errorf("Blocks() after EOF = %d, want 4", got)
+			}
+		})
+	}
+}

@@ -3,134 +3,177 @@ package cli
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/michaellorant/shellshot/internal/recording"
-	"github.com/michaellorant/shellshot/internal/snapshot"
+	"github.com/michaellorant/shellshot/internal/recording/bin"
+	"github.com/michaellorant/shellshot/internal/recording/bin/head"
 )
 
-// writeFixtureRecording writes a two-frame recording and returns its path.
-func writeFixtureRecording(t *testing.T) string {
+func runReplayCmd(t *testing.T, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "demo.jsonl")
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	w, err := recording.NewWriter(f, recording.Header{Cols: 10, Rows: 2, Command: []string{"demo"}, Started: time.Unix(0, 0).UTC()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, fr := range []snapshot.Frame{
-		{At: 0, Snapshot: snapshot.Snapshot{Cols: 10, Rows: 2, Lines: []string{"first", ""}}},
-		{At: 500 * time.Millisecond, Snapshot: snapshot.Snapshot{Cols: 10, Rows: 2, Lines: []string{"second", ""}}},
-	} {
-		if err := w.WriteFrame(fr); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return path
+	var out, errBuf bytes.Buffer
+	code = Run(context.Background(), append([]string{"replay"}, args...), &out, &errBuf)
+	return code, out.String(), errBuf.String()
 }
 
-// writeStyledRecording writes a one-frame recording whose first three
-// characters are red and returns its path.
-func writeStyledRecording(t *testing.T) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "styled.jsonl")
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	w, err := recording.NewWriter(f, recording.Header{Cols: 10, Rows: 1, Command: []string{"demo"}, Started: time.Unix(0, 0).UTC()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	red := snapshot.Style{Fg: snapshot.Color{Kind: snapshot.ColorPalette, Index: 1}}
-	frame := snapshot.Frame{Snapshot: snapshot.Snapshot{
-		Cols: 10, Rows: 1,
-		Lines: []string{"red ok"},
-		Spans: [][]snapshot.Span{{{Start: 0, End: 3, Style: red}}},
-	}}
-	if err := w.WriteFrame(frame); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
+const clearSeq = "\x1b[H\x1b[2J"
 
 func TestReplayColorFlag(t *testing.T) {
-	path := writeStyledRecording(t)
+	path := writeFile(t, "styled.shot", styledRecording(t))
 	t.Setenv("NO_COLOR", "")
 	tests := []struct {
-		color string
-		want  string
+		color     string
+		wantColor bool
 	}{
-		{"always", "\x1b[31mred\x1b[0m ok\n"},
-		{"never", "red ok\n"},
-		{"auto", "red ok\n"}, // stdout is a buffer, not a terminal
+		{"always", true},
+		{"never", false},
+		{"auto", false}, // stdout is a buffer, not a terminal
 	}
 	for _, tt := range tests {
 		t.Run(tt.color, func(t *testing.T) {
-			var stdout, stderr bytes.Buffer
-			code := Run(context.Background(), []string{"replay", path, "--color", tt.color}, &stdout, &stderr)
+			code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", "--color", tt.color)
 			if code != 0 {
-				t.Fatalf("exit code = %d, stderr = %q", code, stderr.String())
+				t.Fatalf("exit code = %d, stderr = %q", code, stderr)
 			}
-			if stdout.String() != tt.want {
-				t.Errorf("stdout = %q, want %q", stdout.String(), tt.want)
+			if got := strings.Contains(stdout, "\x1b[31mred\x1b[0m ok"); got != tt.wantColor {
+				t.Errorf("stdout has the red span = %v, want %v: %q", got, tt.wantColor, stdout)
+			}
+			if !tt.wantColor && strings.Contains(stdout, "\x1b") {
+				t.Errorf("stdout = %q, want no escape sequences", stdout)
+			}
+			if !strings.Contains(stdout, "red ok") && !tt.wantColor {
+				t.Errorf("stdout = %q, want the text 'red ok'", stdout)
 			}
 		})
 	}
 }
 
 func TestReplayPlaysFramesInOrder(t *testing.T) {
-	path := writeFixtureRecording(t)
-	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"replay", path, "--speed", "1000"}, &stdout, &stderr)
+	path := writeFile(t, "demo.shot", simpleRecording(t))
+	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000")
 	if code != 0 {
-		t.Fatalf("exit code = %d, stderr = %q", code, stderr.String())
+		t.Fatalf("exit code = %d, stderr = %q", code, stderr)
 	}
-	if want := "first\n\nsecond\n\n"; stdout.String() != want {
-		t.Errorf("stdout = %q, want %q", stdout.String(), want)
+	// Blank screen, "first", then both rows: three frames of two lines each.
+	if want := "\n\nfirst\n\nfirst\nsecond\n"; stdout != want {
+		t.Errorf("stdout = %q, want %q", stdout, want)
+	}
+	if stderr != "" {
+		t.Errorf("stderr = %q, want empty", stderr)
 	}
 }
 
 func TestReplayClearFlag(t *testing.T) {
-	path := writeFixtureRecording(t)
-	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"replay", path, "--speed", "1000", "--clear"}, &stdout, &stderr)
+	path := writeFile(t, "demo.shot", simpleRecording(t))
+	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear")
 	if code != 0 {
-		t.Fatalf("exit code = %d, stderr = %q", code, stderr.String())
+		t.Fatalf("exit code = %d, stderr = %q", code, stderr)
 	}
-	out := stdout.String()
-	if strings.Count(out, "\x1b[H\x1b[2J") != 2 {
-		t.Errorf("want clear before each of 2 frames, got %q", out)
+	if n := strings.Count(stdout, clearSeq); n != 3 {
+		t.Errorf("want a clear before each of 3 frames, got %d in %q", n, stdout)
 	}
-	if strings.Index(out, "first") > strings.Index(out, "second") {
-		t.Errorf("frames out of order: %q", out)
+	if strings.Index(stdout, "first") > strings.Index(stdout, "second") {
+		t.Errorf("frames out of order: %q", stdout)
+	}
+}
+
+// --fps sets the sampling grid: two writes 20ms apart share one frame at
+// 10 fps and get a frame each at 1000 fps.
+func TestReplayFPSChangesFrameCount(t *testing.T) {
+	data := buildRecording(t, head.Head{Cols: 10, Rows: 2}, bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
+		must(t, w.Output(10*time.Millisecond, []byte("a")))
+		must(t, w.Output(30*time.Millisecond, []byte("b")))
+	})
+	path := writeFile(t, "fps.shot", data)
+	for fps, want := range map[string]int{"10": 2, "1000": 3} { // blank + final, or blank + a + final
+		_, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", "--clear", "--fps", fps)
+		if n := strings.Count(stdout, clearSeq); n != want {
+			t.Errorf("--fps %s: %d frames, want %d (stderr %q)", fps, n, want, stderr)
+		}
+	}
+}
+
+// A five minute pause is one step of the frame iterator, not thousands, and
+// replays at --speed in a fraction of the pause.
+func TestReplayIdleGapIsInstant(t *testing.T) {
+	path := writeFile(t, "idle.shot", idleGapRecording(t))
+	start := time.Now()
+	code, stdout, stderr := runReplayCmd(t, path, "--speed", "2000", "--clear")
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %q", code, stderr)
+	}
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Errorf("replay took %v, want well under the 5 minute gap", elapsed)
+	}
+	if n := strings.Count(stdout, clearSeq); n < 3 || n > 5 {
+		t.Errorf("%d frames for a recording with two bursts, want 3 to 5", n)
+	}
+	if !strings.Contains(stdout, "after") {
+		t.Errorf("final frame missing: %q", stdout)
+	}
+}
+
+func TestReplaySurvivesResize(t *testing.T) {
+	path := writeFile(t, "resize.shot", resizingRecording(t))
+	for _, clear := range []string{"--clear=false", "--clear=true"} {
+		code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000", clear)
+		if code != 0 {
+			t.Fatalf("%s: exit code = %d, stderr = %q", clear, code, stderr)
+		}
+		if !strings.Contains(stdout, "small bigger") {
+			t.Errorf("%s: stdout = %q, want the final text 'small bigger'", clear, stdout)
+		}
+	}
+}
+
+func TestReplayTruncatedPlaysValidPrefix(t *testing.T) {
+	data, firstEnd := twoBlockRecording(t)
+	path := writeFile(t, "torn.shot", data[:len(data)-3])
+	code, stdout, stderr := runReplayCmd(t, path, "--speed", "1000")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 for a truncated recording; stderr %q", code, stderr)
+	}
+	if want := fmt.Sprintf("shellshot: recording is truncated (%d bytes valid)\n", firstEnd); stderr != want {
+		t.Errorf("stderr = %q, want %q", stderr, want)
+	}
+	if !strings.Contains(stdout, "one") || strings.Contains(stdout, "two") {
+		t.Errorf("stdout = %q, want the first block only", stdout)
+	}
+}
+
+func TestReplayCorruptIsFatal(t *testing.T) {
+	data, firstEnd := twoBlockRecording(t)
+	bad := append([]byte(nil), data...)
+	bad[firstEnd-10] ^= 0xff // inside the first block, which is followed by more data
+	path := writeFile(t, "corrupt.shot", bad)
+	code, _, stderr := runReplayCmd(t, path, "--speed", "1000")
+	if code != 1 || !strings.Contains(stderr, "corrupt") {
+		t.Errorf("exit code = %d, stderr = %q, want exit 1 with a corrupt error", code, stderr)
 	}
 }
 
 func TestReplayErrors(t *testing.T) {
-	good := writeFixtureRecording(t)
-	bad := filepath.Join(t.TempDir(), "bad.jsonl")
-	if err := os.WriteFile(bad, []byte("not json\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	good := writeFile(t, "demo.shot", simpleRecording(t))
+	json := writeFile(t, "old.jsonl", []byte(`{"version":1,"cols":10,"rows":2}`+"\n"))
+	empty := writeFile(t, "empty.shot", nil)
 	tests := []struct {
 		name string
 		args []string
 		want string
 	}{
-		{"missing file", []string{"replay", filepath.Join(t.TempDir(), "nope.jsonl")}, "no such file"},
-		{"malformed file", []string{"replay", bad}, "malformed"},
+		{"missing file", []string{"replay", filepath.Join(t.TempDir(), "nope.shot")}, "no such file"},
+		{"json file", []string{"replay", json}, "not a shellshot recording (bad magic)"},
+		{"empty file", []string{"replay", empty}, "truncated"},
 		{"zero speed", []string{"replay", good, "--speed", "0"}, "speed must be greater than zero"},
 		{"negative speed", []string{"replay", good, "--speed", "-2"}, "speed must be greater than zero"},
+		{"fps zero", []string{"replay", good, "--fps", "0"}, "invalid --fps 0: must be between 1 and 1000"},
+		{"fps negative", []string{"replay", good, "--fps", "-5"}, "invalid --fps -5"},
+		{"fps too high", []string{"replay", good, "--fps", "1001"}, "invalid --fps 1001"},
 		{"invalid color", []string{"replay", good, "--color", "sometimes"}, "invalid --color"},
 		{"no file argument", []string{"replay"}, "accepts 1 arg"},
 	}

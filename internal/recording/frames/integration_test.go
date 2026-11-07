@@ -38,7 +38,7 @@ func TestReplayThroughGhostty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	it, err := frames.New(r, frames.Options{Factory: ghostty.New})
+	it, err := frames.New(r, frames.Options{FPS: 10, Factory: ghostty.New})
 	if err != nil {
 		t.Fatal(err)
 	}

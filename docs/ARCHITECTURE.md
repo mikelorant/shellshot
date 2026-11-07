@@ -10,7 +10,9 @@ that can be replayed.
 | Command | Purpose |
 |---|---|
 | `shellshot record [-o file] [-c "cmd"] [--cols N --rows N] [--fps N] [--ignore-exit-status] [-- cmd args...]` | Interactive recorder (asciicast-style): runs $SHELL (or the given command) on a live passthrough terminal and records snapshot frames. Exits with the child's exit code (128+sig for signal deaths) after writing the recording, unless `--ignore-exit-status` |
-| `shellshot replay file [--speed f] [--clear] [--color auto\|always\|never]` | Play recording frames to stdout with original timing; `--clear` defaults to on for a terminal; `--color auto` (default) emits SGR only on a terminal with `NO_COLOR` unset |
+| `shellshot replay file [--speed f] [--fps N] [--clear] [--color auto\|always\|never]` | Read a binary recording, replay it through libghostty (`recording/frames`, sampled at `--fps`, default 60, 1..1000) and play the frames to stdout with original timing; `--clear` defaults to on for a terminal; `--color auto` (default) emits SGR only on a terminal with `NO_COLOR` unset. A file with the wrong magic is rejected (`not a shellshot recording (bad magic)`); a torn tail (`bin.ErrTruncated`) plays the valid prefix, prints `shellshot: recording is truncated (N bytes valid)` to stderr and exits 0; `bin.ErrCorrupt` is fatal. Resize events change the frame size mid-stream, which replay just prints |
+| `shellshot export file [-o out.apng] [--fps N] [timeline, theme and raster flags]` | Same reading path as `replay`, rendered to an animated PNG by `export/pipeline`. The pipeline has a fixed canvas (the header size), so a recording that resizes fails with `recording changes size mid-way (...); export does not support resizes yet` (known limitation) |
+| `shellshot info file` | Header facts (size, start, duration, recorder, engine, argv, input flag) and event statistics (blocks, events by kind, OUT bytes, file size against raw payload, complete or truncated) from a scan with `bin.OpenAt`, without libghostty |
 | `shellshot version` | Print version |
 
 ## Package layout (module `github.com/michaellorant/shellshot`)
@@ -24,7 +26,9 @@ internal/pty              // spawn command in a PTY: Process{Read, Write, Resize
 internal/tty              // IsTerminal, Size, MakeRaw; wraps golang.org/x/term (no cgo)
 internal/live             // stdin -> process pump + output tee; depends only on io interfaces
 internal/session          // orchestrates pty + vt + sampler -> emits snapshot.Frame to a Sink
-internal/recording        // file format (JSON Lines): Writer, Reader
+internal/recording        // file format (JSON Lines): Writer, Reader (still written by `record`; no longer read by replay/export)
+internal/recording/bin    // binary format: Writer, Reader (read by replay, export, info)
+internal/recording/frames // binary event log -> snapshot frames through a vt.Factory (Options.FPS)
 internal/replay           // plays frames to an io.Writer with timing
 scripts/build-libghostty.sh, Makefile   // dependency + build tooling
 ```
