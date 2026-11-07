@@ -59,7 +59,7 @@ With no command, `record` runs `$SHELL` (fallback `/bin/sh`) and records until i
 exits. Use `-c 'string'` (run via `$SHELL -c`) or `-- cmd args...` for a specific
 command. On a terminal, stdin is put in raw mode and output is shown live while
 being recorded. Flags: `-o` (default `recording.shot`), `--cols`/`--rows` (default:
-current terminal size, else 80x24), `--interval` (sampling, default 100ms).
+current terminal size, else 80x24), `--fps` (screen sampling rate in frames per second, default 60, max 1000).
 A frame is stored only when the screen differs from the previous one.
 If the command exits non-zero, `record` still writes the recording and then exits
 with the command's status (a note goes to stderr); `--ignore-exit-status` makes it

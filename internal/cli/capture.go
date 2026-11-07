@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -21,7 +20,7 @@ const eot = 0x04
 // used by record.
 type captureOptions struct {
 	Cols, Rows int
-	Interval   time.Duration
+	FPS        int
 	// Command is the program followed by its arguments; it must not be empty.
 	Command []string
 	// Stdin, when non-nil, is pumped to the process as user input.
@@ -34,7 +33,7 @@ type captureOptions struct {
 	Live io.Writer
 }
 
-// addCaptureFlags registers --cols, --rows and --interval on cmd, binding
+// addCaptureFlags registers --cols, --rows and --fps on cmd, binding
 // them to o, with explicit --cols and --rows defaults. Flag parsing stops at
 // the first positional argument, so the child's own flags (as in "shellshot
 // record -- ls -l") are never interpreted by shellshot. The caller decides how
@@ -44,7 +43,15 @@ func addCaptureFlags(cmd *cobra.Command, o *captureOptions, cols, rows int) {
 	cmd.Flags().SetInterspersed(false)
 	cmd.Flags().IntVar(&o.Cols, "cols", cols, "terminal width in cells")
 	cmd.Flags().IntVar(&o.Rows, "rows", rows, "terminal height in cells")
-	cmd.Flags().DurationVar(&o.Interval, "interval", session.DefaultInterval, "screen sampling interval")
+	cmd.Flags().IntVar(&o.FPS, "fps", session.DefaultFPS, "screen sampling rate in frames per second")
+}
+
+// validate reports an unusable option value.
+func (o captureOptions) validate() error {
+	if o.FPS < 1 || o.FPS > session.MaxFPS {
+		return fmt.Errorf("invalid --fps %d: must be between 1 and %d", o.FPS, session.MaxFPS)
+	}
+	return nil
 }
 
 // capture runs o.Command in a PTY, feeds its output to a libghostty terminal
@@ -58,6 +65,9 @@ func addCaptureFlags(cmd *cobra.Command, o *captureOptions, cols, rows int) {
 func capture(ctx context.Context, o captureOptions, sink session.Sink) (exitCode int, err error) {
 	if len(o.Command) == 0 {
 		return -1, fmt.Errorf("no command given")
+	}
+	if err := o.validate(); err != nil {
+		return -1, err
 	}
 	proc, err := pty.Start(ctx, pty.Config{
 		Command: o.Command[0],
@@ -84,6 +94,6 @@ func capture(ctx context.Context, o captureOptions, sink session.Sink) (exitCode
 		live.PumpWith(pumpCtx, o.Stdin, p, pumpOpts)
 	}
 
-	cfg := session.Config{Interval: o.Interval, Cols: o.Cols, Rows: o.Rows}
+	cfg := session.Config{FPS: o.FPS, Cols: o.Cols, Rows: o.Rows}
 	return session.Run(ctx, p, ghostty.New, cfg, sink)
 }

@@ -171,6 +171,8 @@ type harness struct {
 	cancel  context.CancelFunc
 	sinkErr error // returned by the sink when frameFail reaches zero
 	stopped atomic.Bool
+	period  atomic.Int64 // duration the ticker was created with
+	fps     int
 	factory vt.Factory
 	cols    int
 	rows    int
@@ -215,11 +217,15 @@ func startRun(t *testing.T, failOnFrame int, failErr error, mutate func(*harness
 		return nil
 	})
 	cfg := Config{
+		FPS:    h.fps,
 		Cols:   h.cols,
 		Rows:   h.rows,
 		Events: h.events,
 		Clock:  h.clock.now,
-		Ticker: func(time.Duration) (<-chan time.Time, func()) { return h.ticks, func() { h.stopped.Store(true) } },
+		Ticker: func(d time.Duration) (<-chan time.Time, func()) {
+			h.period.Store(int64(d))
+			return h.ticks, func() { h.stopped.Store(true) }
+		},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	h.cancel = cancel
@@ -625,11 +631,103 @@ func TestSinkFuncCallsFunction(t *testing.T) {
 
 func TestConfigWithDefaults(t *testing.T) {
 	c := Config{}.withDefaults()
-	if c.Interval != 100*time.Millisecond || c.Cols != 80 || c.Rows != 24 || c.Clock == nil || c.Ticker == nil {
+	if c.FPS != 60 || c.Cols != 80 || c.Rows != 24 || c.Clock == nil || c.Ticker == nil {
 		t.Errorf("defaults = %+v", c)
 	}
-	c = Config{Interval: time.Second, Cols: 10, Rows: 5}.withDefaults()
-	if c.Interval != time.Second || c.Cols != 10 || c.Rows != 5 {
+	c = Config{FPS: -3}.withDefaults()
+	if c.FPS != DefaultFPS {
+		t.Errorf("negative FPS = %d, want %d", c.FPS, DefaultFPS)
+	}
+	c = Config{FPS: 30, Cols: 10, Rows: 5}.withDefaults()
+	if c.FPS != 30 || c.Cols != 10 || c.Rows != 5 {
 		t.Errorf("explicit values overridden: %+v", c)
+	}
+}
+
+func TestConfigPeriod(t *testing.T) {
+	for _, tc := range []struct {
+		fps  int
+		want time.Duration
+	}{
+		{0, 16667 * time.Microsecond},
+		{-1, 16667 * time.Microsecond},
+		{60, 16667 * time.Microsecond},
+		{1, time.Second},
+		{10, 100 * time.Millisecond},
+		{30, 33333 * time.Microsecond},
+		{1000, time.Millisecond},
+	} {
+		if got := (Config{FPS: tc.fps}).Period(); got != tc.want {
+			t.Errorf("Config{FPS: %d}.Period() = %v, want %v", tc.fps, got, tc.want)
+		}
+	}
+}
+
+func TestRunTicksAtDefault60FPS(t *testing.T) {
+	h := startRun(t, 0, nil, nil)
+	h.nextFrame()
+	if got, want := time.Duration(h.period.Load()), 16667*time.Microsecond; got != want {
+		t.Errorf("ticker period = %v, want %v", got, want)
+	}
+	h.cancel()
+	h.wait()
+}
+
+func TestRunUsesConfiguredFPS(t *testing.T) {
+	h := startRun(t, 0, nil, func(h *harness) { h.fps = 10 })
+	h.nextFrame()
+	if got, want := time.Duration(h.period.Load()), 100*time.Millisecond; got != want {
+		t.Errorf("ticker period = %v, want %v", got, want)
+	}
+	h.cancel()
+	h.wait()
+}
+
+// At 60fps an idle session ticks constantly; those ticks must not snapshot the
+// terminal, and output that arrives between two ticks is captured by the next.
+func TestRunIdleTicksTakeNoSnapshotsAt60FPS(t *testing.T) {
+	h := startRun(t, 0, nil, nil)
+	period := Config{}.Period()
+	h.nextFrame()   // initial frame: one snapshot
+	for range 120 { // two seconds of idle ticks
+		h.tick()
+	}
+	h.settle()
+	h.noFrame()
+	if n := h.term.snapshots.Load(); n != 1 {
+		t.Fatalf("snapshots after idle ticks = %d, want 1 (the initial frame only)", n)
+	}
+
+	h.clock.advance(period / 2) // change within one tick period
+	h.output("x")
+	if n := h.term.snapshots.Load(); n != 1 {
+		t.Errorf("snapshots before next tick = %d, want 1", n)
+	}
+	h.tick()
+	f := h.nextFrame()
+	if f.Snapshot.Lines[0] != "x" || f.At != period/2 {
+		t.Errorf("frame = %+v, want text x at half a period", f)
+	}
+	h.tick()
+	h.settle()
+	h.noFrame()
+	if n := h.term.snapshots.Load(); n != 2 {
+		t.Errorf("snapshots = %d, want 2 (initial + one dirty tick)", n)
+	}
+	h.cancel()
+	h.wait()
+}
+
+func TestRunRejectsFPSAboveMax(t *testing.T) {
+	proc := newFakeProc()
+	code, err := Run(context.Background(), proc, func(int, int) (vt.Terminal, error) {
+		t.Error("terminal created despite invalid fps")
+		return nil, errors.New("unreachable")
+	}, Config{FPS: MaxFPS + 1}, SinkFunc(func(snapshot.Frame) error { return nil }))
+	if !errors.Is(err, ErrFPS) || code != -1 {
+		t.Errorf("Run = (%d, %v), want ErrFPS", code, err)
+	}
+	if !proc.isClosed() {
+		t.Error("process not closed")
 	}
 }

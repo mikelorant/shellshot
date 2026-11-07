@@ -22,7 +22,7 @@ func newRecordCmd() *cobra.Command {
 	var output, script string
 	var ignoreExit bool
 	cmd := &cobra.Command{
-		Use:   "record [-o file] [-c command] [--cols N] [--rows N] [--interval d] [--ignore-exit-status] [-- command [args...]]",
+		Use:   "record [-o file] [-c command] [--cols N] [--rows N] [--fps N] [--ignore-exit-status] [-- command [args...]]",
 		Short: "Record an interactive shell or command to a file",
 		Long: "Record runs $SHELL (or /bin/sh), or the command given with -c or after --, " +
 			"on a live terminal and records its screen. Recording ends when the command exits.",
@@ -32,6 +32,9 @@ func newRecordCmd() *cobra.Command {
 				return err
 			}
 			opts.Command = command
+			if err := opts.validate(); err != nil {
+				return err
+			}
 			opts.Cols, opts.Rows = resolveSize(opts.Cols, opts.Rows, cmd.OutOrStdout())
 			return runRecord(cmd, opts, output, ignoreExit)
 		},
