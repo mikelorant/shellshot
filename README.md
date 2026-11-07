@@ -65,7 +65,8 @@ $ shellshot snap --color always -- printf '\033[31mred\033[0m plain\n' | cat -v
 ```
 
 If the command exits non-zero, `snap` prints the screen and a note on stderr
-(`shellshot: command exited with 3`); its own exit status is still 0.
+(`shellshot: command exited with 3`), then exits with the command's status.
+Pass `--ignore-exit-status` to exit 0 regardless.
 
 ### `record`: interactive recording
 
@@ -82,6 +83,10 @@ command. On a terminal, stdin is put in raw mode and output is shown live while
 being recorded. Flags: `-o` (default `recording.shot`), `--cols`/`--rows` (default:
 current terminal size, else 80x24), `--interval` (sampling, default 100ms).
 A frame is stored only when the screen differs from the previous one.
+If the command exits non-zero, `record` still writes the recording and then exits
+with the command's status (a note goes to stderr); `--ignore-exit-status` makes it
+exit 0. When stdin is a pipe or file rather than a terminal, reaching its end sends
+Ctrl-D to the command, so a shell reading from the pipe exits.
 
 ### `replay`: play a recording
 
@@ -136,8 +141,9 @@ Output is written atomically (a failed run leaves no partial file).
   ```
 - **Next: a compressed binary format.** It is designed in
   [docs/research/binary-format.md](docs/research/binary-format.md). Building blocks
-  (`internal/recording/bin/{varint,codec,head,event,chunk}`, with zstd) are in
-  progress and not yet wired into `record`, `replay` or `export`.
+  (`internal/recording/bin/{varint,codec,head,event,chunk}`, with zstd) and a
+  binary writer and reader (`internal/recording/bin`) exist, but nothing uses them
+  yet: `record` still writes JSON and `replay` and `export` read JSON only.
 - Full JSON field reference: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#recording-format-json-lines-extension-shot).
 
 ## Why libghostty is a pinned submodule
@@ -190,6 +196,8 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
 - Text is drawn with an **embedded JetBrains Mono** (Regular, Bold, Italic, Bold
   Italic; licence in `internal/render/font/assets/OFL.txt`). Box-drawing, block,
   braille and powerline characters are drawn as sprites.
+  Symbols Nerd Font Mono is bundled as a fallback for icon glyphs the main font
+  lacks.
 - Idle gaps are capped by `--idle-limit`; very short frames are merged.
 
 ## Known limitations
@@ -200,10 +208,12 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
   background colour painted on trailing spaces (e.g. a full-width status bar's
   empty part) is lost.
 - **CJK, emoji and other glyphs missing from JetBrains Mono are not drawn.** Wide
-  characters are recorded and keep their two-cell column positions, but there is
-  no fallback font yet, so those cells render blank in `export`. (`snap` and
-  `replay` print them as text.)
-- `snap` exits 0 even if the command fails.
+  characters are recorded and keep their two-cell column positions, but the only
+  fallback font bundled is Symbols Nerd Font Mono (icons and Powerline/Nerd Font
+  symbols), so CJK and emoji cells render blank in `export`. (`snap` and `replay`
+  print them as text.)
+- **Nerd Font icons are clipped to their cell.** Icons from the fallback font are
+  not yet scaled to fit, so oversized ones are cut off at the cell edge.
 - JSON recordings are large and store full-screen text per frame; there is no compression yet.
 - Stable only on macOS; no input events or resize events are recorded.
 
