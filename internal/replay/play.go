@@ -18,7 +18,7 @@ import (
 var ErrInvalidSpeed = errors.New("replay: speed must be greater than zero")
 
 // Source yields frames in order. Next returns io.EOF after the last frame.
-// *recording.Reader satisfies Source.
+// *frames.Iterator satisfies Source.
 type Source interface {
 	Next() (snapshot.Frame, error)
 }

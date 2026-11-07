@@ -6,7 +6,8 @@ It captures the screen as timed snapshot frames, so it can:
 
 - **record**: record an interactive session (asciicast-style) to a `.shot` file;
 - **replay**: play a recording back in a terminal with its original timing;
-- **export**: render a recording as an animated PNG (APNG).
+- **export**: render a recording as an animated PNG (APNG);
+- **info**: show a recording's header and statistics.
 
 Target platform: macOS (native arch). Linux and Windows are out of scope.
 Design details are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -74,6 +75,15 @@ hello
 green done
 ```
 
+`replay` reads the binary recording format and re-renders the terminal output
+through libghostty at `--fps n` frames per second (default 60, 1 to 1000; the
+screen is sampled on that grid and a frame is shown only when it changed).
+A file that is not a recording (for example an old JSON `.shot`) is rejected with
+`not a shellshot recording (bad magic)`. A recording cut short by a crash plays up
+to the damage, then `shellshot: recording is truncated (N bytes valid)` goes to
+stderr and the exit status is 0; a corrupt recording is an error. If the terminal
+was resized while recording, the new size simply shows up in the following frames.
+
 `--speed f` multiplies the speed. `--clear` redraws from the top of the screen
 for every frame; it defaults to on only when stdout is a terminal (piped output
 prints each full frame in sequence, so the output above is the final one).
@@ -100,29 +110,69 @@ $ shellshot export demo.shot        # writes demo.apng next to the input
 | `--loops` | 0 | plays (0 = forever) |
 | `--min-delay` | 20ms | shorter frames are merged into the previous one |
 | `--cursor` | `block` | `block`, `bar`, `underline`, `none` |
+| `--fps` | 60 | frame sampling rate in frames per second (1 to 1000) |
 
 A theme file is JSON with all fields required:
 `{"name":"x","foreground":"#rrggbb","background":"#rrggbb","cursor":"#rrggbb","palette":[16 × "#rrggbb"]}`.
 Output is written atomically (a failed run leaves no partial file).
+A truncated recording exports up to the damage with the same stderr note as `replay`.
+
+Known limitation: the APNG canvas has a fixed size, so a recording whose terminal
+was resized part-way fails with `recording changes size mid-way (80x24 -> 100x30);
+export does not support resizes yet`.
+
+### `info`: header and statistics
+
+```console
+$ shellshot info demo.shot
+file          demo.shot
+size          80x24
+started       2025-01-02T03:04:05Z
+duration      2s
+recorder      shellshot 0.0.0-test
+engine        ghostty abc1234
+command       ls -l
+input         recorded
+blocks        2
+events        6
+  OUT         2
+  IN          1
+  RESIZE      1
+  MARK        1
+  EXIT        1
+  other       0
+out bytes     12
+payload bytes 24
+file bytes    180
+file/payload  7.50
+status        complete
+```
+
+`info` reads the event log without replaying it through a terminal, so it is quick on
+large files. `payload bytes` is the raw data of all events and `file/payload` is the
+file size divided by it (below 1 when compression wins). `status` is `complete` when the
+file ends at a chunk boundary, else `truncated (N bytes valid)`. A corrupt file
+prints what could be read, reports `damaged: ...` and exits 1.
 
 ## Recording format
 
-- **Today: JSON Lines, version 2**, extension `.shot`. Line 1 is a header
+- **Binary format** (`replay`, `export` and `info` read it). A chunked, compressed
+  file designed in [docs/research/binary-format.md](docs/research/binary-format.md)
+  and implemented in `internal/recording/bin` (with `varint`, `codec`, `head`,
+  `event`, `chunk` below it): a header, then blocks of timestamped events (terminal
+  output, resizes, marks, exit status). `internal/recording/frames` replays the
+  events through libghostty to produce the screen frames the commands use.
+- **JSON Lines, version 2** (what `record` writes until it is switched to the binary
+  format; the three commands above no longer read it). Line 1 is a header
   (`version`, `cols`, `rows`, `command`, `started`); each following line is a
   frame (`t` in ms, `lines`, cursor, `title`, optional `spans` for styles and
-  `widths` for wide/zero-width runes). The reader also accepts version 1
-  (unstyled).
+  `widths` for wide/zero-width runes).
 
   ```
   {"version":2,"cols":60,"rows":10,"command":["zsh","-c","echo hello; ..."],"started":"..."}
   {"t":101,"lines":["hello","",...],"cx":0,"cy":1,"cv":true,"title":""}
   {"t":513,"lines":["hello","green done",...],"cx":0,"cy":2,"cv":true,"title":"","spans":[[],[[0,5,"32"]],...]}
   ```
-- **Next: a compressed binary format.** It is designed in
-  [docs/research/binary-format.md](docs/research/binary-format.md). Building blocks
-  (`internal/recording/bin/{varint,codec,head,event,chunk}`, with zstd) and a
-  binary writer and reader (`internal/recording/bin`) exist, but nothing uses them
-  yet: `record` still writes JSON and `replay` and `export` read JSON only.
 - Full JSON field reference: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#recording-format-json-lines-extension-shot).
 
 ## Why libghostty is a pinned submodule
@@ -151,7 +201,7 @@ against your zig. Commit the submodule pointer and `go.mod`/`go.sum` together.
 
 ```
 cmd/shellshot          main: one line, no logic
-internal/cli           cobra commands and flags (version, record, replay, export)
+internal/cli           cobra commands and flags (version, record, replay, export, info)
 internal/snapshot      pure data: Snapshot, Cursor, Frame, Style (no deps)
 internal/vt            Terminal interface + Factory (no cgo)
 internal/vt/ghostty    the only cgo package: libghostty adapter

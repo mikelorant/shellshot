@@ -11,10 +11,10 @@ import (
 
 	"github.com/michaellorant/shellshot/internal/export/pipeline"
 	"github.com/michaellorant/shellshot/internal/export/timeline"
-	"github.com/michaellorant/shellshot/internal/recording"
 	"github.com/michaellorant/shellshot/internal/render/font"
 	"github.com/michaellorant/shellshot/internal/render/raster"
 	"github.com/michaellorant/shellshot/internal/render/theme"
+	"github.com/michaellorant/shellshot/internal/snapshot"
 )
 
 // exportFlags holds the values of the export command's flags.
@@ -30,6 +30,7 @@ type exportFlags struct {
 	loops     int
 	minDelay  time.Duration
 	cursor    string
+	fps       int
 }
 
 // newExportCmd builds "shellshot export", which renders a recording as an
@@ -55,6 +56,7 @@ func newExportCmd() *cobra.Command {
 	fl.DurationVar(&f.hold, "hold", 2*time.Second, "how long the final frame stays on screen")
 	fl.IntVar(&f.loops, "loops", 0, "number of times the animation plays (0 for forever)")
 	fl.DurationVar(&f.minDelay, "min-delay", 20*time.Millisecond, "shortest frame delay; shorter frames are merged into the previous one (0 to keep all)")
+	addFPSFlag(cmd, &f.fps)
 	fl.StringVar(&f.cursor, "cursor", "block", "cursor shape: block, bar, underline or none")
 	return cmd
 }
@@ -89,6 +91,9 @@ func (f exportFlags) validate() (raster.CursorStyle, error) {
 		return 0, fmt.Errorf("invalid --loops %d (must not be negative)", f.loops)
 	case f.minDelay < 0:
 		return 0, fmt.Errorf("invalid --min-delay %v (must not be negative)", f.minDelay)
+	}
+	if err := validateFPS(f.fps); err != nil {
+		return 0, err
 	}
 	return cursor, nil
 }
@@ -153,18 +158,14 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 		return fmt.Errorf("export: %w", err)
 	}
 
-	in, err := os.Open(input)
+	it, src, closeAll, err := openFrames(input, flags.fps)
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
-	defer in.Close()
-	rec, err := recording.NewReader(in)
-	if err != nil {
-		return fmt.Errorf("export: %s: %w", input, err)
-	}
-	hdr := rec.Header()
+	defer closeAll()
+	hdr := src.Head()
 
-	var frames int
+	var steps int
 	opts := pipeline.Options{
 		Timeline: timeline.Options{
 			Speed:     flags.speed,
@@ -173,15 +174,16 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 			MinDelay:  flags.minDelay,
 		},
 		Loops:    flags.loops,
-		Progress: func(_, total int) { frames = total },
+		Progress: func(_, total int) { steps = total },
 	}
 	size, err := writeFileAtomic(output, func(f *os.File) error {
-		return pipeline.Export(cmd.Context(), rec, hdr.Cols, hdr.Rows, renderer, f, opts)
+		return pipeline.Export(cmd.Context(), fixedSize{src: it, cols: hdr.Cols, rows: hdr.Rows}, hdr.Cols, hdr.Rows, renderer, f, opts)
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d frames (%.1f KB) to %s\n", frames, float64(size)/1024, output)
+	src.warnTruncated(cmd.ErrOrStderr())
+	fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d frames (%.1f KB) to %s\n", steps, float64(size)/1024, output)
 	return nil
 }
 
@@ -232,4 +234,24 @@ func writeFileAtomic(path string, write func(*os.File) error) (size int64, err e
 		return 0, fmt.Errorf("export: write %s: %w", path, err)
 	}
 	return info.Size(), nil
+}
+
+// fixedSize passes frames through and fails on the first one whose size
+// differs from the recording's initial size: the APNG canvas has a fixed
+// size, so export does not support recordings that resize yet.
+type fixedSize struct {
+	src        pipeline.Source
+	cols, rows int
+}
+
+func (s fixedSize) Next() (snapshot.Frame, error) {
+	f, err := s.src.Next()
+	if err != nil {
+		return f, err
+	}
+	if c, r := f.Snapshot.Cols, f.Snapshot.Rows; c != s.cols || r != s.rows {
+		return snapshot.Frame{}, fmt.Errorf("recording changes size mid-way (%dx%d -> %dx%d); export does not support resizes yet",
+			s.cols, s.rows, c, r)
+	}
+	return f, nil
 }

@@ -20,7 +20,7 @@ import (
 )
 
 // Source yields recorded frames in order. Next returns io.EOF after the last
-// frame. *recording.Reader satisfies it.
+// frame. *frames.Iterator satisfies it.
 type Source interface {
 	Next() (snapshot.Frame, error)
 }

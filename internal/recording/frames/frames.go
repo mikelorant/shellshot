@@ -7,7 +7,8 @@
 //
 // # Sampling
 //
-// Frames are taken on a fixed grid of Options.Interval. The first frame is the
+// Frames are taken on a fixed grid whose period is one second divided by
+// Options.FPS (60 frames per second by default, a period of about 16.667ms). The first frame is the
 // blank screen at t=0. Events are grouped by the grid boundary at or after their
 // timestamp (an event at exactly a boundary belongs to that boundary). When a
 // group is complete the terminal is snapshotted, and the frame is emitted,
@@ -48,9 +49,9 @@ import (
 	"github.com/michaellorant/shellshot/internal/vt"
 )
 
-// DefaultInterval is the sampling grid used when Options.Interval is not
-// positive.
-const DefaultInterval = 100 * time.Millisecond
+// DefaultFPS is the sampling rate used when Options.FPS is not positive. It
+// matches the live recorder's default.
+const DefaultFPS = 60
 
 // ErrClosed is returned by Next after Close.
 var ErrClosed = errors.New("frames: iterator closed")
@@ -65,8 +66,10 @@ type Source interface {
 
 // Options configures an Iterator.
 type Options struct {
-	// Interval is the sampling grid. Zero or negative selects DefaultInterval.
-	Interval time.Duration
+	// FPS is the sampling rate in frames per second; the grid period is one
+	// second divided by FPS, rounded to the nearest microsecond (and never
+	// below one microsecond). Zero or negative selects DefaultFPS.
+	FPS int
 	// Factory creates the terminal. It is required.
 	Factory vt.Factory
 	// OmitFinal disables the always-emitted final frame; the last group is then
@@ -124,15 +127,21 @@ func New(src Source, o Options) (*Iterator, error) {
 	it := &Iterator{
 		src:      src,
 		term:     term,
-		interval: o.Interval,
+		interval: period(o.FPS),
 		omitFin:  o.OmitFinal,
 		first:    true,
 		prev:     snap,
 	}
-	if it.interval <= 0 {
-		it.interval = DefaultInterval
-	}
 	return it, nil
+}
+
+// period returns the grid period for fps, which is DefaultFPS when not
+// positive. It rounds like session.Config.Period.
+func period(fps int) time.Duration {
+	if fps <= 0 {
+		fps = DefaultFPS
+	}
+	return max(time.Duration(float64(time.Second)/float64(fps)).Round(time.Microsecond), time.Microsecond)
 }
 
 // Marks returns the MARK events read so far, in order. It grows as Next
