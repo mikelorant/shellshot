@@ -1,6 +1,6 @@
 # Examples
 
-Eleven POSIX `sh` scripts that print colourful, animated terminal output. They
+Ten POSIX `sh` demo scripts that print colourful, animated terminal output. They
 are demo material for `shellshot` and a test bed for terminals. Each one needs a
 terminal, fits 80x24, ends by itself and restores the terminal (cursor, alternate
 screen, scroll region, attributes) on exit, Ctrl-C or SIGTERM. They only print
