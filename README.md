@@ -65,7 +65,8 @@ $ shellshot snap --color always -- printf '\033[31mred\033[0m plain\n' | cat -v
 ```
 
 If the command exits non-zero, `snap` prints the screen and a note on stderr
-(`shellshot: command exited with 3`); its own exit status is still 0.
+(`shellshot: command exited with 3`), then exits with the command's status.
+Pass `--ignore-exit-status` to exit 0 regardless.
 
 ### `record`: interactive recording
 
@@ -82,6 +83,10 @@ command. On a terminal, stdin is put in raw mode and output is shown live while
 being recorded. Flags: `-o` (default `recording.shot`), `--cols`/`--rows` (default:
 current terminal size, else 80x24), `--interval` (sampling, default 100ms).
 A frame is stored only when the screen differs from the previous one.
+If the command exits non-zero, `record` still writes the recording and then exits
+with the command's status (a note goes to stderr); `--ignore-exit-status` makes it
+exit 0. When stdin is a pipe or file rather than a terminal, reaching its end sends
+Ctrl-D to the command, so a shell reading from the pipe exits.
 
 ### `replay`: play a recording
 
@@ -201,9 +206,8 @@ only `cli` imports cobra. Interfaces are declared at the consumer.
   empty part) is lost.
 - **CJK, emoji and other glyphs missing from JetBrains Mono are not drawn.** Wide
   characters are recorded and keep their two-cell column positions, but there is
-  no fallback font yet, so those cells render blank in `export`. (`snap` and
+  only an icon fallback font (Symbols Nerd Font Mono) is bundled, so those cells render blank in `export`. (`snap` and
   `replay` print them as text.)
-- `snap` exits 0 even if the command fails.
 - JSON recordings are large and store full-screen text per frame; there is no compression yet.
 - Stable only on macOS; no input events or resize events are recorded.
 
