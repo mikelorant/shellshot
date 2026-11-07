@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/michaellorant/shellshot/internal/recording"
+	"github.com/michaellorant/shellshot/internal/session"
 	"github.com/michaellorant/shellshot/internal/snapshot"
 )
 
@@ -78,18 +79,34 @@ func TestRecordingSinkRejectsWrongLineCount(t *testing.T) {
 
 func TestRecordFlagDefaults(t *testing.T) {
 	cmd := newRecordCmd()
-	if got := cmd.Flags().Lookup("output").DefValue; got != "recording.shot" {
-		t.Errorf("--output default = %q, want recording.shot", got)
+	for name, want := range map[string]string{
+		"output":   "recording.shot",
+		"command":  "",
+		"cols":     "0",
+		"rows":     "0",
+		"interval": session.DefaultInterval.String(),
+	} {
+		if got := cmd.Flags().Lookup(name).DefValue; got != want {
+			t.Errorf("--%s default = %q, want %q", name, got, want)
+		}
 	}
 	if cmd.Flags().ShorthandLookup("o") == nil {
 		t.Error("missing -o shorthand")
 	}
+	if cmd.Flags().ShorthandLookup("c") == nil {
+		t.Error("missing -c shorthand")
+	}
 }
 
-func TestRecordRequiresCommand(t *testing.T) {
+func TestRecordRejectsCommandStringWithArgv(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if code := Run(context.Background(), []string{"record"}, &stdout, &stderr); code != 1 {
+	args := []string{"record", "-o", filepath.Join(t.TempDir(), "x.shot"), "-c", "true", "--", "ls"}
+	code := runWithStdin(context.Background(), args, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "mutually exclusive") {
+		t.Errorf("stderr = %q, want mutually exclusive error", stderr.String())
 	}
 }
 
@@ -97,7 +114,7 @@ func TestRecordWritesRecording(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.shot")
 	var stdout, stderr bytes.Buffer
 	args := []string{"record", "-o", path, "--cols", "40", "--rows", "5", "--", "sh", "-c", `printf 'hello\nworld'`}
-	if code := Run(context.Background(), args, &stdout, &stderr); code != 0 {
+	if code := runWithStdin(context.Background(), args, strings.NewReader(""), &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr %q)", code, stderr.String())
 	}
 	if !strings.Contains(stderr.String(), "frames to "+path) {
@@ -116,6 +133,47 @@ func TestRecordWritesRecording(t *testing.T) {
 	if h := r.Header(); h.Cols != 40 || h.Rows != 5 || h.Command[0] != "sh" {
 		t.Errorf("header = %+v", h)
 	}
+	last := lastRecordedFrame(t, r)
+	if len(last.Snapshot.Lines) < 2 || last.Snapshot.Lines[0] != "hello" || last.Snapshot.Lines[1] != "world" {
+		t.Errorf("last frame lines = %q, want hello and world first", last.Snapshot.Lines)
+	}
+}
+
+func TestRecordForwardsStdinAndShowsOutputLive(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "x.shot")
+	var stdout, stderr bytes.Buffer
+	args := []string{"record", "-o", path, "--cols", "40", "--rows", "6", "-c", "read x; echo got:$x"}
+	code := runWithStdin(context.Background(), args, strings.NewReader("hi\n"), &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr %q)", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "got:hi") {
+		t.Errorf("live stdout = %q, want it to contain got:hi", stdout.String())
+	}
+	if strings.Contains(stderr.String(), "recording —") {
+		t.Errorf("stderr = %q, want no interactive hint for non-terminal stdin", stderr.String())
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open recording: %v", err)
+	}
+	defer f.Close()
+	r, err := recording.NewReader(f)
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+	if h := r.Header(); h.Cols != 40 || h.Rows != 6 || len(h.Command) != 3 || h.Command[1] != "-c" {
+		t.Errorf("header = %+v", h)
+	}
+	if text := lastRecordedFrame(t, r).Snapshot.Text(); !strings.Contains(text, "got:hi") {
+		t.Errorf("last frame = %q, want it to contain got:hi", text)
+	}
+}
+
+// lastRecordedFrame reads r to the end and returns the last frame.
+func lastRecordedFrame(t *testing.T, r *recording.Reader) snapshot.Frame {
+	t.Helper()
 	var last snapshot.Frame
 	n := 0
 	for {
@@ -132,7 +190,5 @@ func TestRecordWritesRecording(t *testing.T) {
 	if n == 0 {
 		t.Fatal("recording has no frames")
 	}
-	if len(last.Snapshot.Lines) < 2 || last.Snapshot.Lines[0] != "hello" || last.Snapshot.Lines[1] != "world" {
-		t.Errorf("last frame lines = %q, want hello and world first", last.Snapshot.Lines)
-	}
+	return last
 }
