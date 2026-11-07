@@ -382,6 +382,7 @@ func TestDriverNoWorkAndPastDeadlineWaitsForEvents(t *testing.T) {
 		t.Fatalf("polls = %d, want 1 (no spinning on an idle Step)", n)
 	}
 	h.output("a") // output wakes the driver again
+	h.settle()    // the poll that follows the chunk is done before it is counted
 	if n := len(d.polls()); n != 2 {
 		t.Errorf("polls after output = %d, want 2", n)
 	}
