@@ -14,6 +14,7 @@ The Go binary links libghostty-vt through cgo. libghostty is built from the pinn
 | `make showcase` | Records the showcase demo and exports the README image `docs/assets/showcase.png` (on demand; see below) |
 | `make check-showcase` | Fails if `docs/assets/showcase.png` is stale (see "Regenerating the README image") |
 | `make test-examples` | Runs every `contrib/examples/*.sh` under dash, bash, sh and zsh (takes a few minutes); it checks exit status, terminal restore and Ctrl-C handling |
+| `make check-examples` | Records every `contrib/examples/*.sh` at 80x24 with the real binary, follows the cursor through the raw output to find lines that auto-wrap, and lists every non-ASCII character the demos print, flagging those no embedded font has (they render blank). Takes about a minute; needs `bin/shellshot` (it builds it), libghostty and `uv`. Not part of `make test` |
 | `make fmt` | `gofmt -w .` |
 | `make clean` | Removes `bin/` |
 | `make distclean` | Removes `bin/` and `build/`; run `make deps` again afterwards |
