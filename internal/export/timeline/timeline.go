@@ -69,6 +69,13 @@ type Options struct {
 	// MinDelay is the shortest delay a step may have; shorter steps are
 	// folded into their predecessor (see Build). Zero disables folding.
 	MinDelay time.Duration
+	// TrimLeadingBlank drops the first step when its screen is blank
+	// (snapshot.Snapshot.IsBlank) and it is shown for at most this long, so a
+	// recording that starts with an empty terminal before the first output
+	// opens on that output. The step is removed from playback and its delay
+	// goes nowhere: the output is that much shorter. A lone step is never
+	// dropped. Zero disables the trim and the caller applies any default.
+	TrimLeadingBlank time.Duration
 	// Segments overrides the policy for ranges of the recording clock; see
 	// Segment and the "Segments" section of the package comment. It must be
 	// sorted and non-overlapping (FlattenSegments builds such a list from
@@ -99,7 +106,14 @@ type Step struct {
 //     Hold, unmodified.
 //  3. Consecutive frames with Equal snapshots are merged into one step that
 //     keeps the first snapshot and the sum of the delays.
-//  4. Min-delay folding: scanning forward, any step whose delay is below
+//  4. Leading blank trim: if there is more than one step and the first is a
+//     blank screen shown for at most TrimLeadingBlank, it is dropped and the
+//     next step becomes the first. "First" is the first step emitted, so
+//     when a hidden span (a Skip segment) covers the start of the recording,
+//     it is the screen at the end of that span. This runs after de-duplication
+//     and before folding, so the new first step is protected from folding
+//     like any first step. The dropped delay is not given to a neighbour.
+//  5. Min-delay folding: scanning forward, any step whose delay is below
 //     MinDelay is dropped and its delay added to the preceding kept step, so
 //     that step stays on screen longer and the short intermediate state is
 //     not shown. The first and the last step are never dropped, so the
@@ -107,7 +121,8 @@ type Step struct {
 //     MinDelay).
 //
 // Dedup and folding only move time between steps, so the sum of the returned
-// delays equals the sum of the per-frame delays from rule 2.
+// delays equals the sum of the per-frame delays from rule 2, less the step
+// dropped by rule 4.
 func Build(frames []snapshot.Frame, o Options) ([]Step, error) {
 	speed := o.Speed
 	if speed == 0 {
@@ -116,8 +131,8 @@ func Build(frames []snapshot.Frame, o Options) ([]Step, error) {
 	if math.IsNaN(speed) || math.IsInf(speed, 0) || speed < 0 {
 		return nil, fmt.Errorf("timeline: invalid speed %v", o.Speed)
 	}
-	if o.IdleLimit < 0 || o.Hold < 0 || o.MinDelay < 0 {
-		return nil, errors.New("timeline: idle limit, hold and min delay must not be negative")
+	if o.IdleLimit < 0 || o.Hold < 0 || o.MinDelay < 0 || o.TrimLeadingBlank < 0 {
+		return nil, errors.New("timeline: idle limit, hold, min delay and leading blank trim must not be negative")
 	}
 	if err := validateSegments(o.Segments); err != nil {
 		return nil, err
@@ -171,7 +186,12 @@ func Build(frames []snapshot.Frame, o Options) ([]Step, error) {
 		return nil, nil
 	}
 
-	// Rule 4: fold short steps into the previous kept step.
+	// Rule 4: drop a blank first step.
+	if o.TrimLeadingBlank > 0 && len(steps) > 1 && steps[0].Delay <= o.TrimLeadingBlank && steps[0].Snapshot.IsBlank() {
+		steps = steps[1:]
+	}
+
+	// Rule 5: fold short steps into the previous kept step.
 	if o.MinDelay > 0 {
 		kept := steps[:1]
 		for i := 1; i < len(steps); i++ {

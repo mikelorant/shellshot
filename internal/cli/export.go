@@ -39,8 +39,11 @@ type exportFlags struct {
 	hold                      time.Duration
 	loops                     int
 	minDelay                  time.Duration
-	cursor                    string
-	fps                       int
+	// keepLeadingBlank is --keep-leading-blank: do not drop a blank first
+	// frame.
+	keepLeadingBlank bool
+	cursor           string
+	fps              int
 	// fallbackFonts are --fallback-font files, in the order given.
 	fallbackFonts []string
 	systemFonts   bool
@@ -84,6 +87,7 @@ func newExportCmd() *cobra.Command {
 	fl.DurationVar(&f.hold, "hold", 2*time.Second, "how long the final frame stays on screen; when given, scene holds are ignored (without it a scene hold is added to this one where a scene ends)")
 	fl.IntVar(&f.loops, "loops", 0, "number of times the animation plays (0 for forever)")
 	fl.DurationVar(&f.minDelay, "min-delay", 20*time.Millisecond, "shortest frame delay; shorter frames are merged into the previous one (0 to keep all)")
+	fl.BoolVar(&f.keepLeadingBlank, "keep-leading-blank", false, "keep a blank first frame; without it a blank screen shown for at most "+defaultLeadingBlank.String()+" at the start is dropped, so viewers that show only the first frame do not show an empty terminal")
 	addFPSFlag(cmd, &f.fps)
 	fl.StringVar(&f.cursor, "cursor", "block", "cursor shape: block, bar, underline or none")
 	fl.StringArrayVar(&f.fallbackFonts, "fallback-font", nil, "TTF/OTF/TTC `file` for glyphs the built-in fonts lack (repeatable; tried in order, after the built-in fonts)")
@@ -96,6 +100,10 @@ func newExportCmd() *cobra.Command {
 	addSVGFlags(cmd, &f.svg)
 	return cmd
 }
+
+// defaultLeadingBlank is the longest blank first frame export drops unless
+// --keep-leading-blank is given.
+const defaultLeadingBlank = 250 * time.Millisecond
 
 // cursorStyles maps the --cursor values to raster cursor styles.
 var cursorStyles = map[string]raster.CursorStyle{
@@ -277,6 +285,10 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	defer closeAll()
 	hdr := src.Head()
 
+	var trimBlank time.Duration
+	if !flags.keepLeadingBlank {
+		trimBlank = defaultLeadingBlank
+	}
 	var steps int
 	opts := pipeline.Options{
 		Timeline: timeline.Options{
@@ -285,6 +297,8 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 			Hold:      flags.hold,
 			MinDelay:  flags.minDelay,
 			Segments:  plan.Segments,
+
+			TrimLeadingBlank: trimBlank,
 		},
 		Progress: func(_, total int) { steps = total },
 	}
