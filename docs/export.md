@@ -300,26 +300,31 @@ nothing (no background, or only a foreground colour, bold, italic, faint or blin
 | `--hold` | 2s | How long the final frame stays |
 | `--min-delay` | 20ms | Shortest frame delay; shorter frames merge into the previous one (0 keeps all) |
 | `--loops` | 0 | Times the animation plays (0 for forever) |
-| `--keep-leading-blank` | off | Keep a blank first frame; see below |
+| `--keep-leading-blank` | off | Keep a blank screen at the start of the animation; see below |
 
 ### Leading blank frame
 
 A recording starts with the empty terminal that existed before the program printed anything.
 Viewers that show only the first frame (macOS Preview, Quick Look, chat previews) would show an
 empty terminal. So, in every format, export drops the first frame when it shows
-nothing (no text and no styled cell; the cursor does not count) and is on screen for 250 ms or
-less, measured on the output clock. The recording then starts at the first output. Decisions:
+nothing (no text and no styled cell; the cursor does not count), however long it is on screen
+(after `--idle-limit` and `--speed`). The recording then starts at the first output. Decisions:
 
 - The dropped frame is removed from playback: its time is not added to the next frame, so the
   animation is that much shorter. The idle before the first output is not interesting.
-- A blank first frame longer than 250 ms stays (that wait is part of what happened), and so does
-  a recording that has only one frame.
+- A recording that has only one frame keeps it, blank or not.
 - Only the first frame is considered, once. If a hidden span covers the start, the first frame is
   the screen at the end of that span, and the same rule applies to it.
 - `--keep-leading-blank` turns the trim off.
 
-The trim is the timeline option `TrimLeadingBlank` (0 disables it); the command line sets it to
-250 ms.
+The trim is the boolean timeline option `TrimLeadingBlank`; the command line sets it unless
+`--keep-leading-blank` is given.
+
+`shellshot replay` shares this timing policy: it takes `--idle-limit` (default 2s, 0 for no
+limit, applied before `--speed`) and `--keep-leading-blank`, and builds its waits with the same
+timeline code. A recording with a long pause, or a long wait before the first output, therefore
+replays with no wait longer than `--idle-limit` and starts at the first output. `replay` holds
+the whole recording in memory while it plays.
 
 ## Scenes and hidden spans
 

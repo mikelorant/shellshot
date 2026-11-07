@@ -41,7 +41,7 @@ type exportFlags struct {
 	loops                     int
 	minDelay                  time.Duration
 	// keepLeadingBlank is --keep-leading-blank: do not drop a blank first
-	// frame.
+	// frame, whatever its length.
 	keepLeadingBlank bool
 	// poster is the --poster value.
 	poster string
@@ -86,11 +86,11 @@ func newExportCmd() *cobra.Command {
 	fl.StringVar(&f.adjustHeight, "adjust-cell-height", "0", "change the cell height after --scale, in pixels or percent; text stays vertically centred, like Ghostty's adjust-cell-height; the result must be 1 px to 10x the font cell")
 	fl.IntVar(&f.padding, "padding", raster.DefaultPadding, "border around the screen in pixels (at least 1), before --scale")
 	fl.Float64Var(&f.speed, "speed", 1, "playback speed multiplier (2 plays twice as fast); when given, replaces the speed of every scene")
-	fl.DurationVar(&f.idleLimit, "idle-limit", 2*time.Second, "longest pause between frames, before --speed (0 for no limit); when given, replaces the idle limit of every scene")
+	fl.DurationVar(&f.idleLimit, "idle-limit", defaultIdleLimit, "longest pause between frames, before --speed (0 for no limit); when given, replaces the idle limit of every scene")
 	fl.DurationVar(&f.hold, "hold", 2*time.Second, "how long the final frame stays on screen; when given, scene holds are ignored (without it a scene hold is added to this one where a scene ends)")
 	fl.IntVar(&f.loops, "loops", 0, "number of times the animation plays (0 for forever)")
 	fl.DurationVar(&f.minDelay, "min-delay", 20*time.Millisecond, "shortest frame delay; shorter frames are merged into the previous one (0 to keep all)")
-	fl.BoolVar(&f.keepLeadingBlank, "keep-leading-blank", false, "keep a blank first frame; without it a blank screen shown for at most "+defaultLeadingBlank.String()+" at the start is dropped, so viewers that show only the first frame do not show an empty terminal")
+	fl.BoolVar(&f.keepLeadingBlank, "keep-leading-blank", false, keepLeadingBlankHelp)
 	fl.StringVar(&f.poster, "poster", defaultPoster, "png only: the frame viewers without animation support show (Preview, Quick Look, chat previews): first, last, none or a time such as 12s on the output clock. A poster other than the first frame adds one full frame to the file")
 	addFPSFlag(cmd, &f.fps)
 	fl.StringVar(&f.cursor, "cursor", "block", "cursor shape: block, bar, underline or none")
@@ -105,9 +105,11 @@ func newExportCmd() *cobra.Command {
 	return cmd
 }
 
-// defaultLeadingBlank is the longest blank first frame export drops unless
-// --keep-leading-blank is given.
-const defaultLeadingBlank = 250 * time.Millisecond
+// keepLeadingBlankHelp is the --keep-leading-blank help of export and replay.
+const keepLeadingBlankHelp = "keep a blank screen at the start of the animation"
+
+// defaultIdleLimit is the --idle-limit default of export and replay.
+const defaultIdleLimit = 2 * time.Second
 
 // cursorStyles maps the --cursor values to raster cursor styles.
 var cursorStyles = map[string]raster.CursorStyle{
@@ -293,10 +295,6 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	defer closeAll()
 	hdr := src.Head()
 
-	var trimBlank time.Duration
-	if !flags.keepLeadingBlank {
-		trimBlank = defaultLeadingBlank
-	}
 	var steps int
 	opts := pipeline.Options{
 		Timeline: timeline.Options{
@@ -306,7 +304,7 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 			MinDelay:  flags.minDelay,
 			Segments:  plan.Segments,
 
-			TrimLeadingBlank: trimBlank,
+			TrimLeadingBlank: !flags.keepLeadingBlank,
 		},
 		Poster:   poster,
 		Progress: func(_, total int) { steps = total },

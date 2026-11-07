@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -10,17 +11,19 @@ import (
 )
 
 // newReplayCmd builds "shellshot replay", which plays a recording to stdout
-// with its original timing.
+// with its original timing, long pauses capped.
 func newReplayCmd() *cobra.Command {
 	var (
-		speed       float64
-		clearScreen bool
-		colorMode   string
-		fps         int
-		noCrop      bool
+		speed            float64
+		idleLimit        time.Duration
+		keepLeadingBlank bool
+		clearScreen      bool
+		colorMode        string
+		fps              int
+		noCrop           bool
 	)
 	cmd := &cobra.Command{
-		Use:   "replay FILE [--speed f] [--fps n] [--clear] [--no-crop] [--color auto|always|never]",
+		Use:   "replay FILE [--speed f] [--idle-limit d] [--keep-leading-blank] [--fps n] [--clear] [--no-crop] [--color auto|always|never]",
 		Short: "Play a recording to stdout with its original timing",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -31,7 +34,13 @@ func newReplayCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("replay: %w", err)
 			}
-			opts := replay.Options{Speed: speed, Clear: clearScreen, Color: color}
+			opts := replay.Options{
+				Speed:            speed,
+				IdleLimit:        idleLimit,
+				TrimLeadingBlank: !keepLeadingBlank,
+				Clear:            clearScreen,
+				Color:            color,
+			}
 			if clearScreen && !noCrop {
 				opts.Cols, opts.Rows = terminalSize(cmd.OutOrStdout())
 			}
@@ -39,6 +48,8 @@ func newReplayCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().Float64Var(&speed, "speed", 1, "playback speed multiplier (2 plays twice as fast)")
+	cmd.Flags().DurationVar(&idleLimit, "idle-limit", defaultIdleLimit, "longest pause between frames, before --speed (0 for no limit)")
+	cmd.Flags().BoolVar(&keepLeadingBlank, "keep-leading-blank", false, keepLeadingBlankHelp)
 	cmd.Flags().BoolVar(&clearScreen, "clear", false, "clear the screen before each frame (default: only when stdout is a terminal)")
 	cmd.Flags().BoolVar(&noCrop, "no-crop", false, "do not crop frames larger than the terminal (they scroll and wrap on every redraw)")
 	addFPSFlag(cmd, &fps)
@@ -51,6 +62,9 @@ func newReplayCmd() *cobra.Command {
 // was interrupted) plays to the end; either is noted on stderr and is not an
 // error.
 func runReplay(cmd *cobra.Command, path string, fps int, opts replay.Options) (err error) {
+	if opts.IdleLimit < 0 {
+		return fmt.Errorf("replay: invalid --idle-limit %v (must not be negative)", opts.IdleLimit)
+	}
 	if opts.Speed <= 0 {
 		return fmt.Errorf("replay: speed must be greater than zero (got %v)", opts.Speed)
 	}

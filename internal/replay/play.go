@@ -10,6 +10,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/mikelorant/shellshot/internal/export/timeline"
 	"github.com/mikelorant/shellshot/internal/snapshot"
 )
 
@@ -28,6 +29,12 @@ type Options struct {
 	// Speed scales playback: 2 plays twice as fast. Zero means 1; negative,
 	// NaN and infinite values are rejected with ErrInvalidSpeed.
 	Speed float64
+	// IdleLimit caps the wait between two frames before Speed is applied.
+	// Zero means no cap.
+	IdleLimit time.Duration
+	// TrimLeadingBlank drops a blank first frame, whatever its length, so
+	// playback opens on the first output. A lone frame is never dropped.
+	TrimLeadingBlank bool
 	// Clear draws each frame over the previous one from the top-left corner
 	// instead of appending lines; use it when w is a terminal. See Render.
 	Clear bool
@@ -45,10 +52,14 @@ type Options struct {
 }
 
 // Play reads frames from src and writes each rendered frame to w, waiting
-// between frames for the difference in their At times divided by Speed.
-// The first frame is shown immediately. Frames whose At does not advance
-// are shown without waiting. Play returns nil once src reports io.EOF, and
-// otherwise an error wrapping the cause (context, source or write failure).
+// between frames for the difference in their At times, capped at IdleLimit and
+// divided by Speed (the timeline package applies this policy, as for export).
+// The first frame is shown immediately. Frames whose At does not advance are
+// shown without waiting. Consecutive frames with equal snapshots are shown
+// once (a frames.Iterator never yields them). Play reads all of src before it shows anything, so a
+// recording is held in memory while it plays. It returns nil once src reports
+// io.EOF, and otherwise an error wrapping the cause (context, source or write
+// failure); frames read before a source failure are still played.
 func Play(ctx context.Context, src Source, w io.Writer, opts Options) error {
 	speed := opts.Speed
 	if speed == 0 {
@@ -62,26 +73,36 @@ func Play(ctx context.Context, src Source, w io.Writer, opts Options) error {
 		sleep = sleepTimer
 	}
 
-	var prev time.Duration
-	for first := true; ; first = false {
+	var frames []snapshot.Frame
+	var readErr error
+	for {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("replay: %w", err)
 		}
 		f, err := src.Next()
 		if errors.Is(err, io.EOF) {
-			return nil
+			break
 		}
 		if err != nil {
-			return fmt.Errorf("replay: read frame: %w", err)
+			readErr = fmt.Errorf("replay: read frame: %w", err)
+			break
 		}
-		if !first && f.At > prev {
-			d := time.Duration(float64(f.At-prev) / speed)
-			if err := sleep(ctx, d); err != nil {
-				return fmt.Errorf("replay: wait: %w", err)
-			}
+		frames = append(frames, f)
+	}
+	steps, err := timeline.Build(frames, timeline.Options{
+		Speed:            speed,
+		IdleLimit:        opts.IdleLimit,
+		TrimLeadingBlank: opts.TrimLeadingBlank,
+	})
+	if err != nil {
+		return fmt.Errorf("replay: %w", err)
+	}
+
+	for _, s := range steps {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("replay: %w", err)
 		}
-		prev = f.At
-		snap := f.Snapshot
+		snap := s.Snapshot
 		if opts.Clear {
 			snap = Crop(snap, opts.Cols, opts.Rows)
 		}
@@ -89,7 +110,13 @@ func Play(ctx context.Context, src Source, w io.Writer, opts Options) error {
 		if _, err := io.WriteString(w, Render(snap, RenderOptions{Clear: opts.Clear, Color: opts.Color})); err != nil {
 			return fmt.Errorf("replay: write frame: %w", err)
 		}
+		if s.Delay > 0 {
+			if err := sleep(ctx, s.Delay); err != nil {
+				return fmt.Errorf("replay: wait: %w", err)
+			}
+		}
 	}
+	return readErr
 }
 
 // sleepTimer waits for d or until ctx is done.

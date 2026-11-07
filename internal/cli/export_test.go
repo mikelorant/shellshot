@@ -672,7 +672,7 @@ func TestExportFallbackFontAndSystemFontsAreAccepted(t *testing.T) {
 	}
 }
 
-// A short blank screen at the start is dropped by default, so the first frame
+// A blank screen at the start is dropped by default, so the first frame
 // shows the first output; --keep-leading-blank keeps it.
 func TestExportDropsLeadingBlankFrame(t *testing.T) {
 	t.Parallel()
@@ -699,5 +699,24 @@ func TestExportDropsLeadingBlankFrame(t *testing.T) {
 	}
 	if samePixels(compose(t, k, 0), compose(t, d, 0)) {
 		t.Error("kept export starts with the same frame: the blank screen was not kept")
+	}
+}
+
+// A blank screen of any length is dropped: ten seconds of nothing before the
+// first output do not show up even though the idle cap shortens them to 2s.
+func TestExportDropsLongLeadingBlankFrame(t *testing.T) {
+	t.Parallel()
+	data := buildRecording(t, head.Head{Cols: 10, Rows: 2}, bin.WriterOptions{}, func(w *bin.Writer, _ *bytes.Buffer) {
+		must(t, w.Output(10*time.Second, []byte("first")))
+		must(t, w.Exit(11*time.Second, 0))
+	})
+	in := writeFile(t, "late.shot", data)
+	out := filepath.Join(t.TempDir(), "late.png")
+	code, stderr := runExportCmd(t, in, "-o", out, "--hold", "1s", "--fps", "10")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	if apng := decodeAnimatedPNG(t, out); len(apng.Frames) != 1 {
+		t.Errorf("%d frames, want 1: the 10s blank screen should be dropped", len(apng.Frames))
 	}
 }

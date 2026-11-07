@@ -56,7 +56,8 @@ When stdin is a pipe, its end sends Ctrl-D to the program, so a shell reading it
 printf 'echo hi\nexit\n' | SHELL=/bin/sh shellshot record -o hi.shot --cols 40 --rows 6
 ```
 
-Play it back in the terminal, at any speed:
+Play it back in the terminal, at any speed (a pause longer than `--idle-limit`, 2 s by default, is
+cut short, and a blank screen at the start is skipped):
 
 ```sh
 shellshot replay demo.shot --speed 2
@@ -152,7 +153,7 @@ Reserved, not built: `fresh`, `cleanup`, `caption`, `require` and `export --scen
   images. Blink is drawn steady.
 - A GIF has at most 255 colours plus transparency; a WebP is lossless but its support in chat tools
   and READMEs is unverified (see [docs/export.md](docs/export.md#webp)).
-- A blank first frame shown for 250 ms or less is dropped, so viewers that show only the first
+- A blank first frame is dropped, however long it lasts, so viewers that show only the first
   frame do not show an empty terminal; `--keep-leading-blank` turns that off.
 - Emoji are drawn with Apple-derived artwork by default, with Noto Color Emoji as fallback
   (`--emoji-set apple|noto`, `--emoji-font FILE`). Apple's artwork belongs to Apple Inc. and is not
