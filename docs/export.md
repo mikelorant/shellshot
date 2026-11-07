@@ -1,23 +1,23 @@
 # Export reference
 
-`shellshot export FILE [-o OUT] [flags]` renders a recording as an animated PNG (APNG, the
-default), an animated GIF, an animated WebP or an SVG. An APNG is a standard PNG that carries animation data. Browsers,
+`shellshot export FILE [-o OUT] [flags]` renders a recording as an animated PNG (the
+default), an animated GIF, an animated WebP or an SVG. Browsers,
 GitHub, Slack and Discord animate it; at the time of writing, macOS Preview and Quick Look show
-only one image, which export makes the end of the recording (see [Poster](#poster-apng)). Run `shellshot export --help` for the flag list.
+only one image, which export makes the end of the recording (see [Poster](#poster-png)). Run `shellshot export --help` for the flag list.
 
 ## Output format
 
 `--format NAME` chooses the output format. Without it, the format comes from the extension of
-`-o` (case-insensitive), and is `apng` when there is no `-o` or `-o` has no extension. An
+`-o` (case-insensitive), and is `png` when there is no `-o` or `-o` has no extension. An
 extension that no format owns, or an unknown `--format` name, fails with the list of supported
-formats (`supported: apng, gif, svg, webp`); `--format` then lets you write any file name.
+formats (`supported: png, gif, svg, webp`); `--format` then lets you write any file name.
 
 | Format | `--format` | Extensions | Notes |
 | --- | --- | --- | --- |
-| Animated PNG | `apng` | `.png`, `.apng` | The default. Full colour. Plays in browsers, GitHub, Slack and Discord. |
+| Animated PNG | `png` | `.png` | The default. Full colour. Plays in browsers, GitHub, Slack and Discord. |
 | Animated GIF | `gif` | `.gif` | At most 255 colours plus transparency. Plays everywhere. See [GIF](#gif). |
 | SVG | `svg` | `.svg` | Vector text, animated with CSS (or one still with `--frame`). Small for text, but animation support in viewers varies; see [SVG](#svg). |
-| Animated WebP | `webp` | `.webp` | Lossless, smaller than APNG. Plays in current browsers; see [WebP](#webp) for sharing sites. |
+| Animated WebP | `webp` | `.webp` | Lossless, smaller than PNG. Plays in current browsers; see [WebP](#webp) for sharing sites. |
 
 ## GIF
 
@@ -36,7 +36,7 @@ chat tool and image viewer.
   several times the encode time (still under a second for the recordings measured). Plain text shows no benefit, so it is off by default. `--gif-colors N` (2 to 255, default
   255) lowers the palette size for smaller files and coarser colour.
 - **Size.** Only the rectangle that changed is stored for each frame, and identical frames
-  merge. On the recordings measured, the GIF was about 2 to 2.5 times smaller than the APNG of the same
+  merge. On the recordings measured, the GIF was about 2 to 2.5 times smaller than the PNG of the same
   recording because it has 8 bits per pixel. Smooth gradients are where a GIF loses the most
   quality.
 - **Timing.** A GIF delay is a whole number of centiseconds, so every frame lasts at least 2 cs
@@ -54,36 +54,36 @@ chat tool and image viewer.
 ## WebP
 
 `--format webp` (or `-o out.webp`) writes an animated lossless WebP. The pixels are exactly the
-ones the APNG has: there is no lossy mode and no quality flag, because lossy WebP smears the
+ones the PNG has: there is no lossy mode and no quality flag, because lossy WebP smears the
 coloured one-pixel strokes of terminal text.
 
 - Each frame after the first stores only the rectangle that changed since the previous frame,
   with "do not blend" and no disposal, so every frame recomposes exactly. WebP stores a frame's
   offset in units of two pixels, so a rectangle starts at the even coordinates up and left of the
-  first changed pixel and may be one pixel larger than the APNG's.
+  first changed pixel and may be one pixel larger than the PNG's.
 - A frame is never shorter than 10 ms; shorter delays are raised to it (`--min-delay` defaults to
   20ms, so this only matters when you lower it). Whether a given player clamps short delays
   itself was not verified. One frame can last up to 16777215 ms (about 4.6 hours); longer holds
   are split.
-- `--loops` is stored in 16 bits, so the WebP maximum is 65535 (the APNG has no such limit).
+- `--loops` is stored in 16 bits, so the WebP maximum is 65535 (the PNG has no such limit).
 - The canvas is at most 16384 pixels in each direction (a limit of the lossless bitstream).
 - Exports are opaque, so the file does not set the WebP alpha flag.
 - Encoding is pure Go (the lossless encoder of `github.com/HugoSmits86/nativewebp`, MIT). It adds
-  about 0.3 MB to the binary and is slower and uses more memory than the APNG encoder: the
+  about 0.3 MB to the binary and is slower and uses more memory than the PNG encoder: the
   whole file is held in memory until the export ends.
 
 Measured on the 60x12 line-counting recording and the 80x30 emoji recording
 (`contrib/examples/emoji.sh`), same machine, same flags:
 
-| Recording | `--scale` | APNG | WebP |
+| Recording | `--scale` | PNG | WebP |
 |---|---|---|---|
 | lines, 41 frames | 1 | 260,389 B | 192,572 B |
 | lines, 41 frames | 2 | 537,828 B | 354,858 B |
 | emoji, 14 frames | 1 | 87,757 B | 71,170 B |
 | emoji, 14 frames | 2 | 241,793 B | 186,100 B |
 
-The WebP files are 19 to 34 percent smaller. Export time was 0.2 to 0.6 s (APNG 0.1 to 0.5 s);
-peak memory was up to 188 MB for the emoji recording at `--scale 2` (APNG 124 MB).
+The WebP files are 19 to 34 percent smaller. Export time was 0.2 to 0.6 s (PNG 0.1 to 0.5 s);
+peak memory was up to 188 MB for the emoji recording at `--scale 2` (PNG 124 MB).
 
 Where the result plays:
 
@@ -97,9 +97,9 @@ Where the result plays:
 | Slack | Unverified; likely a still image |
 | macOS Preview and Quick Look | Unverified; Quick Look may play it, Preview probably not |
 
-Use `apng` or `gif` for places you have not tested. The files were checked
+Use `png` or `gif` for places you have not tested. The files were checked
 with libwebp's `webpinfo` and `webpmux` and decoded with `ffmpeg`, which gives frames identical to
-the APNG's.
+the PNG's.
 
 ## SVG
 
@@ -125,7 +125,7 @@ the font the viewer picks (JetBrains Mono, then `ui-monospace`, Menlo, `monospac
 Measured sizes on this implementation (80x24 unless noted; the 60x12 scrolling recording is 41
 frames; sizes include everything in the file):
 
-| Recording | Animated SVG | Static (`--frame last`) | Static, `--svg-text paths` | APNG |
+| Recording | Animated SVG | Static (`--frame last`) | Static, `--svg-text paths` | PNG |
 |---|---|---|---|---|
 | scrolling lines, 60x12 | 49,351 B | 1,446 B | 7,747 B | 260,389 B |
 | colors.sh | 55,805 B | 54,410 B | 79,910 B | 30,167 B |
@@ -141,7 +141,7 @@ supported):
 |---|---|
 | Browser, SVG opened directly or in `<object>` | Yes (per MDN; not re-checked here) |
 | Browser, `<img src="x.svg">` | CSS animations should run in the secure animated mode of the spec; partly verified in research, not tested here |
-| GitHub README `<img>` | **Unverified.** Reports conflict and no current test was made. Use APNG or GIF there |
+| GitHub README `<img>` | **Unverified.** Reports conflict and no current test was made. Use PNG or GIF there |
 | macOS Quick Look, Preview | Unverified; probably a still image |
 | Slack, Discord | Unverified; not expected to preview SVG inline |
 | VS Code Markdown preview | Unverified; may block the image |
@@ -150,11 +150,11 @@ supported):
 **PNG is the safe choice for READMEs and chat.** Use SVG where you control the viewer (your own
 site, documentation, a browser tab) or want a small, sharp still (`--frame last`).
 
-## Poster (APNG)
+## Poster (PNG)
 
-A viewer that cannot animate shows one image of a PNG: the *default image*. Preview, Quick Look and
-many chat previews are such viewers. An APNG normally has no separate default image, so they show
-its first frame. `--poster` (APNG only) chooses what they show instead.
+The file is a standard PNG using the APNG extension, so a viewer without animation support shows one image: the *default image*. Preview, Quick Look and
+many chat previews are such viewers. An animated PNG normally has no separate default image, so they show
+its first frame. `--poster` (PNG only) chooses what they show instead.
 
 | `--poster` | Default image |
 |---|---|
@@ -164,8 +164,8 @@ its first frame. `--poster` (APNG only) chooses what they show instead.
 | a time such as `12s` | The frame on screen at that time on the output clock, after `--speed`, `--idle-limit` and `--hold` and the [leading blank trim](#leading-blank-frame), like `--frame` of SVG; a time past the end picks the last frame |
 
 - The poster is drawn by the same renderer, with the same theme, font and cursor, and stored as
-  the PNG's `IDAT` image *without* an `fcTL` chunk before it, as the APNG specification defines
-  a default image that is not part of the animation. Every animation frame is then an `fdAT`
+  the PNG's `IDAT` image *without* an `fcTL` chunk before it, which is how a default image
+  outside the animation is stored. Every animation frame is then an `fdAT`
   chunk, `acTL` counts only them, and animating viewers play exactly the same animation as
   without a poster. A viewer that decodes the file as a plain PNG shows the poster.
 - **Size.** A poster other than the first frame costs one full-canvas image. Measured on the
@@ -184,14 +184,14 @@ its first frame. `--poster` (APNG only) chooses what they show instead.
 ## Output file
 
 - Without `-o`, the output is `FILE` with its extension replaced by the first extension of the
-  format (`.png` for `apng`, `.gif` for `gif`, `.svg` for `svg`, `.webp` for `webp`).
+  format (`.png` for `png`, `.gif` for `gif`, `.svg` for `svg`, `.webp` for `webp`).
 - `-o` is used as typed, whatever its extension, and the extension picks the format unless
   `--format` is given. `-o -` writes a file named `-`; export does not write to stdout.
 - Export refuses to overwrite the input recording and replaces any other existing file.
 - The file is written atomically: a failed run leaves no partial output.
 - The `wrote N frames` line on stderr counts the frames in the file, not the steps of the
   timeline: the encoders merge frames that render the same picture (for example a cursor move
-  with `--cursor none`) into one longer frame. An APNG's poster is not a frame.
+  with `--cursor none`) into one longer frame. A PNG's poster is not a frame.
 - A recording cut short by a crash exports up to the damage, with the same note on stderr as
   `replay`.
 - The canvas size is fixed. A recording whose terminal changed size part-way fails with
