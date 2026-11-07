@@ -23,11 +23,30 @@ type cell struct {
 	advance fixed.Int26_6
 }
 
-// fallback is the hook for runes the primary font lacks (alternate fonts,
-// tofu boxes, ...). It reports whether it drew c. Until a later task adds
-// fallback fonts it draws nothing, so such runes are left blank.
+// fallback draws c with a fallback font when the primary face lacks its
+// glyph (Nerd Font icons, ...). It reports whether it drew c. The fallback
+// face has the primary's pixel size and is not scaled: some icons are
+// designed to overflow their cell, and those are clipped to the cell rect
+// (c.width cells wide: 1, or 2 for a wide rune). A rune no font has is left
+// blank.
 func (r *Renderer) fallback(img *image.RGBA, c cell) bool {
-	return false
+	face, ok, err := r.fonts.FaceFor(c.c, c.st.bold, c.st.italic, r.sizePx)
+	if err != nil || !ok {
+		return false
+	}
+	o := r.cellOrigin(c.col, c.row)
+	cellRect := image.Rect(o.X, o.Y, o.X+c.width*r.metrics.CellWidth, o.Y+r.metrics.CellHeight)
+	d := &xfont.Drawer{
+		Dst:  img.SubImage(cellRect).(*image.RGBA),
+		Src:  image.NewUniform(c.st.fg),
+		Face: face,
+		Dot:  r.baselineDot(c.col, c.row),
+	}
+	if c.mark {
+		d.Dot.X += c.advance
+	}
+	d.DrawString(string(c.c))
+	return true
 }
 
 // drawLine draws row of s in two passes so a cell's background never covers
@@ -114,7 +133,7 @@ func (r *Renderer) drawGlyph(img *image.RGBA, d *xfont.Drawer, c cell) {
 	}
 	face := r.face(c.st)
 	if _, ok := face.GlyphAdvance(c.c); !ok {
-		r.fallback(img, c)
+		r.fallback(img, c) // the primary face lacks c: try the fallback fonts
 		return
 	}
 	d.Face = face

@@ -27,6 +27,10 @@ const (
 type Fonts interface {
 	// Face returns the face for the style at sizePx pixels (em size).
 	Face(bold, italic bool, sizePx float64) (xfont.Face, error)
+	// FaceFor returns the face that draws r in the style at sizePx pixels:
+	// the primary face if it has r, otherwise a fallback face. ok is false
+	// if no font has r.
+	FaceFor(r rune, bold, italic bool, sizePx float64) (face xfont.Face, ok bool, err error)
 	// Metrics returns the whole-pixel cell geometry at sizePx.
 	Metrics(sizePx float64) (font.Metrics, error)
 }

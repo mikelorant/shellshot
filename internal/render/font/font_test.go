@@ -146,3 +146,139 @@ func TestLoadCustom(t *testing.T) {
 		t.Error("custom set lacks 'A'")
 	}
 }
+
+// nerdRunes are Nerd Font icons JetBrains Mono lacks: Devicons git branch,
+// Font Awesome home, and a Material Design icon in the supplementary private
+// use area. (JetBrains Mono itself draws the Powerline branch U+E0A0.)
+var nerdRunes = []rune{0xE725, 0xF015, 0xF0001}
+
+func TestFaceForNerdGlyphFallsBack(t *testing.T) {
+	s := mustDefault(t)
+	primary, err := s.Face(false, false, 14)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range nerdRunes {
+		if s.HasGlyph(r) {
+			t.Errorf("primary HasGlyph(%U) = true, want false", r)
+		}
+		if _, ok := primary.GlyphAdvance(r); ok {
+			t.Errorf("primary face has glyph %U", r)
+		}
+		face, ok, err := s.FaceFor(r, false, false, 14)
+		if err != nil || !ok {
+			t.Fatalf("FaceFor(%U) = ok %v, err %v; want a fallback face", r, ok, err)
+		}
+		if face == primary {
+			t.Errorf("FaceFor(%U) returned the primary face", r)
+		}
+		if _, ok := face.GlyphAdvance(r); !ok {
+			t.Errorf("fallback face for %U has no glyph", r)
+		}
+	}
+}
+
+func TestFaceForPrefersPrimaryPerStyle(t *testing.T) {
+	s := mustDefault(t)
+	for _, st := range []struct{ bold, italic bool }{{false, false}, {true, false}, {false, true}, {true, true}} {
+		want, _ := s.Face(st.bold, st.italic, 14)
+		got, ok, err := s.FaceFor('A', st.bold, st.italic, 14)
+		if err != nil || !ok || got != want {
+			t.Errorf("FaceFor('A', bold=%v, italic=%v) = %v, %v, %v; want the primary face", st.bold, st.italic, got, ok, err)
+		}
+	}
+}
+
+// Runes the primary family already draws never reach the fallback.
+func TestFaceForPowerlineBranchStaysOnPrimary(t *testing.T) {
+	s := mustDefault(t)
+	primary, _ := s.Face(false, false, 14)
+	got, ok, err := s.FaceFor(0xE0A0, false, false, 14)
+	if err != nil || !ok || got != primary {
+		t.Errorf("FaceFor(U+E0A0) = %v, %v, %v; want the primary face", got, ok, err)
+	}
+}
+
+func TestFaceForStyledRequestUsesRegularSymbols(t *testing.T) {
+	s := mustDefault(t)
+	reg, ok, err := s.FaceFor(0xF015, false, false, 14)
+	if err != nil || !ok {
+		t.Fatalf("regular: ok %v, err %v", ok, err)
+	}
+	for _, st := range []struct{ bold, italic bool }{{true, false}, {false, true}, {true, true}} {
+		got, ok, err := s.FaceFor(0xF015, st.bold, st.italic, 14)
+		if err != nil || !ok || got != reg {
+			t.Errorf("FaceFor(bold=%v, italic=%v) = %v, %v, %v; want the regular symbols face", st.bold, st.italic, got, ok, err)
+		}
+	}
+}
+
+func TestFaceForMissingEverywhere(t *testing.T) {
+	s := mustDefault(t)
+	for _, r := range []rune{'世', 0x10FFFE} {
+		face, ok, err := s.FaceFor(r, false, false, 14)
+		if err != nil || ok || face != nil {
+			t.Errorf("FaceFor(%U) = %v, %v, %v; want nil, false, nil", r, face, ok, err)
+		}
+	}
+}
+
+func TestFaceForCachedPerSize(t *testing.T) {
+	s := mustDefault(t)
+	a, _, _ := s.FaceFor(0xE725, false, false, 14)
+	b, _, _ := s.FaceFor(0xF015, true, true, 14)
+	c, _, _ := s.FaceFor(0xE725, false, false, 20)
+	if a != b {
+		t.Error("same fallback font and size returned different faces")
+	}
+	if a == c {
+		t.Error("different sizes returned the same fallback face")
+	}
+}
+
+func TestFaceForInvalidSize(t *testing.T) {
+	s := mustDefault(t)
+	for _, size := range []float64{0, -1} {
+		if _, _, err := s.FaceFor('A', false, false, size); err == nil {
+			t.Errorf("FaceFor size %v succeeded, want error", size)
+		}
+	}
+}
+
+func TestLoadWithoutFallbacks(t *testing.T) {
+	g := jetBrainsMonoRegular
+	s, err := Load(g, g, g, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := s.FaceFor(0xE725, false, false, 14); ok || err != nil {
+		t.Errorf("FaceFor without fallbacks = ok %v, err %v; want false, nil", ok, err)
+	}
+}
+
+func TestLoadFallbackGarbageAndChain(t *testing.T) {
+	g := jetBrainsMonoRegular
+	if _, err := Load(g, g, g, g, FallbackFont{Name: "bad", Data: []byte("nope")}); err == nil {
+		t.Error("Load with garbage fallback succeeded")
+	}
+	// The symbols font, listed after another fallback that lacks the glyph,
+	// is still reached.
+	s, err := Load(g, g, g, g, FallbackFont{Name: "jb", Data: g}, FallbackFont{Name: "nerd", Data: symbolsNerdFontMono})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := s.FaceFor(0xF015, false, false, 14); !ok {
+		t.Error("second fallback not consulted")
+	}
+}
+
+func TestMetricsUnaffectedByFallbacks(t *testing.T) {
+	g := jetBrainsMonoRegular
+	plain, _ := Load(g, g, g, g)
+	withFB := mustDefault(t)
+	a, _ := plain.Metrics(14)
+	b, _ := withFB.Metrics(14)
+	if a != b {
+		t.Errorf("fallbacks changed metrics: %+v vs %+v", a, b)
+	}
+}
