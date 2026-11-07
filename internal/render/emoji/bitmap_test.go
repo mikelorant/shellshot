@@ -176,6 +176,28 @@ func TestBitmapMissingGlyphs(t *testing.T) {
 	}
 }
 
+// A glyph the cmap names (alone or through a variation selector) but that no
+// strike has a bitmap for is not drawn at all, not drawn as an empty image:
+// Apple Color Emoji maps U+2640 U+FE0F that way. A Chain relies on the false
+// to move on to the next font.
+func TestBitmapGlyphWithoutBitmapIsNotDrawn(t *testing.T) {
+	b := loadBitmap(t)
+	for name, c := range map[string]string{
+		"with VS16":    girl + "\uFE0F",
+		"with VS15":    girl + "\uFE0E",
+		"before a ZWJ": girl + zwj + girl,
+	} {
+		if img, ok := b.Image(c, 16); ok || img != nil {
+			t.Errorf("%s %q: drawn (ok %v, image %v)", name, c, ok, img != nil)
+		}
+	}
+	// The font still draws what it has bitmaps for, so the false is not a
+	// broken font.
+	if _, ok := b.Image(smiley, 16); !ok {
+		t.Error("smiley not drawn")
+	}
+}
+
 // The strike is the smallest ppem >= side, else the largest; a glyph the
 // strike lacks comes from another strike.
 func TestBitmapStrikeChoice(t *testing.T) {
