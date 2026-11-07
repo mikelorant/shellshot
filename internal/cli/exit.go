@@ -39,3 +39,7 @@ func reportExit(w io.Writer, code int, ignore bool) error {
 	}
 	return ExitError{Code: code}
 }
+
+// exitScriptSyntax is the exit code of a script that does not parse, validate
+// or lower (docs/scripting.md, "Exit codes").
+const exitScriptSyntax = 2

@@ -32,15 +32,25 @@ type recordOptions struct {
 func newRecordCmd() *cobra.Command {
 	var opts captureOptions
 	var ro recordOptions
-	var script string
+	var commandString string
+	var so scriptOptions
 	cmd := &cobra.Command{
-		Use:   "record [-o file] [-c command] [--cols N] [--rows N] [--record-input] [--coalesce DURATION] [--codec none|flate|zstd] [--ignore-exit-status] [-- command [args...]]",
+		Use:   "record [-o file] [-c command] [--cols N] [--rows N] [--record-input] [--coalesce DURATION] [--codec none|flate|zstd] [--ignore-exit-status] [-- command [args...]]\n       shellshot record --script FILE [--list] [--watch] [-o file] [--cols N] [--rows N] [--record-input]",
 		Short: "Record an interactive shell or command to a file",
 		Long: "Record runs $SHELL (or /bin/sh), or the command given with -c or after --, " +
 			"on a live terminal and records its output with timing. Recording ends when the command exits.\n\n" +
-			"Keystrokes are not recorded unless --record-input is set.",
+			"Keystrokes are not recorded unless --record-input is set.\n\n" +
+			"With --script FILE the session is run by a script (see docs/scripting.md) instead of by you. " +
+			"--list prints what the script would do and runs nothing. " +
+			"-o, --cols and --rows given on the command line win over the script's output and size.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			command, err := resolveCommand(args, script, shellFromEnv(os.Getenv))
+			if scriptRequested(cmd) {
+				if err := validateScriptFlags(cmd, so, commandString, args); err != nil {
+					return err
+				}
+				return runRecordScript(cmd, so, opts, ro)
+			}
+			command, err := resolveCommand(args, commandString, shellFromEnv(os.Getenv))
 			if err != nil {
 				return err
 			}
@@ -52,10 +62,11 @@ func newRecordCmd() *cobra.Command {
 	addCaptureFlags(cmd, &opts, 0, 0)
 	cmd.Flags().StringVarP(&ro.Output, "output", "o", defaultRecordingFile, "recording file to write")
 	addIgnoreExitStatusFlag(cmd, &ro.IgnoreExit)
-	cmd.Flags().StringVarP(&script, "command", "c", "", "shell command string to run with $SHELL -c")
+	cmd.Flags().StringVarP(&commandString, "command", "c", "", "shell command string to run with $SHELL -c")
 	cmd.Flags().BoolVar(&ro.RecordInput, "record-input", false, "also record the keystrokes sent to the command")
 	cmd.Flags().DurationVar(&ro.Coalesce, "coalesce", 0, "merge output events closer together than this (0 keeps every read separate)")
 	cmd.Flags().StringVar(&ro.Codec, "codec", codecZstd, "block compression: none, flate or zstd")
+	addScriptFlags(cmd, &so)
 	return cmd
 }
 
