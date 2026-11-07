@@ -63,6 +63,8 @@ func (k Kind) String() string {
 		return "mark"
 	case KindExit:
 		return "exit"
+	case KindSpan:
+		return "span"
 	}
 	return fmt.Sprintf("kind(%d)", uint8(k))
 }
