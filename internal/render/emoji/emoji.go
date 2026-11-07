@@ -7,6 +7,9 @@
 // A Font looks up a whole grapheme cluster (a ZWJ family, a flag, a skin
 // tone, a keycap, a variation-selector sequence or a single emoji) and
 // renders it as a square RGBA image of any pixel size, cached per size.
+//
+// Bitmap handles CBLC/CBDT PNG fonts such as Apple Color Emoji; Load picks
+// the backend for a font file.
 package emoji
 
 import (
@@ -20,11 +23,6 @@ import (
 	"golang.org/x/image/vector"
 )
 
-const (
-	variationSelector15 = '\uFE0E' // text presentation
-	variationSelector16 = '\uFE0F' // emoji presentation
-)
-
 type renderKey struct {
 	glyph uint16
 	side  int
@@ -32,15 +30,13 @@ type renderKey struct {
 
 // Font is a parsed colour emoji font. It is safe for concurrent use.
 type Font struct {
-	sf     *sfnt.Font
+	glyphMap
 	layers map[uint16][]layer
-	ligs   ligatures
 
 	unitsPerEm int // side of the square emoji box, in font units
 	top        int // y of the box's top edge in font units (above the baseline)
 
 	mu    sync.Mutex
-	buf   sfnt.Buffer
 	cache map[renderKey]*image.RGBA
 }
 
@@ -64,9 +60,8 @@ func Parse(data []byte) (*Font, error) {
 		return nil, err
 	}
 	f := &Font{
-		sf:         sf,
+		glyphMap:   glyphMap{sf: sf, ligs: ligs},
 		layers:     layers,
-		ligs:       ligs,
 		unitsPerEm: int(sf.UnitsPerEm()),
 		cache:      make(map[renderKey]*image.RGBA),
 	}
@@ -110,61 +105,14 @@ func (f *Font) Image(cluster string, side int) (*image.RGBA, bool) {
 	return img, true
 }
 
-// glyphFor resolves cluster to a layered glyph: the whole sequence first
-// (with and without variation selectors, since fonts disagree on whether a
-// sequence includes them), then the first rune alone.
+// glyphFor resolves cluster to a layered glyph.
 func (f *Font) glyphFor(cluster string) (uint16, bool) {
-	runes := []rune(cluster)
-	if len(runes) == 0 {
-		return 0, false
-	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, seq := range sequenceVariants(runes) {
-		if gid, ok := f.lookup(seq); ok {
-			return gid, true
-		}
-	}
-	return f.lookup(runes[:1])
-}
-
-// lookup maps seq to a layered glyph through cmap and, for several runes,
-// the GSUB ligatures. The caller holds f.mu.
-func (f *Font) lookup(seq []rune) (uint16, bool) {
-	gids := make([]uint16, len(seq))
-	for i, r := range seq {
-		g, err := f.sf.GlyphIndex(&f.buf, r)
-		if err != nil || g == 0 {
-			return 0, false
-		}
-		gids[i] = uint16(g)
-	}
-	gid := gids[0]
-	if len(gids) > 1 {
-		gid = f.ligs[seqKey(gids)]
-	}
-	_, ok := f.layers[gid]
-	return gid, ok && gid != 0
-}
-
-// sequenceVariants lists the spellings of runes to try, most specific first:
-// as given, without variation selectors, and with an emoji variation
-// selector after the first rune (the form keycap sequences use).
-func sequenceVariants(runes []rune) [][]rune {
-	out := [][]rune{runes}
-	var bare []rune
-	for _, r := range runes {
-		if r != variationSelector15 && r != variationSelector16 {
-			bare = append(bare, r)
-		}
-	}
-	if len(bare) != len(runes) {
-		out = append(out, bare)
-	}
-	if len(bare) > 1 {
-		out = append(out, append([]rune{bare[0], variationSelector16}, bare[1:]...))
-	}
-	return out
+	return f.resolve(cluster, func(gid uint16) bool {
+		_, ok := f.layers[gid]
+		return ok
+	})
 }
 
 // render rasterises the layers of gid into a side x side image. The emoji
