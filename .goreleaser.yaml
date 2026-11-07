@@ -5,7 +5,8 @@
 # built beforehand by `make release-libs` (scripts/build-libghostty.sh <zig-target>) into
 # build/libghostty-<os>-<arch>. Linux targets pin glibc 2.28 so the binaries run on common distros.
 # macOS targets also need the macOS SDK (SDKROOT, from Xcode or the Command Line Tools), so build on a Mac.
-# Nothing is published and no secrets are needed: see docs/development.md, "Releases".
+# `make snapshot` (--snapshot --skip=publish) publishes nothing. On a tag the release workflow creates a
+# DRAFT GitHub Release that is published by hand: see docs/development.md, "Releases".
 version: 2
 
 project_name: shellshot
@@ -42,8 +43,35 @@ checksum:
   name_template: checksum.txt
   algorithm: sha256
 
+# Conventional commits, grouped. Housekeeping types stay out of the release notes.
 changelog:
-  disable: true
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Others
+      order: 999
+  filters:
+    exclude:
+      - '^docs(\([[:word:]]+\))??!?:'
+      - '^test(\([[:word:]]+\))??!?:'
+      - '^chore(\([[:word:]]+\))??!?:'
+      - '^build(\([[:word:]]+\))??!?:'
+      - '^ci(\([[:word:]]+\))??!?:'
 
+# Always a draft: the maintainer reviews and publishes it by hand.
 release:
-  disable: true
+  github:
+    owner: mikelorant
+    name: shellshot
+  draft: true
+  prerelease: auto
+  mode: replace
+  header: |
+    ## shellshot {{ .Tag }}
+  footer: |
+    Verify the archives against `checksum.txt` (sha256). Container image: `ghcr.io/mikelorant/shellshot:{{ .Version }}`.
