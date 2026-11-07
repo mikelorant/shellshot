@@ -174,6 +174,8 @@ nap() {
 ex_cup() { printf '\033[%d;%dH' "$1" "$2"; }       # cursor to row, column (1-based)
 ex_sgr() { printf '\033[%sm' "$1"; }
 ex_rst() { printf '\033[0m'; }
+ex_save() { printf '\033%s' 7; }                    # DECSC (a digit right after \033 would read as octal)
+ex_restore() { printf '\033%s' 8; }                 # DECRC
 ex_clear() { printf '\033[2J\033[H'; }
 ex_fg256() { printf '\033[38;5;%dm' "$1"; }
 ex_bg256() { printf '\033[48;5;%dm' "$1"; }
