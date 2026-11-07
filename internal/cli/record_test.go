@@ -171,6 +171,68 @@ func TestRecordForwardsStdinAndShowsOutputLive(t *testing.T) {
 	}
 }
 
+// recordTimeout bounds record runs fed from a finite stdin, so a regression
+// that hangs fails fast.
+const recordTimeout = 10 * time.Second
+
+// runRecordWithTimeout runs args with stdin and fails the test if Run does not
+// return within recordTimeout.
+func runRecordWithTimeout(t *testing.T, args []string, stdin string) (code int, stdout, stderr string) {
+	t.Helper()
+	var out, errOut bytes.Buffer
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan int, 1)
+	go func() { done <- runWithStdin(ctx, args, strings.NewReader(stdin), &out, &errOut) }()
+	select {
+	case code = <-done:
+		return code, out.String(), errOut.String()
+	case <-time.After(recordTimeout):
+		cancel()
+		t.Fatalf("record did not finish within %v after stdin EOF", recordTimeout)
+		return 0, "", ""
+	}
+}
+
+func TestRecordPipedStdinEOFExitsDefaultShell(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "eof.shot")
+	t.Setenv("SHELL", "/bin/sh")
+	args := []string{"record", "-o", path, "--cols", "40", "--rows", "5"}
+	code, _, stderr := runRecordWithTimeout(t, args, "echo hi\n")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr %q)", code, stderr)
+	}
+	assertLastFrameContains(t, path, "hi")
+}
+
+func TestRecordPipedStdinEOFEndsCat(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "cat.shot")
+	args := []string{"record", "-o", path, "--cols", "40", "--rows", "5", "-c", "cat"}
+	code, _, stderr := runRecordWithTimeout(t, args, "hi\n")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr %q)", code, stderr)
+	}
+	assertLastFrameContains(t, path, "hi")
+}
+
+// assertLastFrameContains fails unless the last frame of the recording at path
+// contains want.
+func assertLastFrameContains(t *testing.T, path, want string) {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open recording: %v", err)
+	}
+	defer f.Close()
+	r, err := recording.NewReader(f)
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+	if text := lastRecordedFrame(t, r).Snapshot.Text(); !strings.Contains(text, want) {
+		t.Errorf("last frame = %q, want it to contain %q", text, want)
+	}
+}
+
 // lastRecordedFrame reads r to the end and returns the last frame.
 func lastRecordedFrame(t *testing.T, r *recording.Reader) snapshot.Frame {
 	t.Helper()

@@ -14,6 +14,9 @@ import (
 	"github.com/michaellorant/shellshot/internal/vt/ghostty"
 )
 
+// eot is the end-of-transmission byte (Ctrl-D) a terminal sends for EOF.
+const eot = 0x04
+
 // captureOptions describes one command run that is sampled into frames. It is
 // shared by the commands that run a program (snap, record).
 type captureOptions struct {
@@ -23,6 +26,10 @@ type captureOptions struct {
 	Command []string
 	// Stdin, when non-nil, is pumped to the process as user input.
 	Stdin io.Reader
+	// EOTOnStdinEOF sends Ctrl-D (EOT) to the process when Stdin reaches EOF,
+	// so a shell fed from a pipe exits as if a user had pressed Ctrl-D. Set it
+	// only when Stdin is not a terminal.
+	EOTOnStdinEOF bool
 	// Live, when non-nil, shows the process output as it is produced.
 	Live io.Writer
 }
@@ -53,6 +60,7 @@ func addCaptureFlagsWithSize(cmd *cobra.Command, o *captureOptions, cols, rows i
 // If o.Live is set, the process output is also written to it as it arrives.
 // If o.Stdin is set, it is pumped to the process until the capture ends; a
 // blocked read of o.Stdin cannot be interrupted and lingers (see live.Pump).
+// With o.EOTOnStdinEOF, the end of o.Stdin is forwarded as Ctrl-D.
 func capture(ctx context.Context, o captureOptions, sink session.Sink) (exitCode int, err error) {
 	if len(o.Command) == 0 {
 		return -1, fmt.Errorf("no command given")
@@ -75,7 +83,11 @@ func capture(ctx context.Context, o captureOptions, sink session.Sink) (exitCode
 	if o.Stdin != nil {
 		pumpCtx, stop := context.WithCancel(ctx)
 		defer stop()
-		live.Pump(pumpCtx, o.Stdin, p)
+		var pumpOpts live.PumpOptions
+		if o.EOTOnStdinEOF {
+			pumpOpts.OnEOF = []byte{eot}
+		}
+		live.PumpWith(pumpCtx, o.Stdin, p, pumpOpts)
 	}
 
 	cfg := session.Config{Interval: o.Interval, Cols: o.Cols, Rows: o.Rows}

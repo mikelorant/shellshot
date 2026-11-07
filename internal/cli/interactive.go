@@ -67,10 +67,14 @@ func stdinTerminal(r io.Reader) *os.File {
 
 // captureLive is capture with the process shown on out and fed from in. When
 // in is a terminal it is put in raw mode for the duration of the capture and
-// always restored before captureLive returns, including on error.
+// always restored before captureLive returns, including on error. When in is
+// not a terminal (a pipe or file), its EOF is forwarded to the process as
+// Ctrl-D so the shell exits instead of waiting forever for more input.
 func captureLive(ctx context.Context, opts captureOptions, in io.Reader, out, errOut io.Writer, sink session.Sink) (code int, err error) {
 	opts.Stdin, opts.Live = in, out
-	if term := stdinTerminal(in); term != nil {
+	term := stdinTerminal(in)
+	opts.EOTOnStdinEOF = term == nil
+	if term != nil {
 		fmt.Fprintln(errOut, interactiveHint)
 		restore, rawErr := tty.MakeRaw(term)
 		if rawErr != nil {

@@ -7,8 +7,8 @@ that can be replayed.
 ## Commands (cobra)
 | Command | Purpose |
 |---|---|
-| `shellshot record [-o file] [-c "cmd"] [--cols N --rows N] [--interval d] [-- cmd args...]` | Interactive recorder (asciicast-style): runs $SHELL (or the given command) on a live passthrough terminal and records snapshot frames |
-| `shellshot snap [--cols --rows] [--color auto\|always\|never] -- cmd args...` | Run cmd, print the final screen (trailing blank rows trimmed); `--color always` emits SGR, `auto` (default) only on a terminal with `NO_COLOR` unset |
+| `shellshot record [-o file] [-c "cmd"] [--cols N --rows N] [--interval d] [--ignore-exit-status] [-- cmd args...]` | Interactive recorder (asciicast-style): runs $SHELL (or the given command) on a live passthrough terminal and records snapshot frames. Exits with the child's exit code (128+sig for signal deaths) after writing the recording, unless `--ignore-exit-status` |
+| `shellshot snap [--cols --rows] [--color auto\|always\|never] [--ignore-exit-status] -- cmd args...` | Run cmd, print the final screen (trailing blank rows trimmed); `--color always` emits SGR, `auto` (default) only on a terminal with `NO_COLOR` unset. Exits with cmd's exit code (128+sig for signal deaths) after printing, unless `--ignore-exit-status`; `shellshot: command exited with N` goes to stderr either way |
 | `shellshot replay file [--speed f] [--clear] [--color auto\|always\|never]` | Play recording frames to stdout with original timing; `--clear` defaults to on for a terminal; `--color auto` (default) emits SGR only on a terminal with `NO_COLOR` unset |
 | `shellshot version` | Print version |
 
@@ -72,5 +72,5 @@ to `main` (fast-forward/squash, one task = one commit, Conventional Commits).
 - No command given → run `$SHELL` (fallback `/bin/sh`) interactively. `-c` runs a shell command string via `$SHELL -c`; `-- cmd args` runs argv directly. Recording ends when the child exits.
 - When stdin is a TTY: put it in raw mode (restored on exit), forward stdin → PTY. PTY output is teed to the real stdout live AND fed to the headless terminal (session).
 - Size defaults to the current terminal size (override with --cols/--rows). POC limit: size is fixed for the recording; SIGWINCH is not propagated (the format has one fixed size). Follow-up: resize events in the format.
-- Non-TTY stdin/stdout still works (pipes): no raw mode, no size detection (80x24 default).
+- Non-TTY stdin/stdout still works (pipes): no raw mode, no size detection (80x24 default). When a non-TTY stdin ends (EOF), `live.Pump` forwards one EOT byte (0x04, Ctrl-D) to the process (`PumpOptions.OnEOF`), so `printf 'echo hi\n' | shellshot record` ends the shell like a user pressing Ctrl-D. It is never sent when stdin is a TTY.
 - New packages: `internal/tty` (IsTerminal, Size, MakeRaw; wraps golang.org/x/term, no cgo) and `internal/live` (stdin→process pump + output tee; depends only on io interfaces). `pty.Process` gains `Write` (io.ReadWriter). `session` is unchanged: the tee is a Process decorator supplied by `live`.
