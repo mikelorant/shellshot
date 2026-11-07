@@ -9,7 +9,7 @@ that can be replayed.
 ## Commands (cobra)
 | Command | Purpose |
 |---|---|
-| `shellshot record [-o file] [-c "cmd"] [--cols N --rows N] [--fps N] [--ignore-exit-status] [-- cmd args...]` | Interactive recorder (asciicast-style): runs $SHELL (or the given command) on a live passthrough terminal and records snapshot frames. Exits with the child's exit code (128+sig for signal deaths) after writing the recording, unless `--ignore-exit-status` |
+| `shellshot record [-o file] [-c "cmd"] [--cols N --rows N] [--record-input] [--coalesce DUR] [--codec none\|flate\|zstd] [--ignore-exit-status] [-- cmd args...]` | Interactive recorder (asciicast-style): runs $SHELL (or the given command) on a live passthrough terminal and writes the binary event log (raw output with timing, exit status; keystrokes only with `--record-input`). Exits with the child's exit code (128+sig for signal deaths) after writing the recording, unless `--ignore-exit-status` |
 | `shellshot replay file [--speed f] [--clear] [--color auto\|always\|never]` | Play recording frames to stdout with original timing; `--clear` defaults to on for a terminal; `--color auto` (default) emits SGR only on a terminal with `NO_COLOR` unset |
 | `shellshot version` | Print version |
 
@@ -49,7 +49,15 @@ The Go binding links via pkg-config, so builds run with
 `make clean` keeps `build/libghostty`; `make distclean` removes it.
 POC target: macOS (native arch). Linux/Windows: out of scope.
 
-## Recording format (JSON Lines, extension `.shot`)
+## Recording format, binary event log (written by `record`)
+`record` writes the format designed in `docs/research/binary-format.md` (`internal/recording/bin`): a chunk file with a `HEAD` chunk then zstd/flate/none-compressed `EVNT` blocks of events `OUT`, `IN` (only with `--record-input`, which sets head flag bit 0), `RESIZE`, `EXIT`. `record` wires it through `session.Config.Events` (a `binSink` in `internal/cli/eventsink.go` over `bin.Writer`):
+- HEAD: size, default 100 µs tick, start time and zone, engine `libghostty-vt` at the pinned submodule commit, `TERM`, argv as executed, an env allowlist (`TERM`, `COLORTERM`, `LANG`, `SHELL`), random 16-byte session id, recorder `shellshot <version>`. Not recorded: cwd, host name, other environment, theme (themes apply at export time). `--coalesce` merges adjacent OUT events within a duration and sets head flag bit 2.
+- One clock: event times are offsets from the session start (`Config.OnStart` hands the origin to the sink, so `IN` events logged by the process-write decorator `inputRecorder` share it). `bin.Writer` is single-owner, so `binSink` serialises the session goroutine and the input pump with a mutex; no goroutine of its own.
+- Flushing: `Config.OnTick` calls `Writer.Tick` from the session ticker (4 Hz for `record`), so a quiet session flushes on the 2 s interval; with nothing pending Tick writes no bytes. The file is written live (no temp file): after a crash it reads up to the last good block (`bin.ErrTruncated`).
+- `session` still runs the headless terminal and samples frames into a discarding sink; `record` no longer has `--fps` (sampling is moving to replay/export).
+- `replay` and `export` read the JSON format below until the binary reader is wired in.
+
+## Recording format (legacy JSON Lines, extension `.shot`)
 Line 1 header: `{"version":2,"cols":80,"rows":24,"command":["ls"],"started":"RFC3339"}`
 Following lines, one per frame: `{"t":<ms int>,"lines":[...],"cx":0,"cy":0,"cv":true,"title":"","spans":[...],"widths":[...]}`
 
@@ -61,7 +69,7 @@ Following lines, one per frame: `{"t":<ms int>,"lines":[...],"cx":0,"cy":0,"cv":
 `Lines` holds text, so a rune is not always one terminal cell, yet `Spans` and `Widths` both index **runes**. `Widths` is a sparse record of the exceptions so a rasteriser can place runes in the same cell columns libghostty used: `nil`/empty (every rune is one cell) or exactly `Rows` entries, one `[]snapshot.Wide{Rune, Cells}` per line. `Rune` is a rune index into that line; `Cells` is 2 for a wide rune (e.g. CJK) or 0 for a zero-width rune (e.g. a combining mark). Runes without an entry occupy exactly one cell. Entries are sorted by `Rune`, unique and within the line's rune count; `Cells` is 0 or 2 (`Snapshot.Validate`). `Snapshot.Columns(row)` returns each rune's starting cell column (a prefix sum of widths; `"世界ab"` → `0,2,4,5`), and `Snapshot.CellWidth(row, runeIdx)` the cells one rune occupies. Lines are right-trimmed, so cell columns are only meaningful up to the last rune. `Equal` treats nil and all-empty `Widths` as equal. The adapter (populating `Widths`) is a separate follow-up; the recording format is described under Recording format.
 
 ## Session semantics
-- Session owns one goroutine reading PTY output and writing to the terminal; snapshots are taken on that goroutine (vt is not concurrency-safe) on a ticker at `--fps` (default 60; a tick only snapshots if output arrived since the last one, so idle sessions cost nothing), emitted only if different from the previous frame; first frame at t=0 and a final frame on process exit (after draining output).
+- Session owns one goroutine reading PTY output and writing to the terminal; snapshots are taken on that goroutine (vt is not concurrency-safe) on a ticker at `Config.FPS` (default 60; `Config.OnTick` also runs on each tick; a tick only snapshots if output arrived since the last one, so idle sessions cost nothing), emitted only if different from the previous frame; first frame at t=0 and a final frame on process exit (after draining output).
 - Context cancellation kills the process and returns.
 
 ## Workflow

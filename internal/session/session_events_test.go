@@ -245,3 +245,55 @@ func TestRunNilEventsStillRuns(t *testing.T) {
 		t.Errorf("Run = (%d, %v), want (4, nil)", r.code, r.err)
 	}
 }
+
+func TestRunOnStartReceivesOriginBeforeOutput(t *testing.T) {
+	starts := make(chan time.Time, 4)
+	h := startRun(t, 0, nil, func(h *harness) {
+		h.onStart = func(at time.Time) { starts <- at }
+	})
+	h.nextFrame()
+	h.clock.advance(time.Second)
+	h.output("a")
+	close(starts)
+	var got []time.Time
+	for at := range starts {
+		got = append(got, at)
+	}
+	if len(got) != 1 || !got[0].Equal(time.Unix(1000, 0)) {
+		t.Errorf("OnStart calls = %v, want one at the clock origin", got)
+	}
+}
+
+func TestRunOnTickCalledEveryTickWithClock(t *testing.T) {
+	ticks := make(chan time.Time, 4)
+	h := startRun(t, 0, nil, func(h *harness) {
+		h.onTick = func(now time.Time) error { ticks <- now; return nil }
+	})
+	h.nextFrame()
+	for i, want := range []time.Time{time.Unix(1001, 0), time.Unix(1002, 0)} {
+		h.clock.advance(time.Second)
+		h.tick()
+		select {
+		case got := <-ticks:
+			if !got.Equal(want) {
+				t.Errorf("OnTick %d = %v, want %v", i, got, want)
+			}
+		case <-time.After(testTimeout):
+			t.Fatalf("OnTick %d not called", i)
+		}
+	}
+}
+
+func TestRunOnTickErrorAborts(t *testing.T) {
+	tickErr := errors.New("flush failed")
+	h := startRun(t, 0, nil, func(h *harness) {
+		h.onTick = func(time.Time) error { return tickErr }
+	})
+	h.nextFrame()
+	h.tick()
+	r := h.wait()
+	if !errors.Is(r.err, tickErr) || r.code != -1 {
+		t.Errorf("Run = (%d, %v), want (-1, tick error)", r.code, r.err)
+	}
+	h.assertClean()
+}

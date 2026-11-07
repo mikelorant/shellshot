@@ -43,7 +43,7 @@ func TestRecordPropagatesChildExitStatusAfterWritingRecording(t *testing.T) {
 	if strings.Contains(stderr, "shellshot: command exited with 3\nshellshot:") {
 		t.Errorf("stderr = %q, exit note printed twice", stderr)
 	}
-	assertLastFrameContains(t, path, "before")
+	assertOutputContains(t, path, "before")
 }
 
 func TestRecordIgnoreExitStatusExitsZero(t *testing.T) {
