@@ -90,14 +90,14 @@ nap 900
 
 # ---- 3 unicode
 caption 3 'Unicode: box drawing, blocks, braille, CJK'
-printf '┌───────┬───────┐ ╔═══════╦═══════╗ ╭─────────╮ ┏━━━━━━━━━┓\n'
-printf '│ light │ cells │ ║ double║ cells ║ │ rounded │ ┃  heavy  ┃\n'
-printf '└───────┴───────┘ ╚═══════╩═══════╝ ╰─────────╯ ┗━━━━━━━━━┛\n\n'
+printf '┌───────┬───────┐ ╔════════╦═══════╗ ╭─────────╮ ┏━━━━━━━━━┓\n'
+printf '│ light │ cells │ ║ double ║ cells ║ │ rounded │ ┃  heavy  ┃\n'
+printf '└───────┴───────┘ ╚════════╩═══════╝ ╰─────────╯ ┗━━━━━━━━━┛\n\n'
 nap 400
 printf '\033[32m▁▂▃▄▅▆▇█\033[0m  ░▒▓█  \033[36m▖▗▘▝ ▙▟▛▜\033[0m  \033[33m⠁⠃⠇⡇⣇⣧⣷⣿\033[0m  \033[34m⢀⣠⣴⣾⣿⣷⣦⣄⡀\033[0m\n\n'
 nap 400
 ex_rep '─' 18
-printf '┌%s┐ ┌%s┐\n│ 日本語のテキスト │ │ 漢字 한글 ＡＢＣ │\n└%s┘ └%s┘\n\n' "$EX_REP" "$EX_REP" "$EX_REP" "$EX_REP"
+printf '┌%s┐ ┌%s┐\n│ ひらがなカタカナ │ │ 汉字 한글 ＡＢＣ │\n└%s┘ └%s┘\n\n' "$EX_REP" "$EX_REP" "$EX_REP" "$EX_REP"
 nap 400
 printf 'combining marks: |e%s|  |é|  accents stay inside their cell\n' "$ACUTE"
 nap 1100
