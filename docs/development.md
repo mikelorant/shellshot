@@ -11,6 +11,9 @@ The Go binary links libghostty-vt through cgo. libghostty is built from the pinn
 | `make build` | `go build -o bin/shellshot ./cmd/shellshot` |
 | `make test` | `make check-showcase`, then `go test ./...` |
 | `make vet` | `go vet ./...` |
+| `make examples` | Records and exports every `contrib/examples/*.sh` into `build/examples/` (fast speed, 80x24) |
+| `make test-scripts` | Runs every `contrib/examples/scripts/*.script` with `--list` and for real (about a minute); not part of `make test` |
+| `make noto-asset`, `make emoji-asset` | Rebuild the embedded colour emoji fonts; see `scripts/README.md`. Needs network, and `uv` for the Apple one |
 | `make showcase` | Records the showcase demo and exports the README image `docs/assets/showcase.png` (on demand; see below) |
 | `make check-showcase` | Fails if `docs/assets/showcase.png` is stale (see "Regenerating the README image") |
 | `make test-examples` | Runs every `contrib/examples/*.sh` under dash, bash, sh and zsh (takes a few minutes); it checks exit status, terminal restore and Ctrl-C handling |

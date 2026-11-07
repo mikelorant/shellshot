@@ -335,7 +335,7 @@ as before.
 `--speed`, `--idle-limit` and `--hold`, when given, each apply to the whole recording and replace
 the matching scene hint. An explicit `--hold` also drops scene hold hints. Without `--hold`, a
 scene hold is added to the default 2s final hold where a scene ends. The precedence is flag, then
-scene hint, then default. The script-level `meta` hint is not read yet.
+scene hint, then default.
 
 A scene or hidden span that was never closed (the recorder was killed) ends at the last event. A
 malformed span event ends the span list, and export warns on stderr.

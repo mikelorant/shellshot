@@ -23,7 +23,7 @@ critical chunk that readers must understand.
 | `HEAD` | critical | Exactly one, first. Tagged header fields |
 | `DICT` | critical | Optional compression dictionary for later blocks |
 | `EVNT` | critical | A block of timestamped events |
-| `them`, `meta` | ancillary | Optional theme and key/value strings after `HEAD` |
+| `them`, `meta` | ancillary | Optional theme and key/value strings after `HEAD`. `record --script` writes `meta` `script` (the script's file name) |
 | `grid`, `indx`, `blob` | ancillary | Reserved. `record` does not write them and readers skip them |
 
 ## Header
@@ -86,8 +86,8 @@ BEGIN: id | type | parent_id | name_len | name | n_hints | n_hints x { tag | len
 are 1 speed (milli-x), 2 idle (µs), 3 hold (µs) and 4 caption (UTF-8). Decoders skip unknown hint
 tags and bytes after the last known field. An unknown version, op or type makes the event ignorable.
 A span still open at the end of the readable events ends at the last event. `info` lists scenes and
-hidden spans when a recording has them. Nothing writes `SPAN` events yet; they belong to the
-unimplemented [script runner](scripting.md).
+hidden spans when a recording has them, and `export` applies their hints. `record --script` writes
+them (see [scripting.md](scripting.md)); a plain `record` writes none.
 
 ## Compression
 

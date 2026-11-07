@@ -14,6 +14,7 @@ a terminal), `--pause` (wait for Enter at the end), `--help`.
 
     shellshot record -o colors.shot --cols 80 --rows 24 -c ./contrib/examples/colors.sh
     shellshot export colors.shot          # writes colors.png (animated PNG)
+    shellshot export colors.shot --format gif   # or gif, webp, svg
 
 `make examples` does this for every demo into `build/examples/` (fast speed).
 `make showcase` records `showcase.sh` at normal speed into the README image `docs/assets/showcase.png` (on demand; see `docs/development.md`).
@@ -39,16 +40,16 @@ a terminal), `--pause` (wait for Enter at the end), `--help`.
 automation samples for `shellshot record --script FILE`, run from the repository
 root; `make test-scripts` runs them all (about a minute).
 
-## What the exporter draws today
+## What the exporter draws
 
 Checked by exporting the demos and looking at the frames. "Recorded" means the
 bytes are in the `.shot` file and the terminal engine tracks them.
 
-| feature | exported PNG |
+| feature | exported image |
 | --- | --- |
 | 16, 256 and truecolour foreground | drawn |
-| background colour behind glyphs | drawn, but only up to the last glyph on the row |
-| background-only cells or rows (spaces, `ESC[K`) | not drawn: bars made of coloured spaces vanish |
+| background colour, inverse, underline, strikethrough on cells | drawn, including trailing blanks (`ESC[K` bars, colour swatches) |
+| blanks with only a foreground colour, bold, italic, faint or blink | nothing to draw, trimmed |
 | bold, faint, italic, inverse, strikethrough | drawn |
 | underline: single, double, curly, dotted, dashed | drawn |
 | underline colour (SGR 58) | recorded, not drawn (uses the text colour) |
