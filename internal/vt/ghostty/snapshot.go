@@ -9,9 +9,10 @@ import (
 )
 
 // Snapshot copies the visible screen: exactly Rows lines of plain text with
-// trailing spaces removed, the styled spans of those lines, the cursor and the
-// title. Spans is nil when no line has styling. The result owns all of its
-// memory.
+// trailing spaces removed, the styled spans and the non-single-cell runes
+// (Widths) of those lines, the cursor and the title. Spans is nil when no line
+// has styling and Widths is nil when every rune is one cell. The result owns
+// all of its memory.
 func (t *terminal) Snapshot() (snapshot.Snapshot, error) {
 	if t.closed {
 		return snapshot.Snapshot{}, ErrClosed
@@ -26,7 +27,8 @@ func (t *terminal) Snapshot() (snapshot.Snapshot, error) {
 
 	lines := make([]string, 0, t.height)
 	spans := make([][]snapshot.Span, 0, t.height)
-	styled := false
+	widths := make([][]snapshot.Wide, 0, t.height)
+	styled, hasWide := false, false
 	for t.rows.Next() {
 		text, err := t.rows.AppendText(t.rowBuf[:0], t.cells)
 		if err != nil {
@@ -37,12 +39,14 @@ func (t *terminal) Snapshot() (snapshot.Snapshot, error) {
 		line := strings.TrimRight(string(text), " ")
 		lines = append(lines, line)
 
-		rs, err := t.rowSpans(utf8.RuneCountInString(line))
+		layout, err := t.rowLayout(utf8.RuneCountInString(line))
 		if err != nil {
 			return snapshot.Snapshot{}, fmt.Errorf("ghostty: read row %d styles: %w", len(lines)-1, err)
 		}
-		spans = append(spans, rs)
-		styled = styled || len(rs) > 0
+		spans = append(spans, layout.spans)
+		widths = append(widths, layout.widths)
+		styled = styled || len(layout.spans) > 0
+		hasWide = hasWide || len(layout.widths) > 0
 	}
 	if len(lines) != t.height {
 		return snapshot.Snapshot{}, fmt.Errorf("ghostty: screen has %d rows, want %d", len(lines), t.height)
@@ -50,6 +54,9 @@ func (t *terminal) Snapshot() (snapshot.Snapshot, error) {
 
 	if !styled {
 		spans = nil
+	}
+	if !hasWide {
+		widths = nil
 	}
 
 	cx, err := t.term.CursorX()
@@ -74,6 +81,7 @@ func (t *terminal) Snapshot() (snapshot.Snapshot, error) {
 		Rows:   t.height,
 		Lines:  lines,
 		Spans:  spans,
+		Widths: widths,
 		Cursor: snapshot.Cursor{X: int(cx), Y: int(cy), Visible: visible},
 		Title:  title,
 	}, nil

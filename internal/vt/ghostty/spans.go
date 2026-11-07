@@ -9,63 +9,108 @@ import (
 	"github.com/michaellorant/shellshot/internal/snapshot"
 )
 
-// rowSpans returns the styled runs of the current row as rune-index ranges
-// into the row's trimmed line, which is limit runes long.
+// rowLayout is the rune-index layout of one trimmed row: its styled runs and
+// the runes that do not occupy exactly one cell.
+type rowLayout struct {
+	spans  []snapshot.Span
+	widths []snapshot.Wide
+}
+
+// cellInfo describes one terminal cell: how many runes it adds to the line,
+// the cells its first rune occupies, and its style.
+type cellInfo struct {
+	runes int
+	width uint8
+	style snapshot.Style
+}
+
+// rowLayout returns the spans and widths of the current row as rune-index
+// entries into the row's trimmed line, which is limit runes long.
 //
 // Indexes are computed from the cells so they stay aligned with the text
 // AppendText produces: a wide character's spacer cell adds no rune, an empty
 // cell counts as one space, and a cell holding a multi-codepoint cluster
-// counts one rune per codepoint. Spans are clipped at limit, so styling past
-// the end of the trimmed text is dropped.
-func (t *terminal) rowSpans(limit int) ([]snapshot.Span, error) {
+// counts one rune per codepoint. Entries are clipped at limit, so styling and
+// widths past the end of the trimmed text are dropped.
+func (t *terminal) rowLayout(limit int) (rowLayout, error) {
+	var layout rowLayout
 	if limit == 0 {
-		return nil, nil
+		return layout, nil
 	}
 	if err := t.rows.Cells(t.cells); err != nil {
-		return nil, fmt.Errorf("load cells: %w", err)
+		return rowLayout{}, fmt.Errorf("load cells: %w", err)
 	}
 
-	var spans []snapshot.Span
 	pos := 0
 	for pos < limit && t.cells.Next() {
-		raw, err := t.cells.Raw()
+		cell, err := t.readCell()
 		if err != nil {
-			return nil, fmt.Errorf("raw cell: %w", err)
+			return rowLayout{}, err
 		}
-		runes, err := t.cellRunes(raw)
-		if err != nil {
-			return nil, err
-		}
-		if runes == 0 {
-			continue
-		}
-		style, err := t.cellStyle(raw)
-		if err != nil {
-			return nil, err
-		}
-		end := min(pos+runes, limit)
-		spans = appendSpan(spans, pos, end, style)
-		pos += runes
+		layout.spans = appendSpan(layout.spans, pos, min(pos+cell.runes, limit), cell.style)
+		layout.widths = appendWides(layout.widths, pos, limit, cell)
+		pos += cell.runes
 	}
-	return spans, nil
+	return layout, nil
 }
 
-// cellRunes returns how many runes the current cell contributes to the line:
-// 0 for a wide character's spacer, 1 for an empty cell, otherwise the number
-// of codepoints in its text.
-func (t *terminal) cellRunes(raw *libghostty.Cell) (int, error) {
+// readCell reads the current cell. A spacer cell (the second half of a wide
+// character, or the leftover cell where a wide character did not fit at the
+// end of a row) has no runes and no style.
+func (t *terminal) readCell() (cellInfo, error) {
+	raw, err := t.cells.Raw()
+	if err != nil {
+		return cellInfo{}, fmt.Errorf("raw cell: %w", err)
+	}
 	wide, err := raw.Wide()
 	if err != nil {
-		return 0, fmt.Errorf("cell width: %w", err)
+		return cellInfo{}, fmt.Errorf("cell width: %w", err)
 	}
 	if wide == libghostty.CellWideSpacerTail || wide == libghostty.CellWideSpacerHead {
-		return 0, nil
+		return cellInfo{}, nil
 	}
+	runes, err := t.cellRunes()
+	if err != nil {
+		return cellInfo{}, err
+	}
+	style, err := t.cellStyle(raw)
+	if err != nil {
+		return cellInfo{}, err
+	}
+	width := uint8(1)
+	if wide == libghostty.CellWideWide {
+		width = 2
+	}
+	return cellInfo{runes: runes, width: width, style: style}, nil
+}
+
+// cellRunes returns how many runes the current non-spacer cell contributes to
+// the line: 1 for an empty cell, otherwise the number of codepoints in its
+// text.
+func (t *terminal) cellRunes() (int, error) {
+	var err error
 	t.cellBuf, err = t.cells.AppendGraphemes(t.cellBuf[:0])
 	if err != nil {
 		return 0, fmt.Errorf("cell text: %w", err)
 	}
 	return max(1, utf8.RuneCount(t.cellBuf)), nil
+}
+
+// appendWides records the runes of cell, which starts at rune index pos, that
+// are not one cell wide: the first rune takes the cell's width and every
+// further codepoint of a cluster is zero-width. Runes at or past limit are
+// dropped.
+func appendWides(wides []snapshot.Wide, pos, limit int, cell cellInfo) []snapshot.Wide {
+	if cell.runes == 0 {
+		return wides
+	}
+	if cell.width != 1 && pos < limit {
+		wides = append(wides, snapshot.Wide{Rune: pos, Cells: cell.width})
+	}
+	for i := pos + 1; i < pos+cell.runes && i < limit; i++ {
+		wides = append(wides, snapshot.Wide{Rune: i, Cells: 0})
+	}
+	return wides
 }
 
 // cellStyle returns the style of the current cell. A cell with no text and
