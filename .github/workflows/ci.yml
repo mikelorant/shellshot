@@ -25,6 +25,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest]
+    # The Makefile exports these for make targets. The go commands below run directly, so they need them too.
+    env:
+      CGO_ENABLED: '1'
+      PKG_CONFIG_PATH: ${{ github.workspace }}/build/libghostty/lib/pkgconfig
     steps:
       # Submodules are fetched below, and only ghostty: apple-emoji-ttf is not needed to build.
       - uses: actions/checkout@v7
@@ -58,6 +62,15 @@ jobs:
       - name: Build libghostty
         if: steps.libghostty.outputs.cache-hit != 'true'
         run: make deps
+
+      # The .pc files hold the absolute prefix of the build, so point them at this workspace
+      # (a cache restored under another path would otherwise leave them pointing nowhere).
+      - name: Check the libghostty pkg-config files
+        run: |
+          sed -i.bak "s|^prefix=.*|prefix=$GITHUB_WORKSPACE/build/libghostty|" build/libghostty/lib/pkgconfig/*.pc
+          rm -f build/libghostty/lib/pkgconfig/*.bak
+          pkg-config --exists libghostty-vt-static || { echo "::error::libghostty-vt-static not found in $PKG_CONFIG_PATH: the libghostty cache is stale, delete it and rerun"; exit 1; }
+          pkg-config --cflags --libs --static libghostty-vt-static
 
       - name: Vet
         run: go vet ./...
