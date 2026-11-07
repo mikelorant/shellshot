@@ -4,7 +4,7 @@ Status: design brief, **v2 consolidated**. One design: the v2 grouped-block lang
 
 **Evidence limits (read first).**
 - This is a design. **No code was run.** Examples were checked by a throwaway Python checker written to this file's EBNF (§4.3), not by the real parser. The checker is not committed. It approximates RE2 with Python `re`.
-- libghostty key encoding (§6) is inherited from the v1 research run (no shell). Encoder output bytes, the pinned-version API and DECCKM sequences are **unverified**. The headers in `build/libghostty/include/ghostty/vt/key/` were read directly; the Go binding was read from GitHub `main`, not the pinned version.
+- libghostty key encoding (§6) is inherited from the v1 research run (no shell). Encoder output bytes, the pinned-version API and DECCKM sequences were since **verified by T6** (§6, `internal/vt/ghostty/keyenc_test.go`); only the leftovers in §6.5 stay unverified.
 - MARK (kind 3) and the rule "kinds ≥ 64 are ancillary" come from `docs/research/binary-format.md` (a design). SPAN (kind 64) and its payload are from `script-scenes.md` §4.3 and are unchanged here. Whether `Writer` flushes on kind 64, and how `frames` treats ancillary events, are **unverified**. Of the code I know only what the two earlier briefs quote (`record.go`, `session.go` 1–80, `timeline.go`, `event.go`).
 - Prior-art claims are marked **fetched** (v1 run) or **memory** (unverified).
 
@@ -460,12 +460,94 @@ scene interrupt {
 
 ---
 
-## 6. Key encoding with libghostty (carried over from v1; mostly unverified)
+## 6. Key encoding with libghostty (verified by T6)
 
-Only `press` uses the encoder. `run`/`type` text is sent as raw UTF-8, one rune per write; Enter inside text is CR (0x0D).
-- **Verified from headers:** `ghostty/vt/key/encoder.h` has `ghostty_key_encoder_new/free/set/encode` and `ghostty_key_encoder_set_from_terminal`, which reads cursor-key application mode (DECCKM), keypad mode, alt-escape prefix, modifyOtherKeys and Kitty flags from the live terminal. Go binding (GitHub `main`, **not the pinned version**): `NewKeyEncoder()`, `SetFromTerminal`, `Encode(*KeyEvent)`; not safe for concurrent use. `SetUTF8` takes the unmodified character, never C0 controls.
-- **NOT verified:** actual bytes (`up` → `ESC [ A` normally, `ESC O A` under DECCKM; `ctrl+c` → `0x03`; `enter` → `0x0D`); whether the pinned module (pseudo-version 20261106) has the same API; whether `ctrl+<letter>` needs `SetUTF8`.
-- **Recommendation:** use the encoder for every `press` key (a static table sends wrong bytes once vim, less or htop switch DECCKM). Cost: cgo coupling, contained by a consumer-side interface (§8.1). **Task T6 is the verification experiment that must pass before T7** (encode `up`, `ctrl+c`, `enter`, `backspace`, `f5`, `alt+x` before and after feeding `ESC[?1h`, assert bytes). `shift+tab`, `alt+s`, `alt+enter`, `pagedown` (tape) are in the same experiment.
+**Verified** on the pinned module `go.mitchellh.com/libghostty v0.0.0-20261106041537-e247028bdf51` (libghostty `0.1.0-dev+66af4c7`, headers in `build/libghostty/include/ghostty/vt/key/`), darwin/arm64, by `internal/vt/ghostty/keyenc_test.go`, which drives a real headless terminal with mode-setting VT output and asserts the exact bytes below. The pinned binding has the API the v1 research took from GitHub `main`.
+
+Only `press` uses the encoder. `run`/`type` text is sent as raw UTF-8, one rune per write; Enter inside text is CR (0x0D). The encoder also encodes text (below), but raw UTF-8 is simpler and mode-independent.
+
+### 6.1 API sequence (all verified)
+
+```go
+enc, _ := libghostty.NewKeyEncoder()   // once per session; enc.Close()
+ev,  _ := libghostty.NewKeyEvent()     // once, reusable; ev.Close()
+
+// Before EACH key press (cheap, 0 allocs): copy the terminal's live modes.
+enc.SetFromTerminal(term)              // *libghostty.Terminal
+enc.SetOptionAsAlt(libghostty.OptionAsAltTrue) // must follow SetFromTerminal, which resets it
+
+// Fill EVERY field every time (the event is reused; a skipped field keeps the last key's value).
+ev.SetAction(libghostty.KeyActionPress)
+ev.SetKey(libghostty.KeyC)                       // physical key: KeyEnter, KeyArrowUp, KeyF5, KeyA ...
+ev.SetMods(libghostty.ModCtrl)                   // bitmask: ModShift|ModCtrl|ModAlt|ModSuper
+ev.SetConsumedMods(0)                            // mods already used to produce the text (see below)
+ev.SetUTF8("c")                                  // unmodified character; "" for function keys
+ev.SetUnshiftedCodepoint('c')                    // unshifted rune; 0 for function keys
+out, err := enc.Encode(ev)                       // []byte; nil, nil means "no bytes"
+```
+
+- **Terminal modes are followed through `SetFromTerminal`**: DECCKM (`ESC[?1h`/`l`), keypad mode, alt-prefix (DEC 1036), backarrow, modifyOtherKeys and the Kitty flag stack (`ESC[>1u` push, `ESC[<u` pop). It copies the state at call time: a mode change after the call is **not** seen until the next `SetFromTerminal` (so call it before every press; vim/less toggling DECCKM between presses is then handled). Manual options (`SetBool(KeyEncoderOptCursorKeyApplication, …)`, `SetKittyFlags`) exist but are not needed.
+- **Ownership/lifetime:** the encoder keeps no reference to the terminal. It copies the options, so it keeps working after `term.Close()` and one encoder can serve many terminals. The event copies the text passed to `SetUTF8` into C memory (freed on `ev.Close()` or the next `SetUTF8`). `Close` is idempotent.
+- **Concurrency:** `KeyEncoder` and `KeyEvent` are documented as not safe for concurrent use (not tested); `SetFromTerminal` also needs the caller to serialise access to the terminal. In shellshot, call it from the session goroutine that owns the terminal.
+- **Allocations:** `SetFromTerminal` 0, filling the event 0 (Go-side), `Encode` 3 per call (stack buffer escapes + result slice). Output over 128 bytes is handled inside `Encode` (verified with 300-byte text).
+- **Keys that produce nothing:** `Encode` returns `nil, nil` (not an error) for bare modifier keys (`KeyShiftLeft`, `KeyControlLeft`), `KeyUnidentified` with no text, releases when Kitty report-events is off, and, because of the field rules below, a printable key given too little data. T7 must treat an empty result as a script error for the chord (never silently send nothing); it must not guess bytes.
+
+### 6.2 Filling the event: what each key class needs
+
+- **Function / navigation keys** (enter, tab, esc, backspace, arrows, home/end, page keys, insert/delete, F-keys): `key` + `mods` only; text `""`, code point `0`.
+- **Printable keys** (letters, digits, punctuation, space): set `key`, `mods`, **text = the unmodified character** and **unshifted code point = the same rune lower-cased**. Both are needed: legacy letter/space with no text → empty; Kitty `ctrl+c` with text but no code point → bare `c` (wrong), with neither → empty. Passing neither works only for legacy `ctrl+<letter>`. Never pass a C0 control as text (`enter` is `KeyEnter`, not `"\r"`).
+- **Alt on macOS:** without `SetOptionAsAlt(OptionAsAltTrue)` (re-applied after every `SetFromTerminal`) darwin encodes `alt+s` as bare `s`, because Option composes characters. Linux is **not verified**; the call is harmless there but its necessity is unchecked.
+- **Typed text:** an event with `key=KeyUnidentified`, no mods and the text encodes to that text unchanged in every mode (`a`, `A`, `é`, `世`, `😀` verified). A shifted character sent as `KeyA`+`ModShift`+`"A"` becomes `ESC[97;2u` under Kitty unless `SetConsumedMods(ModShift)` is set (then `A`); in legacy mode it is `A` either way.
+
+### 6.3 Verified bytes (press; `ESC` = 0x1B)
+
+Normal = fresh terminal. App-cursor = after `ESC[?1h`. Kitty = after `ESC[>1u` (disambiguate flag only).
+
+| key | normal | app-cursor (`ESC[?1h`) | kitty (`ESC[>1u`) |
+|---|---|---|---|
+| enter | `0D` | `0D` | `0D` |
+| tab | `09` | `09` | `09` |
+| shift+tab | `ESC [ Z` | `ESC [ Z` | `ESC [ 9 ; 2 u` |
+| esc | `1B` | `1B` | `ESC [ 27 u` |
+| backspace | `7F` | `7F` | `7F` |
+| space | `20` | `20` | `20` |
+| up / down / right / left | `ESC [ A` / `B` / `C` / `D` | `ESC O A` / `B` / `C` / `D` | `ESC [ A` / `B` / `C` / `D` |
+| home / end | `ESC [ H` / `F` | `ESC O H` / `F` | `ESC [ H` / `F` |
+| pageup / pagedown | `ESC [ 5 ~` / `6 ~` | same | same |
+| delete / insert | `ESC [ 3 ~` / `2 ~` | same | same |
+| f1 | `ESC O P` | `ESC O P` | `ESC [ P` |
+| f5 | `ESC [ 15 ~` | same | same |
+| f12 | `ESC [ 24 ~` | same | same |
+| ctrl+c | `03` | `03` | `ESC [ 99 ; 5 u` |
+| ctrl+d | `04` | `04` | `ESC [ 100 ; 5 u` |
+| ctrl+a | `01` | `01` | `ESC [ 97 ; 5 u` |
+| alt+s | `ESC s` (needs option-as-alt) | `ESC s` | `ESC [ 115 ; 3 u` |
+| alt+enter | `ESC 0D` | `ESC 0D` | `ESC [ 13 ; 3 u` |
+| ctrl+alt+delete | `ESC [ 3 ; 7 ~` | same | same |
+| shift+up | `ESC [ 1 ; 2 A` | same (CSI, not SS3) | same |
+| ctrl+left | `ESC [ 1 ; 5 D` | same (CSI, not SS3) | same |
+
+Other verified behaviour (also asserted by the test):
+- **Kitty overrides DECCKM:** with both `ESC[?1h` and `ESC[>1u` set, `up` is `ESC [ A` and `f1` is `ESC [ P` (the Kitty column). Popping the flags (`ESC[<u`) returns to legacy encoding.
+- **Modified keys in legacy mode:** `ctrl+backspace` → `08`; `alt+backspace` → `ESC 7F`; `shift+enter` → `ESC [ 27 ; 2 ; 13 ~`; `ctrl+enter` → `ESC [ 27 ; 5 ; 13 ~`; `ctrl+space` → `00`; `ctrl+\` → `1C`; `ctrl+[` → `ESC [ 91 ; 5 u` (**not** a bare ESC); modified F-keys use the `ESC [ 1 ; m P` form.
+- **DEC 1036 reset (`ESC[?1036l`):** `alt+s` → bare `s`. The default is alt-sends-ESC-prefix.
+- **modifyOtherKeys 2 (`ESC[>4;2m`):** `alt+s` → `ESC [ 27 ; 3 ; 115 ~`; `ctrl+c` stays `03`.
+- **All Kitty flags (`ESC[>31u`):** `enter` → `ESC [ 13 u`; `a` → `ESC [ 97 ; ; 97 u`.
+
+### 6.4 Surprises for T7
+
+1. Empty text/code point silently yields empty or wrong bytes for printable keys (§6.2); a `Chord → KeySpec` table must carry the base rune for every printable key.
+2. `SetFromTerminal` resets option-as-alt; `alt+<char>` regresses on macOS if it is not re-applied.
+3. Under Kitty the bytes differ for `ctrl+<letter>`, `shift+tab`, `esc`, `alt+*`; scripts that `press` these against a Kitty-aware program (neovim, fish, helix) get CSI-u, which is correct for that program.
+4. Modes are read at call time; `SetFromTerminal` must precede every press, after all pending output has been written to the terminal (T7/T8 ordering: feed the PTY output before encoding the next key).
+
+### 6.5 Still unverified
+
+- Linux behaviour of `alt+<char>` with and without `SetOptionAsAlt`; any non-darwin byte differences.
+- Thread-safety beyond the documentation (not tested; the test is single-goroutine, `-race` clean).
+- Keypad keys and DEC 66 (DECKPAM), modifier-side bits (`ModShiftSide` etc.), Kitty report-events release/repeat sequences, Kitty flags 2/4/8/16 individually, caps/num-lock modifiers.
+- Whether other libghostty versions change these bytes (the test pins the current ones; re-run it on every libghostty bump).
+- **Recommendation (unchanged):** use the encoder for every `press` key (a static table sends wrong bytes once vim, less or htop switch DECCKM). Cost: cgo coupling, contained by a consumer-side interface (§8.1).
 
 ---
 
@@ -554,7 +636,7 @@ type Step struct { Write []byte; Mark string; Span *SpanOp; Deadline time.Durati
 | T3 | Parser + canonical printer | AST (§4.5); syntax errors; permissive superset | Golden `testdata/*.script` → `*.ast.golden`; **fuzz**: no panics, stable error text, accepted input prints and re-parses to the same AST; §5 examples as goldens | T1, T2 |
 | T4 | Validator + diagnostics | legality table, nesting, unique names, ranges, key names, UTF-8/control chars, reserved words, did-you-mean | One table test per error with exact message and line:col; max 10 errors; negative text-block cases | AST types only (hand-built ASTs; parallel with T3) |
 | T5 | `keys` package | chord text → `(Key, Mods)` | every documented name parses; order of modifiers irrelevant | none |
-| T6 | **Verify libghostty key encoder** (experiment) | bytes for the §6 key set, before/after `ESC[?1h`, on the pinned module | cgo test asserts bytes; findings written to §6 | none (needs build tree) |
+| T6 | **Verify libghostty key encoder** (experiment) (**done**) | bytes for the §6 key set, before/after `ESC[?1h`, on the pinned module | cgo test asserts bytes; findings written to §6 | none (needs build tree) |
 | T7 | KeyEncoder adapter | `keys.Chord` → bytes via `SetFromTerminal` | cgo tests as T6 | T5, **T6 passing** |
 | T8 | Lowering | `Lower(AST) → Plan`; scopes resolved; SPAN ops; implicit end span | Plan goldens: scoped `typing`/`linger` revert at `}`; hint inheritance | T3 (AST) |
 | T9 | Executor: input and pacing | `run/type/press/sleep`, text-block units, `typing`, `jitter`, `linger` | fake clock → expected `[]Step` timeline golden; block = one step, one linger | T8, T5 |
@@ -608,12 +690,12 @@ type Step struct { Write []byte; Mark string; Span *SpanOp; Deadline time.Durati
 - Quiet-screen `run` is a heuristic; `run lines` with an interactive middle command can mis-feed it.
 - Text blocks: whitespace-only differences in the closing line's indentation (tabs vs spaces) fail with the "different indentation" hint; fuzz covers it.
 - SPAN touches shared policy: `timeline` segments double an idle cap at a boundary; forced `frames` samples change the frame stream; writer flush on kind 64 unverified.
-- cgo key-encoder API may differ at the pinned commit. Scrollback is not matchable. Session hook T13 collides with binary-format session work. Only screens at marks are reproducible, not bytes.
+- cgo key-encoder API and bytes were verified at the pinned commit (§6); re-run `keyenc_test.go` on every libghostty bump. Scrollback is not matchable. Session hook T13 collides with binary-format session work. Only screens at marks are reproducible, not bytes.
 - A failing run leaves a partial recording that could be published by mistake.
 
 **Contradictions found between the two briefs and how they were resolved:** (a) `read` → `linger`; (b) quoted `run "cmd"` / string scene names / `env ident string` / `command` / `wait … timeout 120s` / `press enter 2` in the scenes grammar → v2 rest-of-line text, bare names, `env K=V`, `shell`, `wait PAT 120s`, `press enter x2`; (c) scenes: "settings first in the block" vs v2 "anywhere" → anywhere; (d) `expect` as a 7th step → `wait … 0s`; (e) `require` kept vs v2 excluded → deferred; (f) `wait idle` and `idle` were reserved/excluded in v2 → `wait idle` kept, `idle` is now a hint setting (removed from the reserved list); (g) MARK pairs (v2) vs SPAN (scenes) → SPAN; (h) auto-exit as hidden span vs v2 §7.4 exit sequence → one sequence, recorded as an implicit hidden span; (i) exit codes "else child's code" vs v2 codes → v2; (j) `type@` and `\` continuation → dropped; (k) span ends on failure written (scenes) vs unclosed start (v2) → ends written, unclosed tolerated after kill.
 
-**Unverified claims:** encoder output bytes; pinned-version API; DECCKM sequences; `/bin/sh` honouring imported `PS1`; vim `--clean` and `~`; `env -S`; scrollback access; `git log --oneline` decorations (the regex tolerates them); embedded-language library facts; asciinema-automation, demo-magic, doitlive, Terminalizer details; Writer/frames behaviour on kind 64; MARK/SPAN availability in the final binary format.
+**Unverified claims:** encoder leftovers in §6.5 (Linux alt handling, keypad, Kitty report-events); `/bin/sh` honouring imported `PS1`; vim `--clean` and `~`; `env -S`; scrollback access; `git log --oneline` decorations (the regex tolerates them); embedded-language library facts; asciinema-automation, demo-magic, doitlive, Terminalizer details; Writer/frames behaviour on kind 64; MARK/SPAN availability in the final binary format.
 
 ## Final recommendation
 
