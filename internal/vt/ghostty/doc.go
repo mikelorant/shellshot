@@ -43,12 +43,16 @@
 //     0 cells.
 //
 // Which codepoints share a cell is libghostty's decision and depends on mode
-// 2027 (grapheme clustering), which is off by default. With it off, a
-// variation selector after a narrow base stays one cell wide (U+2764 U+FE0F is
-// 1 cell + 0), a ZWJ joins the cell of the emoji before it (each emoji of a
-// family is its own 2-cell cell holding the emoji and its joiner) and a skin
-// tone modifier is a separate 2-cell emoji. With the mode on, VS16 widens the
-// base to 2 cells and a skin tone modifier joins its base with 0 cells.
+// 2027 (grapheme clustering). libghostty leaves it off, but New turns it on
+// as the reset default, as Ghostty and other modern terminals do, so the
+// screen layout matches the one the recorded program was written for. With it
+// on, a cluster is always one cell: VS16 widens a narrow base to 2 cells, a
+// ZWJ sequence (a whole family), a skin tone modifier, a regional indicator
+// pair (flag) and a keycap (U+FE0F U+20E3) are all one 2-cell base followed
+// by zero-width runes. With the mode off libghostty splits these into several
+// wide cells, drops some variation selectors and leaves VS16 sequences narrow.
+// A program that switches the mode off (CSI ? 2027 l) gets that layout.
+//
 // Widths is nil when every rune of every line is one cell, and entries at or
 // past the trimmed length of a line are dropped like clipped spans.
 //

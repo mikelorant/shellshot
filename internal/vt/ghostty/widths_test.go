@@ -109,11 +109,11 @@ func TestWidthsCombiningMarkOnWideCharacter(t *testing.T) {
 	wantCursorAtLineEnd(t, s, 0)
 }
 
-// With grapheme clustering (mode 2027) off, which is libghostty's default,
-// a variation selector after a narrow base stays one cell wide.
+// With grapheme clustering (mode 2027) switched off by the program, a
+// variation selector after a narrow base stays one cell wide.
 func TestWidthsVariationSelectorWithoutGraphemeClustering(t *testing.T) {
 	term := newTerminal(t, 20, 1)
-	write(t, term, "\u2764\ufe0fx")
+	write(t, term, "\x1b[?2027l\u2764\ufe0fx")
 
 	s := snap(t, term)
 	wantLines(t, s, 1, "\u2764\ufe0fx")
@@ -121,21 +121,21 @@ func TestWidthsVariationSelectorWithoutGraphemeClustering(t *testing.T) {
 	wantCursorAtLineEnd(t, s, 0)
 }
 
-// With grapheme clustering on, VS16 turns the base into a wide emoji.
+// Grapheme clustering is on by default: VS16 turns the base into a wide emoji.
 func TestWidthsVariationSelectorWithGraphemeClustering(t *testing.T) {
 	term := newTerminal(t, 20, 1)
-	write(t, term, "\x1b[?2027h\u2764\ufe0fx")
+	write(t, term, "\u2764\ufe0fx")
 
 	s := snap(t, term)
 	wantWidths(t, s, 0, snapshot.Wide{Rune: 0, Cells: 2}, snapshot.Wide{Rune: 1, Cells: 0})
 	wantCursorAtLineEnd(t, s, 0)
 }
 
-// libghostty joins a ZWJ to the cell of the emoji before it, so each wide
-// emoji cell holds its emoji and the joiner after it.
-func TestWidthsZeroWidthJoinerSequence(t *testing.T) {
+// With the mode off libghostty joins a ZWJ to the cell of the emoji before
+// it, so each wide emoji cell holds its emoji and the joiner after it.
+func TestWidthsZeroWidthJoinerSequenceWithoutGraphemeClustering(t *testing.T) {
 	term := newTerminal(t, 20, 1)
-	write(t, term, "\U0001F468\u200d\U0001F469\u200d\U0001F467x")
+	write(t, term, "\x1b[?2027l\U0001F468\u200d\U0001F469\u200d\U0001F467x")
 
 	s := snap(t, term)
 	wantLines(t, s, 1, "\U0001F468\u200d\U0001F469\u200d\U0001F467x")
@@ -150,7 +150,7 @@ func TestWidthsZeroWidthJoinerSequence(t *testing.T) {
 // two cells wide.
 func TestWidthsSkinToneModifierWithoutGraphemeClustering(t *testing.T) {
 	term := newTerminal(t, 20, 1)
-	write(t, term, "\U0001F44D\U0001F3FDx")
+	write(t, term, "\x1b[?2027l\U0001F44D\U0001F3FDx")
 
 	s := snap(t, term)
 	wantLines(t, s, 1, "\U0001F44D\U0001F3FDx")
@@ -160,11 +160,43 @@ func TestWidthsSkinToneModifierWithoutGraphemeClustering(t *testing.T) {
 
 func TestWidthsSkinToneModifierWithGraphemeClustering(t *testing.T) {
 	term := newTerminal(t, 20, 1)
-	write(t, term, "\x1b[?2027h\U0001F44D\U0001F3FDx")
+	write(t, term, "\U0001F44D\U0001F3FDx")
 
 	s := snap(t, term)
 	wantWidths(t, s, 0, snapshot.Wide{Rune: 0, Cells: 2}, snapshot.Wide{Rune: 1, Cells: 0})
 	wantCursorAtLineEnd(t, s, 0)
+}
+
+// Emoji sequences are single cells by default (mode 2027 is on): the base
+// takes 2 cells and every follower 0, so a family, a flag and a keycap each
+// span exactly two columns.
+func TestWidthsEmojiSequencesAreOneCluster(t *testing.T) {
+	const family = "\U0001F468\u200d\U0001F469\u200d\U0001F467"
+	const flag = "\U0001F1E6\U0001F1FA"
+	const keycap = "1\ufe0f\u20e3"
+	term := newTerminal(t, 20, 1)
+	write(t, term, family+flag+keycap+"x")
+
+	s := snap(t, term)
+	wantLines(t, s, 1, family+flag+keycap+"x")
+	wantWidths(t, s, 0,
+		snapshot.Wide{Rune: 0, Cells: 2}, snapshot.Wide{Rune: 1, Cells: 0}, snapshot.Wide{Rune: 2, Cells: 0},
+		snapshot.Wide{Rune: 3, Cells: 0}, snapshot.Wide{Rune: 4, Cells: 0},
+		snapshot.Wide{Rune: 5, Cells: 2}, snapshot.Wide{Rune: 6, Cells: 0},
+		snapshot.Wide{Rune: 7, Cells: 2}, snapshot.Wide{Rune: 8, Cells: 0}, snapshot.Wide{Rune: 9, Cells: 0})
+	if got, want := s.Columns(0)[10], 6; got != want {
+		t.Errorf("x starts at column %d, want %d", got, want)
+	}
+	wantCursorAtLineEnd(t, s, 0)
+}
+
+// A full reset (RIS) keeps grapheme clustering on: it is the mode's default.
+func TestWidthsGraphemeClusteringSurvivesReset(t *testing.T) {
+	term := newTerminal(t, 20, 1)
+	write(t, term, "\x1b[?2027l\x1bc\U0001F44D\U0001F3FDx")
+
+	s := snap(t, term)
+	wantWidths(t, s, 0, snapshot.Wide{Rune: 0, Cells: 2}, snapshot.Wide{Rune: 1, Cells: 0})
 }
 
 func TestWidthsWideCharacterWrapsAtRightEdge(t *testing.T) {
