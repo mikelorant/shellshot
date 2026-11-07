@@ -113,7 +113,7 @@ A block is one step.
 | `env` | `KEY=VALUE`, repeatable | inherited | process |
 | `cwd` | path | current directory | process |
 | `seed` | integer, seeds `jitter` | 1 | process |
-| `output` | recording path (`-o` wins) | `recording.shot` | process |
+| `output` | recording path (`-o` wins) | `shellshot-YYYYMMDD-HHMMSS.shot`, never replacing a file | process |
 | `typing` | delay between typed characters | 50ms | behaviour |
 | `jitter` | `0%` to `100%` variation of `typing` | 0% | behaviour |
 | `timeout` | default for `wait` and `run` settling | 15s | behaviour |
