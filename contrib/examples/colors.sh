@@ -1,8 +1,8 @@
 #!/bin/sh
 # shellcheck disable=SC1091,SC2034
 # colors.sh: ANSI colours on a terminal: 16 colours, the 256-colour palette and
-# truecolour gradients. Safe: prints escape sequences only. See examples/README.md.
-#   sh examples/colors.sh [--force] [--pause]      EXAMPLES_SPEED=fast shortens the pauses
+# truecolour gradients. Safe: prints escape sequences only. See contrib/examples/README.md.
+#   sh contrib/examples/colors.sh [--force] [--pause]      EXAMPLES_SPEED=fast shortens the pauses
 
 case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 EX_NAME=${0##*/}

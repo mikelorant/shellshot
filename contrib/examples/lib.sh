@@ -2,7 +2,7 @@
 # lib.sh: shared helpers for the shellshot example scripts. Source it; do not run it.
 #
 # Every example starts with the same few lines (they find this file whether the
-# script is run as `sh examples/x.sh`, `sh /abs/path/x.sh` or `./x.sh`):
+# script is run as `sh contrib/examples/x.sh`, `sh /abs/path/x.sh` or `./x.sh`):
 #
 #   case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 #   EX_NAME=${0##*/}

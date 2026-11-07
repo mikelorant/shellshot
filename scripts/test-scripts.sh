@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs every examples/scripts/*.script through "record --script --list" and then
+# Runs every contrib/examples/scripts/*.script through "record --script --list" and then
 # for real, on its own pty, with a generous timeout. Checks: --list exits 0 and
 # writes nothing, the run exits 0, and the recording is complete.
 # Usage: scripts/test-scripts.sh [script...]   (run from the repo root, after make build)
@@ -13,7 +13,7 @@ LIMIT=${SCRIPT_TIMEOUT:-240}
 if [ "$#" -gt 0 ]; then
     SCRIPTS="$*"
 else
-    SCRIPTS=$(ls examples/scripts/*.script)
+    SCRIPTS=$(ls contrib/examples/scripts/*.script)
 fi
 
 TMP=$(mktemp -d) || exit 2

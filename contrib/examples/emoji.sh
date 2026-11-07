@@ -2,8 +2,8 @@
 # shellcheck disable=SC1091,SC2034
 # emoji.sh: emoji: single code points, text vs emoji presentation, skin tones,
 # ZWJ sequences (family, profession, flag), regional-indicator flags and keycaps.
-# Safe: prints text only. See examples/README.md.
-#   sh examples/emoji.sh [--force] [--pause]
+# Safe: prints text only. See contrib/examples/README.md.
+#   sh contrib/examples/emoji.sh [--force] [--pause]
 
 case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 EX_NAME=${0##*/}

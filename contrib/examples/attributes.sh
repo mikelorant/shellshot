@@ -2,8 +2,8 @@
 # shellcheck disable=SC1091,SC2034
 # attributes.sh: text attributes: bold, faint, italic, underline styles (single,
 # double, curly, dotted, dashed, coloured), strikethrough, overline, inverse,
-# hidden and blink. Safe: prints escape sequences only. See examples/README.md.
-#   sh examples/attributes.sh [--force] [--pause]
+# hidden and blink. Safe: prints escape sequences only. See contrib/examples/README.md.
+#   sh contrib/examples/attributes.sh [--force] [--pause]
 
 case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 EX_NAME=${0##*/}

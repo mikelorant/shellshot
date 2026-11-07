@@ -11,7 +11,7 @@ The Go binary links libghostty-vt through cgo. libghostty is built from the pinn
 | `make build` | `go build -o bin/shellshot ./cmd/shellshot` |
 | `make test` | `go test ./...` |
 | `make vet` | `go vet ./...` |
-| `make test-examples` | Runs every `examples/*.sh` under dash, bash, sh and zsh (takes a few minutes); it checks exit status, terminal restore and Ctrl-C handling |
+| `make test-examples` | Runs every `contrib/examples/*.sh` under dash, bash, sh and zsh (takes a few minutes); it checks exit status, terminal restore and Ctrl-C handling |
 | `make fmt` | `gofmt -w .` |
 | `make clean` | Removes `bin/` |
 | `make distclean` | Removes `bin/` and `build/`; run `make deps` again afterwards |

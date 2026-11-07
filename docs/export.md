@@ -73,7 +73,7 @@ coloured one-pixel strokes of terminal text.
   whole file is held in memory until the export ends.
 
 Measured on the 60x12 line-counting recording and the 80x30 emoji recording
-(`examples/emoji.sh`), same machine, same flags:
+(`contrib/examples/emoji.sh`), same machine, same flags:
 
 | Recording | `--scale` | APNG | WebP |
 |---|---|---|---|

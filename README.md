@@ -84,7 +84,7 @@ status        complete
 Every command has `--help`. Output formats (`--format`), themes, fonts, cell size and timing flags for `export` are in
 [docs/export.md](docs/export.md). The file format is in [docs/format.md](docs/format.md).
 
-[examples/](examples/) has safe demo scripts (colours, emoji, cursor, animations) to record;
+[contrib/examples/](contrib/examples/) has safe demo scripts (colours, emoji, cursor, animations) to record;
 `make examples` renders them all to `build/examples`.
 
 ## Script
@@ -119,7 +119,7 @@ scenes        1
 goes quiet exits 3 and keeps the partial recording; otherwise `record` exits with the shell's status,
 as without `--script`. Scenes and hidden blocks are stored in the file and used by
 `export`. The format and the exit codes are in [docs/scripting.md](docs/scripting.md);
-[examples/scripts/](examples/scripts/) has runnable samples (`make test-scripts`).
+[contrib/examples/scripts/](contrib/examples/scripts/) has runnable samples (`make test-scripts`).
 
 Not built yet: `fresh`, `cleanup`, `caption`, `require` and `export --scene`.
 

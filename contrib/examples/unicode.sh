@@ -1,8 +1,8 @@
 #!/bin/sh
 # shellcheck disable=SC1091,SC2034
 # unicode.sh: Unicode text: box drawing, block elements, braille, wide CJK
-# characters and combining marks. Safe: prints text only. See examples/README.md.
-#   sh examples/unicode.sh [--force] [--pause]
+# characters and combining marks. Safe: prints text only. See contrib/examples/README.md.
+#   sh contrib/examples/unicode.sh [--force] [--pause]
 
 case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 EX_NAME=${0##*/}

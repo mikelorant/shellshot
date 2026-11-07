@@ -2,8 +2,8 @@
 # shellcheck disable=SC1091,SC2034,SC1003
 # osc.sh: operating system commands: the window title (OSC 0 and 2) and clickable
 # hyperlinks (OSC 8). Only prints; the links are text and are never opened.
-# See examples/README.md.
-#   sh examples/osc.sh [--force] [--pause]
+# See contrib/examples/README.md.
+#   sh contrib/examples/osc.sh [--force] [--pause]
 
 case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 EX_NAME=${0##*/}

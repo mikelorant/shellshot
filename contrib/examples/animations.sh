@@ -2,8 +2,8 @@
 # shellcheck disable=SC1091,SC2034,SC2153
 # animations.sh: animation: a braille spinner, a gradient progress bar, scrolling
 # sparklines, falling "rain" and bouncing text, all redrawn in place with cursor
-# addressing. Safe: prints escape sequences only. See examples/README.md.
-#   sh examples/animations.sh [--force] [--pause]      about 12 s
+# addressing. Safe: prints escape sequences only. See contrib/examples/README.md.
+#   sh contrib/examples/animations.sh [--force] [--pause]      about 12 s
 
 case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 EX_NAME=${0##*/}

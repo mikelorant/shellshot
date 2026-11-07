@@ -2,8 +2,8 @@
 # shellcheck disable=SC1091,SC2034
 # buildlog.sh: a realistic but entirely fake build log: timestamps, coloured
 # levels, compile steps, a warning, a flaky test that is retried, and a summary.
-# Nothing is built or run; the clock is simulated. See examples/README.md.
-#   sh examples/buildlog.sh [--force] [--pause]      about 9 s
+# Nothing is built or run; the clock is simulated. See contrib/examples/README.md.
+#   sh contrib/examples/buildlog.sh [--force] [--pause]      about 9 s
 
 case $0 in */*) EX_DIR=${0%/*} ;; *) EX_DIR=. ;; esac
 EX_NAME=${0##*/}

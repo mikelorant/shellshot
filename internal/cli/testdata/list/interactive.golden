@@ -6,10 +6,10 @@ process
   output  interactive.shot
   seed    7
 estimate
-  total   18.073s to 2m34.107s, 3 waits, 3 scenes
+  total   18.409s to 2m34.731s, 3 waits, 3 scenes
   scene   #2 greet: 3.27s to 34.13s
   scene   #3 colours: 7.69s to 29.71s
-  scene   #4 tour: 5.803s to 1m10.177s
+  scene   #4 tour: 6.139s to 1m10.801s
 ops
    1  14:1    hidden           span-begin #1 hidden
    2  15:3    hidden           type "clear" typing=60ms jitter=30%
@@ -36,7 +36,7 @@ ops
   23  28:3    colours          linger 700ms
   24  29:1    colours          span-end #3
   25  31:1    tour             span-begin #4 scene "tour"
-  26  33:3    tour             type "sh examples/colors.sh" typing=30ms jitter=30%
+  26  33:3    tour             type "sh contrib/examples/colors.sh" typing=30ms jitter=30%
   27  33:3    tour             press enter after-gap typing=30ms jitter=30%
   28  33:3    tour             settle quiet=200ms timeout=15s (fails at timeout)
   29  33:3    tour             linger 700ms
@@ -44,7 +44,7 @@ ops
   31  34:3    tour             linger 700ms
   32  35:3    tour             press ctrl+l typing=30ms jitter=30%
   33  35:3    tour             linger 700ms
-  34  36:3    tour             type "sh examples/unicode.sh" typing=30ms jitter=30%
+  34  36:3    tour             type "sh contrib/examples/unicode.sh" typing=30ms jitter=30%
   35  36:3    tour             press enter after-gap typing=30ms jitter=30%
   36  36:3    tour             settle quiet=200ms timeout=15s (fails at timeout)
   37  36:3    tour             linger 700ms

@@ -6,13 +6,13 @@ terminal, fits 80x24, ends by itself and restores the terminal (cursor, alternat
 screen, scroll region, attributes) on exit, Ctrl-C or SIGTERM. They only print
 (plus `sleep`) and never write files, read input, or touch the network.
 
-Run one: `sh examples/colors.sh`. Options: `--force` (run even when stdout is not
+Run one: `sh contrib/examples/colors.sh`. Options: `--force` (run even when stdout is not
 a terminal), `--pause` (wait for Enter at the end), `--help`.
 `EXAMPLES_SPEED=fast` shortens every pause to a quarter.
 
 ## Record and export
 
-    shellshot record -o colors.shot --cols 80 --rows 24 -c ./examples/colors.sh
+    shellshot record -o colors.shot --cols 80 --rows 24 -c ./contrib/examples/colors.sh
     shellshot export colors.shot          # writes colors.png (animated PNG)
 
 `make examples` does this for every demo into `build/examples/` (fast speed).
