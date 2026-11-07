@@ -154,8 +154,7 @@ Run `make release-libs` once (and again after bumping the libghostty pin), then 
 `dist/` holds:
 
 - `shellshot_<version>_<os>_<arch>.tar.gz` for `darwin_amd64`, `darwin_arm64`, `linux_amd64` and
-  `linux_arm64`. Each contains `shellshot`, `README.md` and `NOTICE` (the repository has no
-  `LICENSE` file, so none is shipped);
+  `linux_arm64`. Each contains `shellshot`, `README.md`, `LICENSE` and `NOTICE`;
 - `checksum.txt` (sha256 of the four archives);
 - one directory per target with the bare binary (`dist/shellshot_linux_arm64_v8.0/shellshot`), plus
   goreleaser's `config.yaml`, `artifacts.json` and `metadata.json`.

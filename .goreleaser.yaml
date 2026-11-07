@@ -37,6 +37,7 @@ archives:
     name_template: "shellshot_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - README.md
+      - LICENSE
       - NOTICE
 
 checksum:
