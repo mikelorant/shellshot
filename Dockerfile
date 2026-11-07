@@ -69,11 +69,8 @@ LABEL org.opencontainers.image.title="shellshot" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
 
-# bash runs `record -c` and interactive sessions; less is for demos that page.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends less \
- && rm -rf /var/lib/apt/lists/* \
- && useradd --uid 1000 --create-home --shell /bin/bash shellshot \
+# bash comes with the base image; the binary only needs libc.
+RUN useradd --uid 1000 --create-home --shell /bin/bash shellshot \
  && install -d -o shellshot -g shellshot /work
 
 COPY --from=build /out/shellshot /usr/local/bin/shellshot
