@@ -1,0 +1,41 @@
+# Not runnable until `record --script` ships.
+# Types a few harmless commands at a prompt, the way a person would.
+# Planned use, from the repository root:
+#   shellshot record --script examples/scripts/interactive.script
+size 80x24
+shell /bin/sh
+env PS1="$ "
+cwd .
+typing 60ms
+jitter 30%
+seed 7
+linger 700ms
+output interactive.shot
+
+hidden {
+  run clear
+}
+
+scene greet {
+  run echo "hello from shellshot"
+  run date +%Y
+}
+
+scene colours {
+  run lines {
+    printf '\033[31mred\033[0m \033[32mgreen\033[0m \033[34mblue\033[0m\n'
+    printf '\033[1mbold\033[0m \033[4munderline\033[0m \033[3mitalic\033[0m\n'
+  }
+  wait "underline" 2s
+}
+
+scene tour {
+  typing 30ms
+  run sh examples/colors.sh
+  wait "truecolour" 20s
+  press ctrl+l
+  run sh examples/unicode.sh
+  wait idle 1s
+}
+
+mark end
