@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# GoReleaser v2 configuration. Builds macOS and Linux archives for amd64 and arm64 into dist/.
+#
+# Every target is cross-compiled with zig (zig cc / zig c++) against a per-target libghostty-vt
+# built beforehand by `make release-libs` (scripts/build-libghostty.sh <zig-target>) into
+# build/libghostty-<os>-<arch>. Linux targets pin glibc 2.28 so the binaries run on common distros.
+# macOS targets also need the macOS SDK (SDKROOT, from Xcode or the Command Line Tools), so build on a Mac.
+# Nothing is published and no secrets are needed: see docs/development.md, "Releases".
+version: 2
+
+project_name: shellshot
+
+builds:
+  - id: shellshot
+    main: ./cmd/shellshot
+    binary: shellshot
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      # -extldflags=-s also strips the C debug info from the Linux links (zig's lld keeps it otherwise).
+      - -s -w -X github.com/mikelorant/shellshot/internal/cli.Version={{ .Version }}{{ if eq .Os "linux" }} -extldflags=-s{{ end }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target {{ if eq .Arch "arm64" }}aarch64{{ else }}x86_64{{ end }}-{{ if eq .Os "linux" }}linux-gnu.2.28{{ else }}macos{{ end }}
+      - CXX=zig c++ -target {{ if eq .Arch "arm64" }}aarch64{{ else }}x86_64{{ end }}-{{ if eq .Os "linux" }}linux-gnu.2.28{{ else }}macos{{ end }}
+      # zig ships no libresolv for macOS, so the darwin links need the macOS SDK (make snapshot sets SDKROOT).
+      - CGO_LDFLAGS={{ if eq .Os "darwin" }}-L{{ envOrDefault "SDKROOT" "" }}/usr/lib{{ end }}
+      - PKG_CONFIG_PATH={{ .Env.PWD }}/build/libghostty-{{ .Os }}-{{ .Arch }}/lib/pkgconfig
+
+archives:
+  - id: shellshot
+    formats: [tar.gz]
+    name_template: "shellshot_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - NOTICE
+
+checksum:
+  name_template: checksum.txt
+  algorithm: sha256
+
+changelog:
+  disable: true
+
+release:
+  disable: true

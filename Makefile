@@ -1,7 +1,7 @@
 export PKG_CONFIG_PATH := $(CURDIR)/build/libghostty/lib/pkgconfig
 export CGO_ENABLED := 1
 
-.PHONY: deps build test vet fmt noto-asset emoji-asset examples showcase check-showcase test-examples test-scripts check-examples clean distclean
+.PHONY: deps build test vet fmt noto-asset emoji-asset examples showcase check-showcase test-examples test-scripts check-examples release-libs release-check snapshot clean distclean
 
 deps:
 	./scripts/build-libghostty.sh
@@ -68,8 +68,25 @@ emoji-asset:
 		--with uharfbuzz==0.57.0 --with imagequant==1.1.5 --with zstandard==0.25.0 \
 		python scripts/build-apple-emoji-asset.py
 
+# Release builds (see docs/development.md, "Releases"; needs goreleaser and zig 0.17).
+# Builds libghostty-vt for the four release targets into build/libghostty-<os>-<arch>, one zig
+# invocation per target (glibc 2.28 is the minimum for the Linux binaries).
+release-libs:
+	./scripts/build-libghostty.sh x86_64-linux-gnu.2.28
+	./scripts/build-libghostty.sh aarch64-linux-gnu.2.28
+	./scripts/build-libghostty.sh x86_64-macos
+	./scripts/build-libghostty.sh aarch64-macos
+
+release-check:
+	goreleaser check
+
+# Builds all four archives and checksum.txt into dist/ without a tag, network or publishing
+# (run `make release-libs` first).
+snapshot:
+	PWD="$(CURDIR)" SDKROOT="$${SDKROOT:-$$(xcrun --show-sdk-path 2>/dev/null)}" goreleaser release --snapshot --clean --skip=publish
+
 clean:
-	rm -rf bin
+	rm -rf bin dist
 
 # Also removes the libghostty build output (rebuild with `make deps`).
 distclean: clean

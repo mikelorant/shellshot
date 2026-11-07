@@ -3,3 +3,4 @@
 /.worktrees/
 *.shot
 !internal/recording/bin/testdata/*.shot
+/dist/
