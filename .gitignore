@@ -1,0 +1,4 @@
+/bin/
+/third_party/
+/.worktrees/
+*.shot
