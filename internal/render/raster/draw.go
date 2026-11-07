@@ -6,6 +6,7 @@ import (
 	xfont "golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 
+	"github.com/michaellorant/shellshot/internal/render/sprite"
 	"github.com/michaellorant/shellshot/internal/snapshot"
 )
 
@@ -95,13 +96,21 @@ func (r *Renderer) glyphAdvance(c cell) fixed.Int26_6 {
 	return fixed.I(r.metrics.CellWidth)
 }
 
-// drawGlyph draws c's glyph in its face and foreground. A wide rune draws its
+// drawGlyph draws c's glyph in its face and foreground, or procedurally via
+// the sprite package for box, block, braille and powerline runes. A wide rune draws its
 // glyph once at its first column. Font marks have zero advance and are
 // designed to be drawn at the pen position after their base glyph, so a
 // mark's origin is moved right by the base glyph's advance.
 func (r *Renderer) drawGlyph(img *image.RGBA, d *xfont.Drawer, c cell) {
 	if !hasInk(c.c) {
 		return
+	}
+	if !c.mark {
+		o := r.cellOrigin(c.col, c.row)
+		cellRect := image.Rect(o.X, o.Y, o.X+c.width*r.metrics.CellWidth, o.Y+r.metrics.CellHeight)
+		if sprite.Draw(img, c.c, cellRect, c.st.fg) {
+			return // procedurally drawn: box, block, braille, powerline
+		}
 	}
 	face := r.face(c.st)
 	if _, ok := face.GlyphAdvance(c.c); !ok {
