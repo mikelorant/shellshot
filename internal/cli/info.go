@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/michaellorant/shellshot/internal/recording/bin"
 	"github.com/michaellorant/shellshot/internal/recording/bin/event"
 	"github.com/michaellorant/shellshot/internal/recording/bin/head"
+	"github.com/michaellorant/shellshot/internal/recording/spans"
 )
 
 // newInfoCmd builds "shellshot info", which prints the header and statistics
@@ -25,6 +27,10 @@ func newInfoCmd() *cobra.Command {
 
 The file is scanned event by event but never replayed through a terminal, so
 this is fast even for large recordings.
+
+Recordings made from scripts also list their scenes (id, name, start, length,
+export hints; "(open)" for a scene that was never closed) and a summary of
+their hidden spans.
 
 The status line is one of:
   complete      the recording ends at a chunk boundary after the exit event
@@ -89,13 +95,13 @@ func runInfo(cmd *cobra.Command, path string) error {
 
 	var st recordingStats
 	var scanErr error
-	for {
+	tally := func() (bin.Event, error) {
 		ev, err := r.Next()
 		if err != nil {
 			if err != io.EOF {
 				scanErr = err
 			}
-			break
+			return ev, err
 		}
 		st.last = ev.At
 		st.payloadBytes += uint64(len(ev.Data))
@@ -106,6 +112,17 @@ func runInfo(cmd *cobra.Command, path string) error {
 		}
 		if ev.Kind == event.KindOut {
 			st.outBytes += uint64(len(ev.Data))
+		}
+		return ev, nil
+	}
+	found, spanErr := spans.Scan(tallySource(tally))
+	if errors.Is(spanErr, event.ErrMalformedSpan) {
+		// A bad SPAN payload ends the span list but not the statistics: keep
+		// counting events and report the spans found so far.
+		for {
+			if _, err := tally(); err != nil {
+				break
+			}
 		}
 	}
 
@@ -119,7 +136,7 @@ func runInfo(cmd *cobra.Command, path string) error {
 	case st.events[event.KindExit] == 0:
 		status = statusInterrupted
 	}
-	writeInfo(cmd.OutOrStdout(), path, r, st, fi.Size(), status)
+	writeInfo(cmd.OutOrStdout(), path, r, st, found, fi.Size(), status)
 	if scanErr != nil {
 		return fmt.Errorf("info: %s: %w", path, scanErr)
 	}
@@ -128,7 +145,7 @@ func runInfo(cmd *cobra.Command, path string) error {
 
 // writeInfo prints the report. The layout is fixed: one "label  value" line
 // per fact, labels padded to a common width.
-func writeInfo(w io.Writer, path string, r *bin.Reader, st recordingStats, fileBytes int64, status string) {
+func writeInfo(w io.Writer, path string, r *bin.Reader, st recordingStats, found []spans.Span, fileBytes int64, status string) {
 	h := r.Head()
 	line := func(label string, format string, args ...any) {
 		fmt.Fprintf(w, "%-14s%s\n", label, fmt.Sprintf(format, args...))
@@ -154,6 +171,7 @@ func writeInfo(w io.Writer, path string, r *bin.Reader, st recordingStats, fileB
 	line("  MARK", "%d", st.events[event.KindMark])
 	line("  EXIT", "%d", st.events[event.KindExit])
 	line("  other", "%d", st.otherEvents)
+	writeSpans(w, found)
 	line("out bytes", "%d", st.outBytes)
 	line("payload bytes", "%d", st.payloadBytes)
 	line("file bytes", "%d", fileBytes)
@@ -163,6 +181,75 @@ func writeInfo(w io.Writer, path string, r *bin.Reader, st recordingStats, fileB
 		line("file/payload", "-")
 	}
 	line("status", "%s", status)
+}
+
+// tallySource adapts a function to spans.Source.
+type tallySource func() (bin.Event, error)
+
+func (f tallySource) Next() (bin.Event, error) { return f() }
+
+// writeSpans prints the scenes and hidden spans of a recording; it prints
+// nothing when there are none.
+//
+//	scenes        2
+//	  1 install    0:02.3 +15.6s  speed 8x idle 2s hold 1s
+//	hidden        1 span, 4.4s
+func writeSpans(w io.Writer, found []spans.Span) {
+	var scenes []spans.Span
+	var hiddenN int
+	var hiddenTotal time.Duration
+	for _, s := range found {
+		switch s.Type {
+		case event.SpanScene:
+			scenes = append(scenes, s)
+		case event.SpanHidden:
+			hiddenN++
+			hiddenTotal += s.Duration()
+		}
+	}
+	if len(scenes) > 0 {
+		fmt.Fprintf(w, "%-14s%d\n", "scenes", len(scenes))
+		for _, s := range scenes {
+			text := fmt.Sprintf("  %d %s  %s +%s", s.ID, orDash(s.Name), clockText(s.Start), secondsText(s.Duration()))
+			if h := hintsText(s.Hints); h != "" {
+				text += "  " + h
+			}
+			if s.Open {
+				text += "  (open)"
+			}
+			fmt.Fprintln(w, text)
+		}
+	}
+	if hiddenN > 0 {
+		noun := "spans"
+		if hiddenN == 1 {
+			noun = "span"
+		}
+		fmt.Fprintf(w, "%-14s%d %s, %s\n", "hidden", hiddenN, noun, secondsText(hiddenTotal))
+	}
+}
+
+// clockText formats d as m:ss.t.
+func clockText(d time.Duration) string {
+	d = d.Round(100 * time.Millisecond)
+	return fmt.Sprintf("%d:%04.1f", int(d/time.Minute), (d % time.Minute).Seconds())
+}
+
+// secondsText formats d as seconds with one decimal.
+func secondsText(d time.Duration) string { return fmt.Sprintf("%.1fs", d.Seconds()) }
+
+func hintsText(h event.SpanHints) string {
+	var parts []string
+	if h.Speed != 0 {
+		parts = append(parts, "speed "+strconv.FormatFloat(float64(h.Speed)/1000, 'f', -1, 64)+"x")
+	}
+	if h.Idle != 0 {
+		parts = append(parts, "idle "+h.Idle.String())
+	}
+	if h.Hold != 0 {
+		parts = append(parts, "hold "+h.Hold.String())
+	}
+	return strings.Join(parts, " ")
 }
 
 func orDash(s string) string {

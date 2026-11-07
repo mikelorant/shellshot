@@ -366,6 +366,17 @@ func (w *Writer) Exit(at time.Duration, status int) error {
 	return w.WriteEvent(at, event.KindExit, event.NewExit(0, int64(status)).Data)
 }
 
+// Span records a span boundary (see event.KindSpan) at time at. It returns an
+// error wrapping event.ErrMalformedSpan if s fails Validate. Like every other
+// event it is ordered with the OUT events around it and never coalesced; a
+// pending coalesced OUT run is closed before it.
+func (w *Writer) Span(at time.Duration, s event.Span) error {
+	if err := s.Validate(); err != nil {
+		return err
+	}
+	return w.WriteEvent(at, event.KindSpan, event.AppendSpan(nil, s))
+}
+
 // Tick flushes the pending block if FlushInterval has elapsed between the
 // clock reading of its first event and now. The owner calls it from a timer; it
 // reads no clock itself. With nothing pending it does nothing and writes no

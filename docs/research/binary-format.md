@@ -278,7 +278,20 @@ Event kinds:
 | 3 | MARK | UTF-8 label |
 | 4 | EXIT | zigzag exit status (wait status) |
 | 5–63 | reserved, critical | reader fails with `ErrUnsupported` if encountered |
-| ≥ 64 | ancillary | reader surfaces them as `Kind(n)` raw events; exporters ignore |
+| 64 | SPAN | scene/hidden span boundary, versioned binary payload (below) |
+| ≥ 65 | ancillary | reader surfaces them as `Kind(n)` raw events; exporters ignore |
+
+Kind 64 and above are ancillary, so a reader that predates SPAN passes the events through unchanged.
+
+**SPAN payload** (kind 64; Go: `event.AppendSpan`, `event.ParseSpan`, `(*bin.Writer).Span`; rationale and rules in [script-scenes.md](script-scenes.md) §4). Integers are uvarints, strings are `uvarint len` + UTF-8:
+
+```
+END:    u8 version=1 | u8 op=2 | id
+BEGIN:  u8 version=1 | u8 op=1 | id | u8 type (1 scene, 2 hidden, 3 beat/reserved) | parent_id (0 none) |
+        name_len, name (<= 255 bytes) | n_hints (<= 64) | n_hints x { tag, len, value }
+```
+
+Hint tags: 1 speed (milli-x, 1..1 000 000), 2 idle (µs, <= 24 h), 3 hold (µs, <= 24 h), 4 caption (UTF-8, <= 255 bytes). Decoders skip unknown hint tags and ignore bytes after the last known field. An unknown version, op or type yields `event.ErrUnknownSpan` (the event is ignorable); a truncated or out-of-range payload yields `event.ErrMalformedSpan`. The writer does not flush on SPAN: it follows the normal size, interval and close policy, so a recorder killed between flushes loses the unflushed tail like any other event, and a span still open at the end of the readable events ends at the last event (`internal/recording/spans`).
 
 Rationale for columnar-within-block: the payload bytes form one contiguous text stream for the compressor, and the dt/kind/plen columns are tiny and highly repetitive. *Estimate, unmeasured:* columnar saves 5–15 % over interleaved. Appendix A includes a way to test this; if it saves under 5 % switch to interleaved for simplicity.
 

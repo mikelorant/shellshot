@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/michaellorant/shellshot/internal/recording/bin"
+	"github.com/michaellorant/shellshot/internal/recording/bin/event"
 	"github.com/michaellorant/shellshot/internal/recording/bin/head"
 )
 
@@ -299,5 +300,78 @@ func TestInfoErrors(t *testing.T) {
 	}
 	if code, _, stderr := runInfoCmd(t); code != 1 || !strings.Contains(stderr, "accepts 1 arg") {
 		t.Errorf("no argument: exit %d, stderr %q", code, stderr)
+	}
+}
+
+// spanFixture has two scenes, a hidden span inside the first and one at top
+// level, and a third scene that is never closed.
+func spanFixture(t *testing.T, exit bool) []byte {
+	return buildRecording(t, infoFixtureHead(), bin.WriterOptions{Uncompressed: true}, func(w *bin.Writer, _ *bytes.Buffer) {
+		scene := func(at time.Duration, id uint64, name string, h event.SpanHints) {
+			must(t, w.Span(at, event.Span{Op: event.SpanBegin, ID: id, Type: event.SpanScene, Name: name, Hints: h}))
+		}
+		hidden := func(at time.Duration, id, parent uint64) {
+			must(t, w.Span(at, event.Span{Op: event.SpanBegin, ID: id, Type: event.SpanHidden, Parent: parent}))
+		}
+		end := func(at time.Duration, id uint64) { must(t, w.Span(at, event.Span{Op: event.SpanEnd, ID: id})) }
+
+		hidden(0, 1, 0)
+		must(t, w.Output(500*time.Millisecond, []byte("setup")))
+		end(time.Second, 1)
+		scene(2300*time.Millisecond, 2, "install", event.SpanHints{Speed: 8000, Idle: 2 * time.Second, Hold: time.Second})
+		hidden(5*time.Second, 3, 2)
+		end(7*time.Second, 3)
+		end(17900*time.Millisecond, 2)
+		scene(65*time.Second, 4, "outro", event.SpanHints{Speed: 1500})
+		must(t, w.Output(70*time.Second, []byte("bye")))
+		if exit {
+			must(t, w.Exit(71*time.Second, 0))
+		}
+	})
+}
+
+func TestInfoListsSpansGolden(t *testing.T) {
+	path := writeFile(t, "spans.shot", spanFixture(t, false))
+	code, stdout, stderr := runInfoCmd(t, path)
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	stdout = strings.Replace(stdout, path, "FILE", 1)
+	want := `file          FILE
+size          80x24
+started       2025-01-02T03:04:05Z
+duration      1m10s
+recorder      shellshot 0.0.0-test
+engine        ghostty abc1234
+command       ls -l
+input         recorded
+blocks        1
+events        9
+  OUT         2
+  IN          0
+  RESIZE      0
+  MARK        0
+  EXIT        0
+  other       7
+scenes        2
+  2 install  0:02.3 +15.6s  speed 8x idle 2s hold 1s
+  4 outro  1:05.0 +5.0s  speed 1.5x  (open)
+hidden        2 spans, 3.0s
+out bytes     8
+payload bytes 75
+file bytes    228
+file/payload  3.04
+status        interrupted
+`
+	if stdout != want {
+		t.Errorf("info output:\n%s\nwant:\n%s", stdout, want)
+	}
+}
+
+func TestInfoWithoutSpansHasNoSpanLines(t *testing.T) {
+	data, _ := infoFixture(t)
+	_, stdout, _ := runInfoCmd(t, writeFile(t, "demo.shot", data))
+	if strings.Contains(stdout, "scenes") || strings.Contains(stdout, "hidden") {
+		t.Errorf("unexpected span lines:\n%s", stdout)
 	}
 }
