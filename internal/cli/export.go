@@ -53,6 +53,7 @@ type exportFlags struct {
 	// the --emoji-font file, empty for none.
 	emojiSet  string
 	emojiFont string
+	svg       svgFlags
 }
 
 // newExportCmd builds "shellshot export", which renders a recording as an
@@ -91,6 +92,7 @@ func newExportCmd() *cobra.Command {
 	fl.BoolVar(&f.showHidden, "show-hidden", false, "render hidden spans like the rest of the recording instead of cutting them")
 	fl.StringVar(&f.emojiSet, "emoji-set", emoji.SetApple.String(), "colour emoji artwork: apple or noto. apple draws Apple Color Emoji, whose artwork belongs to Apple Inc. and is not open source, and takes the few emoji it lacks from Noto. noto draws Noto Color Emoji only (SIL OFL 1.1): the licence-clean choice for exports you share")
 	fl.StringVar(&f.emojiFont, "emoji-font", "", "COLR v0 or CBDT/CBLC colour emoji font `file`, tried before the --emoji-set fonts for every emoji")
+	addSVGFlags(cmd, &f.svg)
 	return cmd
 }
 
@@ -220,6 +222,10 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
+	svgOpts, err := flags.svg.options(cmd, outFormat)
+	if err != nil {
+		return err
+	}
 	if output == "" {
 		output = defaultExportPath(input, outFormat)
 		if sameFile(input, output) {
@@ -274,12 +280,16 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 			MinDelay:  flags.minDelay,
 			Segments:  plan.Segments,
 		},
-		NewSink:  outFormat.New(format.Settings{Loops: flags.loops}),
 		Progress: func(_, total int) { steps = total },
 	}
-	size, err := writeFileAtomic(output, func(f *os.File) error {
+	write := func(f *os.File) error {
+		opts.NewSink = outFormat.New(format.Settings{Loops: flags.loops})
 		return pipeline.Export(cmd.Context(), fixedSize{src: it, cols: hdr.Cols, rows: hdr.Rows}, hdr.Cols, hdr.Rows, renderer, f, opts)
-	})
+	}
+	if outFormat.NewSteps != nil {
+		write = svgWriteFunc(cmd, outFormat, svgOpts, flags, renderer, fonts, fixedSize{src: it, cols: hdr.Cols, rows: hdr.Rows}, hdr.Cols, hdr.Rows, opts.Timeline, &steps)
+	}
+	size, err := writeFileAtomic(output, write)
 	if err != nil {
 		return err
 	}
