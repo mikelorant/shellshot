@@ -51,6 +51,25 @@ type Options struct {
 	Sleep func(ctx context.Context, d time.Duration) error
 }
 
+// Stats describes how a playback went. PlayWithStats fills it in whatever the
+// outcome.
+type Stats struct {
+	// Steps is the number of frames the timeline planned to show, and Shown
+	// how many of them were drawn.
+	Steps, Shown int
+	// Played is the wall time from the first frame to the end of playback, on
+	// the monotonic clock. Planned is the sum of the step delays (what
+	// playback takes at the chosen speed and idle limit), and Recorded is the
+	// time of the last frame in the recording.
+	Played, Planned, Recorded time.Duration
+	// IdleCapped is the number of pauses between frames that IdleLimit cut.
+	IdleCapped int
+	// Cropped reports that a frame was cut to fit Options.Cols x Rows.
+	Cropped bool
+	// Interrupted reports that ctx was done before playback ended.
+	Interrupted bool
+}
+
 // Play reads frames from src and writes each rendered frame to w, waiting
 // between frames for the difference in their At times, capped at IdleLimit and
 // divided by Speed (the timeline package applies this policy, as for export).
@@ -60,24 +79,40 @@ type Options struct {
 // recording is held in memory while it plays. It returns nil once src reports
 // io.EOF, and otherwise an error wrapping the cause (context, source or write
 // failure); frames read before a source failure are still played.
+//
+// With Options.Clear, Play leaves the terminal usable however playback ends,
+// including a cancelled ctx: see PlayWithStats.
 func Play(ctx context.Context, src Source, w io.Writer, opts Options) error {
+	_, err := PlayWithStats(ctx, src, w, opts)
+	return err
+}
+
+// PlayWithStats is Play that also returns how playback went. With Options.Clear
+// and at least one frame drawn, it ends by ending any synchronized update,
+// showing the cursor, resetting attributes and moving to a new line below the
+// last drawn row, so whatever is written next starts on a clear line. This
+// happens when playback is cancelled or fails as well as when it completes.
+func PlayWithStats(ctx context.Context, src Source, w io.Writer, opts Options) (stats Stats, err error) {
 	speed := opts.Speed
 	if speed == 0 {
 		speed = 1
 	}
 	if speed < 0 || math.IsNaN(speed) || math.IsInf(speed, 0) {
-		return fmt.Errorf("%w (got %v)", ErrInvalidSpeed, opts.Speed)
+		return stats, fmt.Errorf("%w (got %v)", ErrInvalidSpeed, opts.Speed)
 	}
 	sleep := opts.Sleep
 	if sleep == nil {
 		sleep = sleepTimer
 	}
+	defer func() {
+		stats.Interrupted = ctx.Err() != nil && errors.Is(err, ctx.Err())
+	}()
 
 	var frames []snapshot.Frame
 	var readErr error
 	for {
 		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("replay: %w", err)
+			return stats, fmt.Errorf("replay: %w", err)
 		}
 		f, err := src.Next()
 		if errors.Is(err, io.EOF) {
@@ -89,34 +124,70 @@ func Play(ctx context.Context, src Source, w io.Writer, opts Options) error {
 		}
 		frames = append(frames, f)
 	}
+	if n := len(frames); n > 0 {
+		stats.Recorded = frames[n-1].At
+	}
+	if opts.IdleLimit > 0 {
+		for i := 1; i < len(frames); i++ {
+			if frames[i].At-frames[i-1].At > opts.IdleLimit {
+				stats.IdleCapped++
+			}
+		}
+	}
 	steps, err := timeline.Build(frames, timeline.Options{
 		Speed:            speed,
 		IdleLimit:        opts.IdleLimit,
 		TrimLeadingBlank: opts.TrimLeadingBlank,
 	})
 	if err != nil {
-		return fmt.Errorf("replay: %w", err)
+		return stats, fmt.Errorf("replay: %w", err)
+	}
+	stats.Steps = len(steps)
+	for _, s := range steps {
+		stats.Planned += s.Delay
 	}
 
+	start := time.Now()
+	lastRows := 0 // rows of the last frame drawn
+	defer func() {
+		stats.Played = time.Since(start)
+		if opts.Clear && stats.Shown > 0 {
+			// Best effort: the writer may be what failed.
+			io.WriteString(w, restoreTerminal(lastRows))
+		}
+	}()
 	for _, s := range steps {
 		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("replay: %w", err)
+			return stats, fmt.Errorf("replay: %w", err)
 		}
 		snap := s.Snapshot
 		if opts.Clear {
-			snap = Crop(snap, opts.Cols, opts.Rows)
+			full := snap
+			snap = Crop(full, opts.Cols, opts.Rows)
+			if snap.Cols != full.Cols || len(snap.Lines) != len(full.Lines) {
+				stats.Cropped = true
+			}
 		}
 		// One write per frame, so the terminal receives it in one piece.
 		if _, err := io.WriteString(w, Render(snap, RenderOptions{Clear: opts.Clear, Color: opts.Color})); err != nil {
-			return fmt.Errorf("replay: write frame: %w", err)
+			return stats, fmt.Errorf("replay: write frame: %w", err)
 		}
+		stats.Shown++
+		lastRows = len(snap.Lines)
 		if s.Delay > 0 {
 			if err := sleep(ctx, s.Delay); err != nil {
-				return fmt.Errorf("replay: wait: %w", err)
+				return stats, fmt.Errorf("replay: wait: %w", err)
 			}
 		}
 	}
-	return readErr
+	return stats, readErr
+}
+
+// restoreTerminal returns the text that ends playback in place: it ends a
+// synchronized update, shows the cursor, resets attributes and moves to the
+// start of a new line below the last drawn row (rows rows from the top).
+func restoreTerminal(rows int) string {
+	return ansiSyncEnd + ansiShowCursor + ansiReset + fmt.Sprintf("\x1b[%d;1H\r\n", max(rows, 1))
 }
 
 // sleepTimer waits for d or until ctx is done.

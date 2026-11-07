@@ -324,7 +324,11 @@ The trim is the boolean timeline option `TrimLeadingBlank`; the command line set
 limit, applied before `--speed`) and `--keep-leading-blank`, and builds its waits with the same
 timeline code. A recording with a long pause, or a long wait before the first output, therefore
 replays with no wait longer than `--idle-limit` and starts at the first output. `replay` holds
-the whole recording in memory while it plays.
+the whole recording in memory while it plays. When it draws in place (stdout is a terminal, or
+`--clear`), it ends by showing the cursor, moving below the last frame and printing a summary to
+stderr: how it ended, frames shown, wall time played against time recorded (and saved), idle
+pauses capped, the crop, and the file. `-q`/`--quiet` suppresses it; a piped stdout gets none.
+Ctrl-C is a normal end: the summary says where it stopped, and the exit status is 130.
 
 ## Scenes and hidden spans
 

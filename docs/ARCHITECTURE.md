@@ -45,7 +45,7 @@ internal/session            pty + vt + sampler: emits frames and recording event
 internal/recording/bin      binary format: chunk, varint, codec, head, event; Writer and Reader
 internal/recording/spans    SPAN events -> scenes and hidden spans
 internal/recording/frames   recorded events -> snapshot frames through a vt.Factory
-internal/replay             plays frames to an io.Writer with timing (via export/timeline)
+internal/replay             plays frames to an io.Writer with timing (via export/timeline); returns Stats, restores the cursor
 internal/export/timeline    frames -> timed steps: idle cap, speed, hold, minimum delay, leading blank trim
 internal/export/spanplan    scenes and hidden spans -> timeline segments and forced frames (pure)
 internal/export/pipeline    timeline + raster: frames -> images for a sink; the sink interface and the PNG poster

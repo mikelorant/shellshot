@@ -1,10 +1,16 @@
 package replay_test
 
 import (
+	"context"
+	"errors"
+	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mikelorant/shellshot/internal/replay"
+	"github.com/mikelorant/shellshot/internal/snapshot"
+	"github.com/mikelorant/shellshot/internal/vt"
 	"github.com/mikelorant/shellshot/internal/vt/ghostty"
 )
 
@@ -61,4 +67,83 @@ func TestRenderClearReproducesScreenOnTerminal(t *testing.T) {
 			t.Errorf("%s: viewer shows\n%q\nwant\n%q\n(cursor got %+v want %+v)", st.name, got.Lines, want.Lines, got.Cursor, want.Cursor)
 		}
 	}
+}
+
+// TestPlayEndsWithUsableTerminal plays two frames with a hidden cursor onto a
+// libghostty terminal that already shows a prompt line above, cancelling
+// during the wait after the second, and checks the screen afterwards: the last
+// frame is intact, the cursor is visible on its own line below the frame and
+// there is room to print under it.
+func TestPlayEndsWithUsableTerminal(t *testing.T) {
+	const cols, rows = 20, 8
+	term, err := ghostty.New(cols, rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer term.Close()
+
+	frame := func(at time.Duration, lines ...string) snapshot.Frame {
+		return snapshot.Frame{At: at, Snapshot: snapshot.Snapshot{Cols: cols, Rows: len(lines), Lines: lines}}
+	}
+	src := &frameList{frames: []snapshot.Frame{frame(0, "one", "uno"), frame(time.Second, "two", "dos"), frame(2*time.Second, "three", "tres")}}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	waits := 0
+	_, err = replay.PlayWithStats(ctx, src, termWriter{t, term}, replay.Options{
+		Clear: true,
+		Sleep: func(ctx context.Context, _ time.Duration) error {
+			if waits++; waits == 2 {
+				cancel()
+				return ctx.Err()
+			}
+			return nil
+		},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Play() error = %v, want context.Canceled", err)
+	}
+	got, err := term.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Lines[0] != "two" || got.Lines[1] != "dos" {
+		t.Errorf("screen = %q, want the last drawn frame intact", got.Lines)
+	}
+	if !got.Cursor.Visible || got.Cursor.X != 0 || got.Cursor.Y != 2 {
+		t.Errorf("cursor = %+v, want it visible at the start of row 3, below the frame", got.Cursor)
+	}
+	// Room below: a summary line printed now lands under the frame.
+	if _, err := term.Write([]byte("summary")); err != nil {
+		t.Fatal(err)
+	}
+	if got, err = term.Snapshot(); err != nil {
+		t.Fatal(err)
+	}
+	if got.Lines[0] != "two" || got.Lines[1] != "dos" || got.Lines[2] != "summary" {
+		t.Errorf("screen after the summary = %q, want it under the frame", got.Lines)
+	}
+}
+
+type frameList struct{ frames []snapshot.Frame }
+
+func (l *frameList) Next() (snapshot.Frame, error) {
+	if len(l.frames) == 0 {
+		return snapshot.Frame{}, io.EOF
+	}
+	f := l.frames[0]
+	l.frames = l.frames[1:]
+	return f, nil
+}
+
+// termWriter feeds everything written to a terminal.
+type termWriter struct {
+	t    *testing.T
+	term vt.Terminal
+}
+
+func (w termWriter) Write(p []byte) (int, error) {
+	if _, err := w.term.Write(p); err != nil {
+		w.t.Fatal(err)
+	}
+	return len(p), nil
 }
