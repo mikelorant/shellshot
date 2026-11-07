@@ -11,7 +11,10 @@ import (
 //
 //   - run, type: one KindText (the rest of the line, trimmed, literal: "#" and
 //     "\" are ordinary characters) or, when the text starts with a double
-//     quote, one KindString and an optional comment.
+//     quote, one KindString and an optional comment. If the rest of the line
+//     is exactly a text-block header ("lines {" or "paragraphs {", then an
+//     optional comment), a single KindTextBlock covers the whole block
+//     (textblock.go) and nothing inside it is scanned.
 //   - wait: the first argument is a KindString (starts with a double quote), a
 //     KindRegex (starts with "/") or a plain word such as "idle"; later
 //     arguments are plain words and strings. Only wait scans a regex.
@@ -252,6 +255,10 @@ func (sc *lineScan) scanText(keyword string) {
 		return
 	}
 	text := strings.TrimRight(sc.s[sc.i:], " \t")
+	if shape, ok := textBlockHeader(text); ok {
+		sc.scanTextBlock(keyword, shape)
+		return
+	}
 	sc.emit(KindText, sc.i, text)
 	sc.i = len(sc.s)
 }

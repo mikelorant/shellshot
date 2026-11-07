@@ -45,6 +45,10 @@ const (
 	KindRegex
 	// KindText is the rest-of-line text of "run" or "type": trimmed, literal.
 	KindText
+	// KindTextBlock is a whole text block, header to closing line, as one
+	// token (textblock.go). Pos is the position of the shape word ("lines" or
+	// "paragraphs"), Text is the shape, and Block holds the raw body.
+	KindTextBlock
 	// KindAssign is the "=" of "env KEY=VALUE".
 	KindAssign
 	// KindLBrace is "{" as a word of a "scene" or "hidden" header.
@@ -54,17 +58,18 @@ const (
 )
 
 var kindNames = [...]string{
-	KindIllegal: "ILLEGAL",
-	KindEOF:     "EOF",
-	KindNewline: "NEWLINE",
-	KindComment: "COMMENT",
-	KindWord:    "WORD",
-	KindString:  "STRING",
-	KindRegex:   "REGEX",
-	KindText:    "TEXT",
-	KindAssign:  "ASSIGN",
-	KindLBrace:  "LBRACE",
-	KindRBrace:  "RBRACE",
+	KindIllegal:   "ILLEGAL",
+	KindEOF:       "EOF",
+	KindNewline:   "NEWLINE",
+	KindComment:   "COMMENT",
+	KindWord:      "WORD",
+	KindString:    "STRING",
+	KindRegex:     "REGEX",
+	KindText:      "TEXT",
+	KindTextBlock: "TEXTBLOCK",
+	KindAssign:    "ASSIGN",
+	KindLBrace:    "LBRACE",
+	KindRBrace:    "RBRACE",
 }
 
 func (k Kind) String() string {
@@ -76,7 +81,8 @@ func (k Kind) String() string {
 
 // Token is one lexeme with its start position.
 type Token struct {
-	Kind Kind
-	Pos  Pos
-	Text string
+	Kind  Kind
+	Pos   Pos
+	Text  string
+	Block *TextBlock // KindTextBlock only
 }
