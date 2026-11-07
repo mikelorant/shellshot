@@ -16,6 +16,7 @@ type cellStyle struct {
 	bold, italic bool
 	underline    bool
 	strike       bool
+	hidden       bool // invisible: draws no glyph
 }
 
 // resolveCellStyle maps a snapshot style to a cellStyle.
@@ -28,6 +29,7 @@ func (r *Renderer) resolveCellStyle(st snapshot.Style) cellStyle {
 		italic:    st.Attrs&snapshot.Italic != 0,
 		underline: st.Attrs&snapshot.Underline != 0,
 		strike:    st.Attrs&snapshot.Strike != 0,
+		hidden:    st.Attrs&snapshot.Invisible != 0,
 	}
 }
 

@@ -10,17 +10,24 @@ import (
 	"github.com/michaellorant/shellshot/internal/snapshot"
 )
 
-// cell is one rune of a line placed on the grid with its final style. A
-// zero-width rune (mark) shares the column and width of the rune before it.
+// cell is one grapheme cluster of a line placed on the grid with its final
+// style: the base rune that takes the cell's width, and the zero-width runes
+// that follow it in the same cell (combining marks, variation selectors,
+// joiners and the runes they join, skin tones, keycap and tag runes).
 type cell struct {
-	c        rune
+	c        rune   // base rune
+	marks    []rune // zero-width runes after c, in the same cell
 	row, col int
 	width    int // cells covered, clipped to the screen
 	st       cellStyle
-	mark     bool
-	// advance is the pen advance of the glyph that anchors this cell: its
-	// own for a normal rune, the base rune's for a mark.
+	// advance is the pen advance of the base glyph: where font marks
+	// (zero advance) are drawn after it.
 	advance fixed.Int26_6
+}
+
+// cluster returns the whole grapheme cluster of c as a string.
+func (c cell) cluster() string {
+	return string(c.c) + string(c.marks)
 }
 
 // fallback draws c with a fallback font when the primary face lacks its
@@ -62,7 +69,7 @@ func (r *Renderer) fallback(img *image.RGBA, c cell) bool {
 func (r *Renderer) drawLine(img *image.RGBA, s snapshot.Snapshot, row int, cur cursorBox) {
 	cells := r.rowCells(s, row, cur)
 	for _, c := range cells {
-		if !c.mark && c.st.bg != r.theme.Background {
+		if c.st.bg != r.theme.Background {
 			o := r.cellOrigin(c.col, c.row)
 			fillRect(img, image.Rect(o.X, o.Y, o.X+c.width*r.metrics.CellWidth, o.Y+r.metrics.CellHeight), c.st.bg)
 		}
@@ -70,41 +77,44 @@ func (r *Renderer) drawLine(img *image.RGBA, s snapshot.Snapshot, row int, cur c
 	d := &xfont.Drawer{Dst: img}
 	for _, c := range cells {
 		r.drawGlyph(img, d, c)
-		if !c.mark {
-			r.drawDecorations(img, c)
-		}
+		r.drawDecorations(img, c)
 	}
 }
 
-// rowCells places the runes of s.Lines[row] on the grid, resolving each
-// rune's span style (spans index runes; columns come from s.Columns) and
-// applying the block cursor. Runes starting at or beyond the last column are
-// dropped.
+// rowCells places the grapheme clusters of s.Lines[row] on the grid,
+// resolving each cluster's span style (spans index runes; columns come from
+// s.Columns) and applying the block cursor. A zero-width rune joins the
+// cluster before it (a leading one starts a cluster of its own). Clusters
+// starting at or beyond the last column are dropped.
 func (r *Renderer) rowCells(s snapshot.Snapshot, row int, cur cursorBox) []cell {
 	cols := s.Columns(row)
 	walk := spanWalker{spans: spansOf(s, row)}
 	cells := make([]cell, 0, len(cols)+1)
-	base := cell{width: 1}
-	covered := false // whether a cell sits under the block cursor
-	i := 0
+	dropped := false // whether the current cluster starts off screen
+	i := -1          // rune index
 	for _, c := range s.Lines[row] {
-		cl := cell{c: c, row: row, col: cols[i], width: s.CellWidth(row, i), st: r.resolveCellStyle(walk.at(i))}
 		i++
-		if cl.mark = cl.width == 0; cl.mark {
-			cl.col, cl.width, cl.advance = base.col, base.width, base.advance
-		} else {
-			cl.width = min(cl.width, s.Cols-cl.col)
-			cl.advance = r.glyphAdvance(cl)
-			base = cl
-		}
-		if cl.col >= s.Cols {
+		w := s.CellWidth(row, i)
+		if w == 0 && len(cells) > 0 {
+			if !dropped {
+				cells[len(cells)-1].marks = append(cells[len(cells)-1].marks, c)
+			}
 			continue
 		}
-		if r.blockCursorAt(cur, row, cl.col) {
-			cl.st.fg, cl.st.bg = r.theme.Background, r.theme.Cursor
+		cl := cell{c: c, row: row, col: cols[i], width: max(w, 1), st: r.resolveCellStyle(walk.at(i))}
+		cl.width = min(cl.width, s.Cols-cl.col)
+		if dropped = cl.col >= s.Cols; dropped {
+			continue
+		}
+		cl.advance = r.glyphAdvance(cl)
+		cells = append(cells, cl)
+	}
+	covered := false // whether a cell sits under the block cursor
+	for i := range cells {
+		if r.blockCursorAt(cur, row, cells[i].col) {
+			cells[i].st.fg, cells[i].st.bg = r.theme.Background, r.theme.Cursor
 			covered = true
 		}
-		cells = append(cells, cl)
 	}
 	if r.blockCursorAt(cur, row, cur.col) && !covered {
 		st := cellStyle{fg: r.theme.Background, bg: r.theme.Cursor}
@@ -122,34 +132,66 @@ func (r *Renderer) glyphAdvance(c cell) fixed.Int26_6 {
 	return fixed.I(r.metrics.CellWidth)
 }
 
-// drawGlyph draws c's glyph in its face and foreground, or procedurally via
-// the sprite package for box, block, braille and powerline runes. A wide rune draws its
-// glyph once at its first column. Font marks have zero advance and are
-// designed to be drawn at the pen position after their base glyph, so a
-// mark's origin is moved right by the base glyph's advance.
+// drawGlyph draws c: procedurally via the sprite package for box, block,
+// braille and powerline runes, as a colour emoji for an emoji sequence, and
+// otherwise as font glyphs in the face and foreground of c. A wide cluster
+// draws its glyph once, at its first column. Font marks have zero advance
+// and are designed to be drawn at the pen position after their base glyph,
+// so a mark's origin is moved right by the base glyph's advance.
+//
+// Fonts are tried in this order: sprites; for a sequence that asks for emoji
+// presentation (see emojiSequence) the colour emoji font; the primary face;
+// the fallback chain (see fallback); and finally, for a base rune no text
+// font has, the colour emoji font.
 func (r *Renderer) drawGlyph(img *image.RGBA, d *xfont.Drawer, c cell) {
-	if !hasInk(c.c) {
+	if c.st.hidden {
 		return
 	}
-	if !c.mark {
+	if len(c.marks) == 0 && hasInk(c.c) {
 		o := r.cellOrigin(c.col, c.row)
 		cellRect := image.Rect(o.X, o.Y, o.X+c.width*r.metrics.CellWidth, o.Y+r.metrics.CellHeight)
 		if sprite.Draw(img, c.c, cellRect, c.st.fg) {
 			return // procedurally drawn: box, block, braille, powerline
 		}
 	}
+	if emojiSequence(c) && r.drawEmoji(img, c) {
+		return
+	}
+	if hasInk(c.c) {
+		if _, ok := r.face(c.st).GlyphAdvance(c.c); ok {
+			d.Face = r.face(c.st)
+			d.Src = image.NewUniform(c.st.fg)
+			d.Dot = r.baselineDot(c.col, c.row)
+			d.DrawString(string(c.c))
+		} else if !r.fallback(img, c) && !r.drawEmoji(img, c) {
+			return // no font has the base rune: leave the cell blank
+		}
+	}
+	for _, m := range c.marks {
+		r.drawMark(img, d, c, m)
+	}
+}
+
+// drawMark draws the zero-width rune m of cluster c at the pen position after
+// the base glyph, or through the fallback chain if the primary face lacks it.
+// Runes that only steer shaping (variation selectors, joiners, tags) have no
+// glyph of their own and are skipped.
+func (r *Renderer) drawMark(img *image.RGBA, d *xfont.Drawer, c cell, m rune) {
+	if !hasInk(m) || isFormatRune(m) {
+		return
+	}
 	face := r.face(c.st)
-	if _, ok := face.GlyphAdvance(c.c); !ok {
-		r.fallback(img, c) // the primary face lacks c: try the fallback fonts
+	if _, ok := face.GlyphAdvance(m); !ok {
+		mc := c
+		mc.c, mc.marks = m, nil
+		r.fallback(img, mc)
 		return
 	}
 	d.Face = face
 	d.Src = image.NewUniform(c.st.fg)
 	d.Dot = r.baselineDot(c.col, c.row)
-	if c.mark {
-		d.Dot.X += c.advance
-	}
-	d.DrawString(string(c.c))
+	d.Dot.X += c.advance
+	d.DrawString(string(m))
 }
 
 // spansOf returns row's spans, treating a missing row as unstyled.

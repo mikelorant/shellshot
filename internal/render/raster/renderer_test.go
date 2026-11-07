@@ -194,7 +194,7 @@ func TestRenderZeroWidthRuneOverlaysPreviousCell(t *testing.T) {
 
 func TestRenderMissingGlyphDrawsNothing(t *testing.T) {
 	r, _ := newTestRenderer(t, Options{})
-	img, err := r.Render(plainSnapshot(3, "\U0001F600"))
+	img, err := r.Render(plainSnapshot(3, "\U0010FFFE"))
 	if err != nil {
 		t.Fatal(err)
 	}
