@@ -2,6 +2,7 @@ package font
 
 import (
 	"bytes"
+	"encoding/binary"
 	"image"
 	"image/color"
 	"image/draw"
@@ -215,10 +216,28 @@ func TestFaceForStyledRequestUsesRegularSymbols(t *testing.T) {
 
 func TestFaceForMissingEverywhere(t *testing.T) {
 	s := mustDefault(t)
-	for _, r := range []rune{'世', 0x10FFFE} {
+	for _, r := range []rune{0x10FFFE, 0x1F600} {
 		face, ok, err := s.FaceFor(r, false, false, 14)
 		if err != nil || ok || face != nil {
 			t.Errorf("FaceFor(%U) = %v, %v, %v; want nil, false, nil", r, face, ok, err)
+		}
+	}
+}
+
+// The embedded CJK subset covers hanzi, Hangul, kana and CJK punctuation.
+func TestFaceForCJKFallsBack(t *testing.T) {
+	s := mustDefault(t)
+	for _, r := range []rune{'世', '界', '한', '글', 'こ', 'ん', 'カ', '、', '，'} {
+		if s.HasGlyph(r) {
+			t.Errorf("primary HasGlyph(%U) = true, want false", r)
+		}
+		face, ok, err := s.FaceFor(r, false, false, 14)
+		if err != nil || !ok {
+			t.Errorf("FaceFor(%U) = ok %v, err %v; want the CJK face", r, ok, err)
+			continue
+		}
+		if _, ok := face.GlyphAdvance(r); !ok {
+			t.Errorf("CJK face for %U has no glyph", r)
 		}
 	}
 }
@@ -269,6 +288,97 @@ func TestLoadFallbackGarbageAndChain(t *testing.T) {
 	}
 	if _, ok, _ := s.FaceFor(0xF015, false, false, 14); !ok {
 		t.Error("second fallback not consulted")
+	}
+}
+
+// The first font in the chain that has a rune draws it.
+func TestFallbackChainOrder(t *testing.T) {
+	g := jetBrainsMonoRegular
+	// The symbols font as primary lacks 'A'; both fallbacks have it.
+	s, err := Load(symbolsNerdFontMono, symbolsNerdFontMono, symbolsNerdFontMono, symbolsNerdFontMono,
+		FallbackFont{Name: "regular", Data: g}, FallbackFont{Name: "bold", Data: jetBrainsMonoBold})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := s.fontIndexFor('A', false, false); got != int(styleCount) {
+		t.Fatalf("fontIndexFor('A') = %d, want the first fallback %d", got, styleCount)
+	}
+	first, _, _ := s.FaceFor('A', false, false, 14)
+	want, _ := s.face(int(styleCount), 14)
+	if first != want {
+		t.Error("FaceFor('A') did not return the first fallback's face")
+	}
+}
+
+// User fonts come after the embedded fonts, so they never change glyphs the
+// embedded chain already draws, but they supply what it lacks.
+func TestDefaultExtraFontsFollowEmbeddedChain(t *testing.T) {
+	// The Twemoji font maps U+1F600 to an (outline-less) glyph, so it stands
+	// in for a user font that has a rune nothing else has.
+	s, err := Default(FallbackFont{Name: "user", Data: twemojiMozilla})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const embedded = 2 // Nerd symbols, CJK subset
+	if got := s.fontIndexFor(0xF015, false, false); got != int(styleCount) {
+		t.Errorf("Nerd icon from font %d, want the embedded symbols font %d", got, styleCount)
+	}
+	if got := s.fontIndexFor('世', false, false); got != int(styleCount)+1 {
+		t.Errorf("hanzi from font %d, want the embedded CJK font %d", got, styleCount+1)
+	}
+	if got := s.fontIndexFor(0x1F600, false, false); got != int(styleCount)+embedded {
+		t.Errorf("rune only the user font has from font %d, want %d", got, int(styleCount)+embedded)
+	}
+}
+
+// A TrueType collection is accepted as a fallback; its first font is used.
+func TestLoadFallbackCollection(t *testing.T) {
+	g := jetBrainsMonoRegular
+	s, err := Load(g, g, g, g, FallbackFont{Name: "ttc", Data: wrapInCollection(t, notoSansMonoCJK)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := s.FaceFor('世', false, false, 14); !ok {
+		t.Error("collection member not consulted")
+	}
+}
+
+// wrapInCollection returns a one-font TTC containing font.
+func wrapInCollection(t *testing.T, font []byte) []byte {
+	t.Helper()
+	const header = 16 // "ttcf", version 1.0, numFonts 1, offset of font 0
+	out := append(make([]byte, header), font...)
+	copy(out, "ttcf")
+	binary.BigEndian.PutUint32(out[4:], 0x00010000)
+	binary.BigEndian.PutUint32(out[8:], 1)
+	binary.BigEndian.PutUint32(out[12:], header)
+	// Table offsets in a collection are relative to the start of the file.
+	numTables := int(binary.BigEndian.Uint16(out[header+4:]))
+	for i := range numTables {
+		off := header + 12 + 16*i + 8
+		binary.BigEndian.PutUint32(out[off:], binary.BigEndian.Uint32(out[off:])+header)
+	}
+	return out
+}
+
+func TestEmoji(t *testing.T) {
+	s := mustDefault(t)
+	for _, c := range []string{"\U0001F600", "\U0001F468\u200d\U0001F469\u200d\U0001F467", "\U0001F1E6\U0001F1FA", "1\ufe0f\u20e3"} {
+		img, ok := s.Emoji(c, 32)
+		if !ok || img.Bounds().Dx() != 32 || img.Bounds().Dy() != 32 {
+			t.Errorf("Emoji(%q, 32) = %v, ok %v; want a 32x32 image", c, img != nil, ok)
+		}
+	}
+	if _, ok := s.Emoji("世", 32); ok {
+		t.Error("Emoji drew a hanzi")
+	}
+}
+
+func TestEmojiAbsentWithLoad(t *testing.T) {
+	g := jetBrainsMonoRegular
+	s, _ := Load(g, g, g, g)
+	if _, ok := s.Emoji("\U0001F600", 32); ok {
+		t.Error("Load set has colour emoji")
 	}
 }
 

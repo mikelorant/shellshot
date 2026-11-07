@@ -145,13 +145,13 @@ func TestRenderHello(t *testing.T) {
 
 func TestRenderWideRunePositioning(t *testing.T) {
 	r, _ := newTestRenderer(t, Options{})
-	s := plainSnapshot(6, "世a")
+	s := plainSnapshot(6, "\U0010FFFEa")
 	s.Widths = [][]snapshot.Wide{{{Rune: 0, Cells: 2}}}
 	img, err := r.Render(s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The embedded font has no CJK glyph, so the wide rune draws nothing and
+	// No embedded font has a glyph for U+10FFFE, so the wide rune draws nothing and
 	// the only ink is the 'a', which must start at column 2.
 	for _, col := range []int{0, 1, 3, 4, 5} {
 		if n := inkInCell(r, img, col, 0); n != 0 {
@@ -163,7 +163,7 @@ func TestRenderWideRunePositioning(t *testing.T) {
 	}
 
 	// Same screen without width info puts the 'a' in column 1.
-	img, err = r.Render(plainSnapshot(6, "世a"))
+	img, err = r.Render(plainSnapshot(6, "\U0010FFFEa"))
 	if err != nil {
 		t.Fatal(err)
 	}
