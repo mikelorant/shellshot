@@ -14,7 +14,7 @@ import (
 // Run executes the shellshot CLI with args (excluding the program name),
 // writing normal output to stdout and errors to stderr. It returns the
 // process exit code: 0 on success, 1 on any error, or the exit status of the
-// command that snap or record ran (see ExitError).
+// command that record ran (see ExitError).
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	return runWithStdin(ctx, args, os.Stdin, stdout, stderr)
 }
@@ -50,7 +50,6 @@ func newRootCmd() *cobra.Command {
 		newExportCmd(),
 		newRecordCmd(),
 		newReplayCmd(),
-		newSnapCmd(),
 		newVersionCmd(),
 	)
 	return root

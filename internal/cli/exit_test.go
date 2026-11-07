@@ -21,39 +21,12 @@ func TestExitErrorMessageAndAs(t *testing.T) {
 	}
 }
 
-func TestSnapPropagatesChildExitStatus(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	args := []string{"snap", "--cols", "40", "--rows", "5", "--", "sh", "-c", "echo before; exit 3"}
-	if code := Run(context.Background(), args, &stdout, &stderr); code != 3 {
-		t.Fatalf("exit code = %d, want 3 (stderr %q)", code, stderr.String())
-	}
-	if want := "before\n"; stdout.String() != want {
-		t.Errorf("stdout = %q, want %q", stdout.String(), want)
-	}
-	if want := "shellshot: command exited with 3\n"; stderr.String() != want {
-		t.Errorf("stderr = %q, want only %q", stderr.String(), want)
-	}
-}
-
-func TestSnapIgnoreExitStatusExitsZero(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	args := []string{"snap", "--ignore-exit-status", "--cols", "40", "--rows", "5", "--", "sh", "-c", "echo before; exit 3"}
-	if code := Run(context.Background(), args, &stdout, &stderr); code != 0 {
-		t.Fatalf("exit code = %d, want 0 (stderr %q)", code, stderr.String())
-	}
-	if want := "before\n"; stdout.String() != want {
-		t.Errorf("stdout = %q, want %q", stdout.String(), want)
-	}
-	if !strings.Contains(stderr.String(), "command exited with 3") {
-		t.Errorf("stderr = %q, want the exit note", stderr.String())
-	}
-}
-
-func TestSnapPassesThroughSignalExitCode(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	args := []string{"snap", "--cols", "40", "--rows", "5", "--", "sh", "-c", "kill -TERM $$"}
-	if code := Run(context.Background(), args, &stdout, &stderr); code != 128+15 {
-		t.Fatalf("exit code = %d, want 143 (stderr %q)", code, stderr.String())
+func TestRecordPassesThroughSignalExitCode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "signal.shot")
+	args := []string{"record", "-o", path, "--cols", "40", "--rows", "5", "-c", "kill -TERM $$"}
+	code, _, stderr := runRecordWithTimeout(t, args, "")
+	if code != 128+15 {
+		t.Fatalf("exit code = %d, want 143 (stderr %q)", code, stderr)
 	}
 }
 

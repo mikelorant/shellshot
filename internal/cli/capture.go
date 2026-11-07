@@ -18,7 +18,7 @@ import (
 const eot = 0x04
 
 // captureOptions describes one command run that is sampled into frames. It is
-// shared by the commands that run a program (snap, record).
+// used by record.
 type captureOptions struct {
 	Cols, Rows int
 	Interval   time.Duration
@@ -35,18 +35,12 @@ type captureOptions struct {
 }
 
 // addCaptureFlags registers --cols, --rows and --interval on cmd, binding
-// them to o, with the default session size. Flag parsing stops at the first
-// positional argument, so the child's own flags (as in "shellshot snap -- ls
-// -l") are never interpreted by shellshot. The caller decides how many
-// positional arguments are required and must set o.Command from them in its
-// RunE.
-func addCaptureFlags(cmd *cobra.Command, o *captureOptions) {
-	addCaptureFlagsWithSize(cmd, o, session.DefaultCols, session.DefaultRows)
-}
-
-// addCaptureFlagsWithSize is addCaptureFlags with explicit --cols and --rows
-// defaults.
-func addCaptureFlagsWithSize(cmd *cobra.Command, o *captureOptions, cols, rows int) {
+// them to o, with explicit --cols and --rows defaults. Flag parsing stops at
+// the first positional argument, so the child's own flags (as in "shellshot
+// record -- ls -l") are never interpreted by shellshot. The caller decides how
+// many positional arguments are required and must set o.Command from them in
+// its RunE.
+func addCaptureFlags(cmd *cobra.Command, o *captureOptions, cols, rows int) {
 	cmd.Flags().SetInterspersed(false)
 	cmd.Flags().IntVar(&o.Cols, "cols", cols, "terminal width in cells")
 	cmd.Flags().IntVar(&o.Rows, "rows", rows, "terminal height in cells")

@@ -8,7 +8,7 @@ import (
 )
 
 // ExitError asks Run to exit with Code, the exit status of the command that
-// snap or record ran. A command returns it only after its normal output has
+// record ran. A command returns it only after its normal output has
 // been written. Run does not print it as an error.
 type ExitError struct {
 	Code int
