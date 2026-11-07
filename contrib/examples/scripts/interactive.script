@@ -11,7 +11,7 @@ seed 7
 linger 700ms
 output interactive.shot
 
-hidden {
+hidden setup {
   run clear
 }
 
