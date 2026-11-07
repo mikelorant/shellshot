@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	github.com/creack/pty v1.1.24
+	github.com/kettek/apng v0.0.0-20250827064933-2bb5f5fcf253
 	github.com/spf13/cobra v1.10.2
 	go.mitchellh.com/libghostty v0.0.0-20261106041537-e247028bdf51
 	golang.org/x/term v0.47.0
