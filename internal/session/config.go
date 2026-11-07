@@ -1,16 +1,23 @@
 package session
 
 import (
+	"errors"
 	"io"
 	"time"
 )
 
 // Defaults applied by Config for zero values.
 const (
-	DefaultInterval = 100 * time.Millisecond
-	DefaultCols     = 80
-	DefaultRows     = 24
+	DefaultFPS  = 60
+	DefaultCols = 80
+	DefaultRows = 24
 )
+
+// MaxFPS is the highest accepted sampling rate.
+const MaxFPS = 1000
+
+// ErrFPS is returned by Run when Config.FPS is above MaxFPS.
+var ErrFPS = errors.New("session: fps out of range")
 
 // Process is the running child program as seen by a session. It is satisfied
 // by *pty.Process; it is declared here so session does not import pty (or cgo)
@@ -34,8 +41,11 @@ type Ticker func(d time.Duration) (ticks <-chan time.Time, stop func())
 
 // Config controls a session. The zero value is usable.
 type Config struct {
-	// Interval is the sampling period. Zero or negative means DefaultInterval.
-	Interval time.Duration
+	// FPS is the screen sampling rate in frames per second. Zero or negative
+	// means DefaultFPS; above MaxFPS Run fails with ErrFPS. The screen is only
+	// snapshotted on a tick at which output arrived since the previous
+	// snapshot, so a high rate costs nothing while the program is idle.
+	FPS int
 	// Cols and Rows are the terminal size. Zero or negative values mean
 	// DefaultCols and DefaultRows.
 	Cols, Rows int
@@ -46,10 +56,20 @@ type Config struct {
 	Ticker Ticker
 }
 
+// Period is the time between samples: one second divided by FPS (DefaultFPS
+// when FPS is zero or negative), rounded to the nearest microsecond.
+func (c Config) Period() time.Duration {
+	fps := c.FPS
+	if fps <= 0 {
+		fps = DefaultFPS
+	}
+	return time.Duration(float64(time.Second) / float64(fps)).Round(time.Microsecond)
+}
+
 // withDefaults returns c with zero values replaced by their defaults.
 func (c Config) withDefaults() Config {
-	if c.Interval <= 0 {
-		c.Interval = DefaultInterval
+	if c.FPS <= 0 {
+		c.FPS = DefaultFPS
 	}
 	if c.Cols <= 0 {
 		c.Cols = DefaultCols

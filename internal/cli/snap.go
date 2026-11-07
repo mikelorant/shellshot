@@ -31,7 +31,7 @@ func newSnapCmd() *cobra.Command {
 		ignoreExit bool
 	)
 	cmd := &cobra.Command{
-		Use:   "snap [--cols N] [--rows N] [--interval d] [--color auto|always|never] [--ignore-exit-status] -- command [args...]",
+		Use:   "snap [--cols N] [--rows N] [--fps N] [--color auto|always|never] [--ignore-exit-status] -- command [args...]",
 		Short: "Run a command and print its final screen as text",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Command = args

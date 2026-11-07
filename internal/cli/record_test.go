@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -80,11 +81,11 @@ func TestRecordingSinkRejectsWrongLineCount(t *testing.T) {
 func TestRecordFlagDefaults(t *testing.T) {
 	cmd := newRecordCmd()
 	for name, want := range map[string]string{
-		"output":   "recording.shot",
-		"command":  "",
-		"cols":     "0",
-		"rows":     "0",
-		"interval": session.DefaultInterval.String(),
+		"output":  "recording.shot",
+		"command": "",
+		"cols":    "0",
+		"rows":    "0",
+		"fps":     strconv.Itoa(session.DefaultFPS),
 	} {
 		if got := cmd.Flags().Lookup(name).DefValue; got != want {
 			t.Errorf("--%s default = %q, want %q", name, got, want)

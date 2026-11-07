@@ -37,6 +37,10 @@ const chunkQueueLen = 16
 //     once, even if it equals the previous frame, so a recording always ends
 //     with the terminal's final state.
 //
+// Ticks arrive cfg.Period() apart (60 per second by default). A tick only
+// snapshots the terminal if output was written since the previous snapshot,
+// so an idle session does no work however high the rate is.
+//
 // After the final frame Run waits for the process and returns its exit code;
 // a non-zero exit code is not an error.
 //
@@ -49,6 +53,9 @@ func Run(ctx context.Context, proc Process, newTerm vt.Factory, cfg Config, sink
 	cfg = cfg.withDefaults()
 	defer func() { _ = proc.Close() }()
 
+	if cfg.FPS > MaxFPS {
+		return -1, fmt.Errorf("%w: %d (maximum %d)", ErrFPS, cfg.FPS, MaxFPS)
+	}
 	if err := ctx.Err(); err != nil {
 		return -1, cancelError(err)
 	}
@@ -115,7 +122,7 @@ func (s *session) run(ctx context.Context) (int, error) {
 	}()
 
 	s.start = s.cfg.Clock()
-	ticks, stopTicker := s.cfg.Ticker(s.cfg.Interval)
+	ticks, stopTicker := s.cfg.Ticker(s.cfg.Period())
 	defer stopTicker()
 
 	snap, err := s.term.Snapshot()

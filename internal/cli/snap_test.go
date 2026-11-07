@@ -3,9 +3,11 @@ package cli
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -67,12 +69,12 @@ func TestCaptureFlagsParsing(t *testing.T) {
 		},
 	}
 	addCaptureFlags(cmd, &got)
-	cmd.SetArgs([]string{"--cols", "40", "--rows", "5", "--interval", "50ms", "--", "ls", "-l", "--cols", "9"})
+	cmd.SetArgs([]string{"--cols", "40", "--rows", "5", "--fps", "30", "--", "ls", "-l", "--cols", "9"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	if got.Cols != 40 || got.Rows != 5 || got.Interval != 50*time.Millisecond {
-		t.Errorf("options = %+v, want 40x5 at 50ms", got)
+	if got.Cols != 40 || got.Rows != 5 || got.FPS != 30 {
+		t.Errorf("options = %+v, want 40x5 at 30fps", got)
 	}
 	if want := "ls -l --cols 9"; strings.Join(got.Command, " ") != want {
 		t.Errorf("command = %q, want %q", got.Command, want)
@@ -82,10 +84,10 @@ func TestCaptureFlagsParsing(t *testing.T) {
 func TestSnapFlagDefaults(t *testing.T) {
 	cmd := newSnapCmd()
 	for name, want := range map[string]string{
-		"cols":     "80",
-		"rows":     "24",
-		"interval": session.DefaultInterval.String(),
-		"color":    "auto",
+		"cols":  "80",
+		"rows":  "24",
+		"fps":   strconv.Itoa(session.DefaultFPS),
+		"color": "auto",
 	} {
 		if got := cmd.Flags().Lookup(name).DefValue; got != want {
 			t.Errorf("--%s default = %q, want %q", name, got, want)
@@ -147,5 +149,42 @@ func TestSnapColorFlag(t *testing.T) {
 				t.Errorf("stdout = %q, want %q", stdout.String(), want)
 			}
 		})
+	}
+}
+
+func TestCaptureOptionsValidateFPS(t *testing.T) {
+	for _, tc := range []struct {
+		fps int
+		ok  bool
+	}{{-1, false}, {0, false}, {1, true}, {60, true}, {1000, true}, {1001, false}} {
+		err := captureOptions{FPS: tc.fps}.validate()
+		if (err == nil) != tc.ok {
+			t.Errorf("validate(fps=%d) = %v, want ok=%v", tc.fps, err, tc.ok)
+		}
+	}
+}
+
+func TestRecordRejectsInvalidFPS(t *testing.T) {
+	for _, fps := range []string{"0", "-5", "1001"} {
+		out := filepath.Join(t.TempDir(), "x.shot")
+		var stdout, stderr bytes.Buffer
+		code := runWithStdin(context.Background(), []string{"record", "-o", out, "--fps", fps, "-c", "true"}, strings.NewReader(""), &stdout, &stderr)
+		if code != 1 {
+			t.Errorf("--fps %s: exit code = %d, want 1", fps, code)
+		}
+		if !strings.Contains(stderr.String(), "invalid --fps") {
+			t.Errorf("--fps %s: stderr = %q, want invalid --fps", fps, stderr.String())
+		}
+		if _, err := os.Stat(out); err == nil {
+			t.Errorf("--fps %s: recording file created", fps)
+		}
+	}
+}
+
+func TestRecordRejectsInterval(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runWithStdin(context.Background(), []string{"record", "--interval", "50ms", "-c", "true"}, strings.NewReader(""), &stdout, &stderr)
+	if code == 0 || !strings.Contains(stderr.String(), "unknown flag") {
+		t.Errorf("code=%d stderr=%q, want unknown flag error", code, stderr.String())
 	}
 }
