@@ -187,7 +187,7 @@ func TestResolveScriptSettings(t *testing.T) {
 		{
 			name: "defaults",
 			want: scriptSettings{
-				Argv: []string{"/bin/zsh"}, Env: environ, Cols: 100, Rows: 30, Output: "recording.shot",
+				Argv: []string{"/bin/zsh"}, Env: environ, Cols: 100, Rows: 30, Output: "",
 			},
 		},
 		{
@@ -215,7 +215,7 @@ func TestResolveScriptSettings(t *testing.T) {
 			name: "a flag left at its default does not beat the script",
 			proc: run.Process{Cols: 60, Rows: 8, Output: "demo.shot"},
 			flags: scriptFlags{
-				Output: "recording.shot", Cols: 80, Rows: 24,
+				Output: "", Cols: 80, Rows: 24,
 			},
 			want: scriptSettings{
 				Argv: []string{"/bin/zsh"}, Env: environ, Cols: 60, Rows: 8, Output: "demo.shot",
@@ -227,7 +227,7 @@ func TestResolveScriptSettings(t *testing.T) {
 				Rows: 10, RowsChanged: true,
 			},
 			want: scriptSettings{
-				Argv: []string{"/bin/zsh"}, Env: environ, Cols: 100, Rows: 10, Output: "recording.shot",
+				Argv: []string{"/bin/zsh"}, Env: environ, Cols: 100, Rows: 10, Output: "",
 			},
 		},
 	}
