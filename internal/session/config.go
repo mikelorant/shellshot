@@ -13,11 +13,19 @@ const (
 	DefaultRows = 24
 )
 
+// DefaultShutdownGrace is how long the child gets to exit after a driver's
+// Shutdown (or after the driver is done) before the process is closed.
+const DefaultShutdownGrace = 2 * time.Second
+
 // MaxFPS is the highest accepted sampling rate.
 const MaxFPS = 1000
 
 // ErrFPS is returned by Run when Config.FPS is above MaxFPS.
 var ErrFPS = errors.New("session: fps out of range")
+
+// ErrDriverNeedsWriter is returned by Run when Config.Driver is set but the
+// process cannot be written to (it does not implement io.Writer).
+var ErrDriverNeedsWriter = errors.New("session: driver needs a process that implements io.Writer")
 
 // Process is the running child program as seen by a session. It is satisfied
 // by *pty.Process; it is declared here so session does not import pty (or cgo)
@@ -65,6 +73,16 @@ type Config struct {
 	// event log flush on time without a goroutine of its own. An error aborts
 	// the run like a sink error.
 	OnTick func(now time.Time) error
+	// Driver, if non-nil, scripts the session: it is polled on Run's
+	// goroutine and may write to the process and add marks and spans to the
+	// event log. Nil means off and Run behaves exactly as without the hook.
+	// The process passed to Run must also implement io.Writer. See Driver.
+	Driver Driver
+	// ShutdownGrace is how long the child gets to exit after a driver
+	// Shutdown step, or after the driver is done with the child still
+	// running, before the process is closed. Zero or negative means
+	// DefaultShutdownGrace. Only used with Driver.
+	ShutdownGrace time.Duration
 }
 
 // Period is the time between samples: one second divided by FPS (DefaultFPS
@@ -93,6 +111,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.Ticker == nil {
 		c.Ticker = realTicker
+	}
+	if c.ShutdownGrace <= 0 {
+		c.ShutdownGrace = DefaultShutdownGrace
 	}
 	return c
 }

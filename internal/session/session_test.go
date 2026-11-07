@@ -77,6 +77,11 @@ type fakeProc struct {
 	readErr  error
 	resizeTo [2]int
 	resizeOK error
+
+	wmu      sync.Mutex
+	writes   [][]byte
+	writeErr error
+	onWrite  func(p []byte) // called on each successful Write, if set
 }
 
 func newFakeProc() *fakeProc {
@@ -111,6 +116,24 @@ func (p *fakeProc) deliver(b, d []byte, ok bool) (int, error) {
 		return 0, io.EOF
 	}
 	return copy(b, d), nil
+}
+
+// Write records what a driver sends to the process.
+func (p *fakeProc) Write(b []byte) (int, error) {
+	if p.writeErr != nil {
+		return 0, p.writeErr
+	}
+	if p.isClosed() {
+		return 0, io.ErrClosedPipe
+	}
+	p.wmu.Lock()
+	p.writes = append(p.writes, append([]byte(nil), b...))
+	fn := p.onWrite
+	p.wmu.Unlock()
+	if fn != nil {
+		fn(b)
+	}
+	return len(b), nil
 }
 
 func (p *fakeProc) Resize(cols, rows int) error {
@@ -179,6 +202,19 @@ type harness struct {
 	events  EventSink // Config.Events; nil by default
 	onStart func(time.Time)
 	onTick  func(time.Time) error
+	driver  Driver        // Config.Driver; nil by default
+	grace   time.Duration // Config.ShutdownGrace
+
+	tickers atomic.Int32 // Ticker calls: the first is the sampler, later ones are timers
+	tmu     sync.Mutex
+	timers  []*fakeTimer // timers made through Ticker after the sampler
+}
+
+// fakeTimer is a timer made through Config.Ticker; tests fire it by hand.
+type fakeTimer struct {
+	d       time.Duration
+	c       chan time.Time
+	stopped atomic.Bool
 }
 
 type runResult struct {
@@ -225,8 +261,18 @@ func startRun(t *testing.T, failOnFrame int, failErr error, mutate func(*harness
 		Events:  h.events,
 		OnStart: h.onStart,
 		OnTick:  h.onTick,
-		Clock:   h.clock.now,
+		Driver:  h.driver,
+
+		ShutdownGrace: h.grace,
+		Clock:         h.clock.now,
 		Ticker: func(d time.Duration) (<-chan time.Time, func()) {
+			if h.tickers.Add(1) > 1 {
+				t := &fakeTimer{d: d, c: make(chan time.Time, 1)}
+				h.tmu.Lock()
+				h.timers = append(h.timers, t)
+				h.tmu.Unlock()
+				return t.c, func() { t.stopped.Store(true) }
+			}
 			h.period.Store(int64(d))
 			return h.ticks, func() { h.stopped.Store(true) }
 		},

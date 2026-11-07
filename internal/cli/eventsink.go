@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/michaellorant/shellshot/internal/live"
 	"github.com/michaellorant/shellshot/internal/recording/bin"
+	"github.com/michaellorant/shellshot/internal/recording/bin/event"
 	"github.com/michaellorant/shellshot/internal/session"
 )
 
@@ -70,6 +72,25 @@ func (s *binSink) Resize(at time.Duration, cols, rows int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.w.Resize(at, cols, rows, 0, 0)
+}
+
+// Mark implements session.EventSink.
+func (s *binSink) Mark(at time.Duration, label string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.w.Mark(at, label)
+}
+
+// Span implements session.EventSink. The session treats a span operation as
+// opaque; for this sink it must be an event.Span, which the writer validates.
+func (s *binSink) Span(at time.Duration, op session.SpanOp) error {
+	sp, ok := op.(event.Span)
+	if !ok {
+		return fmt.Errorf("span operation is %T, want event.Span", op)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.w.Span(at, sp)
 }
 
 // Exit implements session.EventSink.

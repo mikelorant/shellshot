@@ -96,6 +96,8 @@ The format is in [format.md](format.md). The wiring:
   since the last one, and a frame is emitted only if it differs from the previous. The first frame is at
   t=0 and a final frame follows process exit, after output is drained.
 - Context cancellation kills the process and returns.
+- `Config.Driver` (optional, nil = off) is polled on the same goroutine after output and at its own
+  deadlines; it writes to the PTY and logs marks and spans, and adds no goroutine that touches the terminal.
 
 ## Cell widths (`Snapshot.Widths`)
 

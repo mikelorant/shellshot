@@ -15,6 +15,9 @@ type fakeEvents struct {
 	seq     []string
 	outs    []eventOutput
 	exits   []eventExit
+	marks   []eventMark
+	spans   []eventSpan
+	markErr error
 	resizes int
 	failOn  int // 1-based Output call that fails; 0 never
 	failErr error
@@ -24,6 +27,16 @@ type fakeEvents struct {
 type eventOutput struct {
 	at time.Duration
 	p  []byte // retained deliberately to check chunks are not reused
+}
+
+type eventMark struct {
+	at    time.Duration
+	label string
+}
+
+type eventSpan struct {
+	at time.Duration
+	op SpanOp
 }
 
 type eventExit struct {
@@ -46,6 +59,22 @@ func (e *fakeEvents) Resize(time.Duration, int, int) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.resizes++
+	return nil
+}
+
+func (e *fakeEvents) Mark(at time.Duration, label string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.seq = append(e.seq, "mark:"+label)
+	e.marks = append(e.marks, eventMark{at, label})
+	return e.markErr
+}
+
+func (e *fakeEvents) Span(at time.Duration, op SpanOp) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.seq = append(e.seq, fmt.Sprintf("span:%v", op))
+	e.spans = append(e.spans, eventSpan{at, op})
 	return nil
 }
 
