@@ -41,7 +41,7 @@ recording does not depend on your typing.
 [documentation-badge]: https://img.shields.io/badge/-📚_Documentation-ff69b4
 [built-with-badge]: https://img.shields.io/badge/-🧱_Built_With-808080
 
-<img src="docs/assets/showcase.png" width="736" alt="A shellshot export of its demo: colours, text styles, Unicode, emoji, cursor control, animation and a dashboard.">
+<img src="docs/assets/showcase.png" width="736" alt="A shellshot export of a terminal session: someone makes a directory, asks a coding agent to build a small dashboard, builds it, and runs it.">
 
 ## 💡 Highlights [⭡](#shellshot)
 
