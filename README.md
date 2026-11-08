@@ -50,7 +50,7 @@ in your terminal, or export it as an animated PNG, GIF, WebP or SVG. A script ca
 - **Exports four formats:** Animated PNG, GIF, WebP or SVG, with no browser or ffmpeg.
 - **Faithful rendering:** Colours, wide characters, emoji and Nerd Font symbols.
 - **Scriptable recordings:** A `.script` file drives the session for you.
-- **Runs anywhere:** Binaries for macOS and Linux, plus a container image.
+- **Runs on macOS and Linux:** Release binaries and a container image.
 
 ## 💬 Why Shellshot? [⭡](#shellshot)
 
