@@ -70,15 +70,21 @@ func posText(m Meta) string {
 
 // scopeText names where an op sits: "-", "NAME", "hidden" or "NAME/hidden".
 func scopeText(m Meta) string {
+	if s := scopeName(m); s != "" {
+		return s
+	}
+	return "-"
+}
+
+// scopeName is scopeText with "" for an op outside any block.
+func scopeName(m Meta) string {
 	switch {
 	case m.Scene != "" && m.Hidden:
 		return m.Scene + "/hidden"
 	case m.Hidden:
 		return "hidden"
-	case m.Scene != "":
-		return m.Scene
 	}
-	return "-"
+	return m.Scene
 }
 
 func opText(op Op) string {

@@ -39,6 +39,12 @@ type Deps struct {
 	Rand *rand.Rand
 	// File is the script path used in error messages; it may be empty.
 	File string
+	// OnProgress, when set, is called from Poll with the position of the
+	// script: at the first Poll, and each time the number of completed steps
+	// or the scope of the current op changes. It must return quickly and must
+	// not call the Executor. It has no effect on the Steps the Executor hands
+	// out.
+	OnProgress func(Progress)
 }
 
 // SpanOp is a SPAN begin or end event for the host to record, with the hints
