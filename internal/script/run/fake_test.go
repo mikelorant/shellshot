@@ -251,6 +251,10 @@ func (s *fakeShell) Text() string {
 	return strings.TrimRight(strings.Join(lines, "\n"), "\n")
 }
 
+// ShellForeground: the shell is in the foreground when no command is still
+// to print its output, and it is not inside vim.
+func (s *fakeShell) ShellForeground() (bool, error) { return len(s.pend) == 0 && s.mode == "", nil }
+
 func (s *fakeShell) Write(now time.Duration, b []byte) {
 	for i := 0; i < len(b); i++ {
 		switch c := b[i]; {
@@ -408,9 +412,10 @@ type seqChange struct {
 	text string
 }
 
-func (s *screenSeq) Text() string                { return s.text }
-func (s *screenSeq) Write(time.Duration, []byte) {}
-func (s *screenSeq) Shutdown(time.Duration)      { s.shut = true }
+func (s *screenSeq) Text() string                   { return s.text }
+func (s *screenSeq) ShellForeground() (bool, error) { return true, nil }
+func (s *screenSeq) Write(time.Duration, []byte)    {}
+func (s *screenSeq) Shutdown(time.Duration)         { s.shut = true }
 
 func (s *screenSeq) Advance(now time.Duration) {
 	s.now = now

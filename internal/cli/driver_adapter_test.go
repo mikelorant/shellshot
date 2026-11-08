@@ -47,6 +47,8 @@ func startedDriver(exec scriptExecutor) *scriptDriver {
 
 func (s fakeScreen) Text() string { return string(s) }
 
+func (s fakeScreen) ShellForeground() (bool, error) { return true, nil }
+
 func TestScriptDriverConvertsSteps(t *testing.T) {
 	t.Parallel()
 	begin := event.Span{Op: event.SpanBegin, ID: 1, Type: event.SpanScene, Name: "intro"}

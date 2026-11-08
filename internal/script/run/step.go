@@ -19,11 +19,16 @@ type Keys interface {
 	EncodeText(s string) ([]byte, error)
 }
 
-// Screen is the headless terminal as the Executor sees it.
+// Screen is the headless terminal, and the terminal line it sits on, as the
+// Executor sees it.
 type Screen interface {
 	// Text returns the visible rows (the alternate screen when active), each
 	// right-trimmed, joined by "\n", with trailing blank rows removed.
 	Text() string
+	// ShellForeground reports whether the shell is the foreground process
+	// group of the terminal: it is at its prompt, and no command it started
+	// is running. The Executor asks only while a "wait done" is current.
+	ShellForeground() (bool, error)
 }
 
 // Deps is what the Executor needs from its host.

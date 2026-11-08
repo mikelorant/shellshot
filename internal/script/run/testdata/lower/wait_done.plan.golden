@@ -1,0 +1,20 @@
+process
+  size    (terminal)
+  shell   (default)
+  output  (default)
+  seed    1
+estimate
+  total   1.6s to 1m24.9s, 2 waits, 0 scenes
+ops
+   1  3:1     -                type "sleep 30" typing=50ms
+   2  3:1     -                press enter after-gap typing=50ms
+   3  3:1     -                settle off
+   4  4:1     -                wait done timeout=1m0s
+   5  5:1     -                wait done timeout=20s
+   6  6:1     -                type "echo after" typing=50ms
+   7  6:1     -                press enter after-gap typing=50ms
+   8  6:1     -                settle off
+   9  -       hidden           span-begin #1 hidden
+  10  -       hidden           drain quiet=200ms timeout=2s (never fails)
+  11  -       hidden           exit grace=2s
+  12  -       hidden           span-end #1

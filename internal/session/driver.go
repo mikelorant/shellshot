@@ -38,7 +38,22 @@ type Screen interface {
 	// terminal is only snapshotted when the screen changed since the last call
 	// that needed one, so a driver that does not call Text costs nothing.
 	Text() string
+	// ShellForeground reports whether the shell, the program the session
+	// started, is the foreground process group of the terminal, which means
+	// it is waiting at its prompt and no command it started is running. It
+	// asks the process on every call and fails if the process cannot tell.
+	ShellForeground() (bool, error)
 }
+
+// ForegroundReporter is implemented by a Process that can tell whether it is
+// the foreground process group of its terminal; *pty.Process does.
+type ForegroundReporter interface {
+	ShellInForeground() (bool, error)
+}
+
+// ErrNoForeground is returned by Screen.ShellForeground when the process
+// cannot report its foreground process group.
+var ErrNoForeground = errors.New("session: the process cannot report its foreground process group")
 
 // SpanOp is a span boundary for Events.Span. The session never looks inside
 // it, so it needs no dependency on the recording format: the driver and the
@@ -143,6 +158,15 @@ func (v screen) Text() string {
 	}
 	d.text, d.textValid = strings.TrimRight(snap.Text(), "\n"), true
 	return d.text
+}
+
+// ShellForeground implements Screen.
+func (v screen) ShellForeground() (bool, error) {
+	p, ok := v.s.proc.(ForegroundReporter)
+	if !ok {
+		return false, ErrNoForeground
+	}
+	return p.ShellInForeground()
 }
 
 // armTimer (re)arms t to fire after d.

@@ -1,0 +1,10 @@
+t=+0s write "s"
+t=+50ms write "l"
+t=+100ms write "e"
+t=+150ms write "e"
+t=+200ms write "p"
+t=+250ms write " "
+t=+300ms write "3"
+t=+350ms write "0"
+t=+400ms write "\r"
+t=+10.4s error wait_done_timeout.script:4:1: wait done timed out after 10s: a program is still running in the foreground

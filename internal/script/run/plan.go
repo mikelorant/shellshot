@@ -110,15 +110,18 @@ const (
 	WaitLiteral WaitKind = iota + 1 // the screen contains Pattern
 	WaitRegex                       // the screen matches Pattern (RE2, multiline)
 	WaitIdle                        // the screen has had no output for Quiet
+	WaitDone                        // the shell is the terminal's foreground process group, steadily for script.DoneDebounce
 )
 
 // OpWait blocks until the screen matches. A wait that does not match within
 // Timeout fails the script. With Assert the screen is checked once and the
 // script fails at once if it does not match ("wait "x" 0s"); Timeout is 0.
+// A WaitDone is never an assertion and its Timeout is at least
+// script.DoneDebounce.
 type OpWait struct {
 	Meta
 	Kind    WaitKind
-	Pattern string        // the substring, or the regex without slashes; empty for WaitIdle
+	Pattern string        // the substring, or the regex without slashes; empty for WaitIdle and WaitDone
 	Quiet   time.Duration // WaitIdle only
 	Timeout time.Duration
 	Assert  bool
