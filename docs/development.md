@@ -146,7 +146,7 @@ Prerequisites: `goreleaser` (`brew install goreleaser`), zig 0.17.x, `git` with 
 
 | Command | Effect |
 |---|---|
-| `make release-libs` | Builds libghostty-vt for the four targets with `scripts/build-libghostty.sh <zig-target>`, one zig invocation each, into `build/libghostty-{linux,darwin}-{amd64,arm64}`. The native `build/libghostty` is separate and unchanged. Takes a few minutes cold |
+| `make release-libs` | Builds libghostty-vt for the four targets with `scripts/build-libghostty.sh <zig-target>`, one zig invocation each in sequence (the release workflow runs them in parallel), into `build/libghostty-{linux,darwin}-{amd64,arm64}`. The native `build/libghostty` is separate and unchanged. Takes a few minutes cold |
 | `make release-check` | `goreleaser check` (validates `.goreleaser.yaml`) |
 | `make snapshot` | `goreleaser release --snapshot --clean --skip=publish`: builds everything into `dist/` without a tag, the network or publishing; the version looks like `0.0.0-SNAPSHOT-<commit>` |
 
@@ -182,15 +182,17 @@ workflows and the Dockerfile: change all three together), and Go comes from `go.
 
 **`ci.yml`** runs on pushes to `main` and on pull requests; a newer push cancels the older run.
 `test` runs on `macos-latest` (arm64) and `ubuntu-latest`: it fetches only the ghostty submodule,
-builds libghostty with `make deps` (cached on the submodule commit, zig version and OS), then runs
+gets libghostty from the cache or builds it (see "The libghostty caches"), then runs
 `go vet ./...`, `go build ./...`, `go test -count=1 -race ./...`, `go mod tidy -diff` and
 `make check-showcase`. `release-check` runs `goreleaser check`. Read-only permissions.
 
 **`release.yml`** runs on a `v*` tag push (a real release) and on manual `workflow_dispatch` (a dry
 run):
 
-- `archives` (macOS runner, `contents: write`) builds libghostty for the four targets
-  (`make release-libs`, cached) and runs GoReleaser. On a tag it creates a **draft** GitHub Release
+- `libs` is a four-way matrix that builds libghostty for one target each, in parallel, on
+  `ubuntu-latest`, and saves each result as its own cache entry (see "The libghostty caches").
+- `archives` (macOS runner, `contents: write`, needs `libs`) restores the four libraries from the
+  caches and runs GoReleaser. On a tag it creates a **draft** GitHub Release
   with the four archives, `checksum.txt` and a changelog of the `feat` and `fix` commits. In a dry run
   it runs `release --snapshot`, which publishes nothing. Both modes upload the archives and
   `checksum.txt` as the `archives` workflow artifact (kept 14 days).
@@ -200,6 +202,39 @@ run):
   the amd64 image (`version`, `record`, `export`, `file` on the PNG) and pushes
   `ghcr.io/mikelorant/shellshot` on tags only: `X.Y.Z`, `X.Y` and `latest` for a stable tag, just
   `X.Y.Z-rc.1` for a prerelease. A dry run builds the image and pushes nothing.
+
+### The libghostty caches
+
+`release.yml` and `ci.yml` share four cache entries, one per target, named
+`libghostty-<goos>-<goarch>-zig<ZIG_VERSION>-<submodule commit>` (path `build/libghostty-<goos>-<goarch>`):
+
+| Entry | zig target | Built by |
+| --- | --- | --- |
+| `libghostty-linux-amd64-…` | `x86_64-linux-gnu.2.28` | `libs` (ubuntu), or the Ubuntu `test` job in CI |
+| `libghostty-linux-arm64-…` | `aarch64-linux-gnu.2.28` | `libs` (ubuntu) |
+| `libghostty-darwin-amd64-…` | `x86_64-macos` | `libs` (ubuntu) |
+| `libghostty-darwin-arm64-…` | `aarch64-macos` | `libs` (ubuntu), or the macOS `test` job in CI |
+
+On a miss a job builds its target with `scripts/build-libghostty.sh <zig-target>` and saves the entry
+right after the build, so a later failure keeps the work. A cold release therefore takes as long as the
+slowest target (about 3 to 5 minutes on GitHub; the four builds run in parallel), a warm one only
+restores. The key has no runner component because the output does not depend on the machine that
+builds it: every target is cross-compiled with zig's baseline CPU for that target (macOS builds on a
+Mac use the same generic CPU, so a native `aarch64-macos` build on the macOS runner matches). Built
+on Linux or on macOS the static libraries are not byte-identical (the compiler's version string
+differs, for example) but both link and pass the cgo tests, so either may fill the entry.
+
+`ci.yml` uses the same entries for its own jobs (`aarch64-macos` on `macos-latest`,
+`x86_64-linux-gnu.2.28` on `ubuntu-latest`), so CI tests the exact libraries that ship, and a tag run
+restores what `main` saved (a tag cannot see caches from other tags or pull requests, only from the
+default branch). The old native `make deps` build (`build/libghostty`) is not reused: on Linux zig's
+default target adds the build machine's own CPU features (for example `sha3`, `i8mm` on arm64), which
+could ship instructions that users' older CPUs lack. `make deps` is unchanged for local use.
+
+To rebuild one target, delete its entry in the repository's Actions > Caches page and rerun the
+workflow; to rebuild all of them, bump `ZIG_VERSION` (in both workflows and the Dockerfile) or move the
+ghostty pin (the key contains both). Entries unused for 7 days are evicted by GitHub; the `archives`
+job then fails with a cache-miss message naming the key: rerun the workflow and `libs` rebuilds it.
 
 To cut a release: make sure `main` is green, then `git tag vX.Y.Z && git push origin vX.Y.Z`. When the
 workflow finishes, review the draft under the repository's Releases page, edit the notes, and publish
