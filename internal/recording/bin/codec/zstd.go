@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"hash/maphash"
+	"strings"
 	"sync"
 
 	"github.com/klauspost/compress/zstd"
@@ -23,6 +24,10 @@ const maxZstdDecodeMemory = 256 << 20
 // uses it to size its output buffer from the input instead of trusting maxLen
 // or a declared frame content size.
 const zstdMaxExpansionShift = 15
+
+// zstdBlockOverflow is the text of the klauspost/compress error for output
+// past the end of the buffer or past the maximum block size.
+const zstdBlockOverflow = "output bigger than max block size"
 
 // maxZstdDictCacheEntries bounds the per-dictionary encoder/decoder cache.
 // When full the cache is dropped and rebuilt on demand.
@@ -224,7 +229,8 @@ func (c *ZstdCodec) Decompress(dst, src, dict []byte, maxLen int) (out []byte, e
 	}()
 
 	// Bytes of spare capacity the decoder may use. maxLen+1 proves overflow.
-	want := min(maxLen, maxZstdDecodeMemory) + 1
+	limit := min(maxLen, maxZstdDecodeMemory) + 1
+	want := limit
 	var h zstd.Header
 	if err := h.Decode(src); err != nil {
 		return dst, fmt.Errorf("%w: %v", ErrCorrupt, err)
@@ -240,6 +246,8 @@ func (c *ZstdCodec) Decompress(dst, src, dict []byte, maxLen int) (out []byte, e
 	if len(src) <= want>>zstdMaxExpansionShift {
 		want = len(src) << zstdMaxExpansionShift
 	}
+	// A frame without a content size is bounded only by the capacity.
+	capacityIsLimit := !h.HasFCS && want == limit
 	start := len(dst)
 	buf := dst
 	if cap(buf)-len(buf) < want {
@@ -249,6 +257,15 @@ func (c *ZstdCodec) Decompress(dst, src, dict []byte, maxLen int) (out []byte, e
 	res, err := dec.DecodeAll(src, buf)
 	if err != nil {
 		if errors.Is(err, zstd.ErrDecoderSizeExceeded) || errors.Is(err, zstd.ErrWindowSizeExceeded) {
+			return dst, fmt.Errorf("%w: %v", ErrTooLarge, err)
+		}
+		// On amd64 the assembly sequence decoder, unlike the Go one, does not
+		// report a block that runs past the capacity as
+		// zstd.ErrDecoderSizeExceeded: it returns an unexported error with
+		// no sentinel. For a frame bounded only by the capacity that block is
+		// the overflow itself. A valid encoder never emits a block over the
+		// limit, so a corrupt block that claims one is also read as too large.
+		if capacityIsLimit && strings.Contains(err.Error(), zstdBlockOverflow) {
 			return dst, fmt.Errorf("%w: %v", ErrTooLarge, err)
 		}
 		return dst, fmt.Errorf("%w: %v", ErrCorrupt, err)
