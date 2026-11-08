@@ -45,7 +45,7 @@ func TestBuildHead(t *testing.T) {
 	if h.StartedUnixNS != started.UnixNano() || h.TZOffsetS != 3600 {
 		t.Errorf("start = %d tz %d", h.StartedUnixNS, h.TZOffsetS)
 	}
-	if h.Engine != (head.Engine{Name: "libghostty-vt", Commit: "66af4c7458db7e19ae7adb44aa7054879be58b6b"}) {
+	if h.Engine != (head.Engine{Name: "libghostty-vt", Commit: "0fa3d577a5614150ff8e2c152de5fb9d5c6d2dec"}) {
 		t.Errorf("engine = %+v", h.Engine)
 	}
 	if h.SessionID != id || h.Recorder != "shellshot "+Version {
