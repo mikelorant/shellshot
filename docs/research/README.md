@@ -11,3 +11,4 @@ directory. Each line gives the question a brief answered and where it stands.
 - [script-scenes.md](script-scenes.md): scenes, hidden spans and their export semantics. Partly superseded by `script-format.md`; the `SPAN` event design is implemented.
 - [apple-emoji.md](apple-emoji.md): whether to ship Apple-style colour emoji. Investigated and prototyped; in progress.
 - [sandboxing.md](sandboxing.md): whether and how to run recorded commands in a sandbox. Out of scope: dropped by the maintainer; the brief is kept as a record only, nothing is implemented or planned.
+- [readme-improvements.md](readme-improvements.md): how The Good Docs Project's README guidance applies to this README. Research only; recommendations not adopted yet, the maintainer decides which to act on.
