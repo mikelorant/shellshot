@@ -3,7 +3,10 @@
 // interfaces.
 package live
 
-import "io"
+import (
+	"errors"
+	"io"
+)
 
 // Process is a running program with a bidirectional stream. It is satisfied
 // by *pty.Process and is a superset of session.Process.
@@ -15,6 +18,28 @@ type Process interface {
 	Wait() (int, error)
 	// Close kills the process if still running and releases it.
 	Close() error
+}
+
+// ErrNoForeground is returned by ShellInForeground when the process cannot
+// report its foreground process group.
+var ErrNoForeground = errors.New("the process cannot report its foreground process group")
+
+// ForegroundReporter is implemented by a Process that can tell whether it is
+// the foreground process group of its terminal; *pty.Process does. It is
+// optional, so a wrapper around a Process must forward it with
+// ShellInForeground or the wrapped process loses the capability.
+type ForegroundReporter interface {
+	ShellInForeground() (bool, error)
+}
+
+// ShellInForeground asks p whether it is the foreground process group of its
+// terminal. It returns ErrNoForeground when p is not a ForegroundReporter.
+func ShellInForeground(p Process) (bool, error) {
+	r, ok := p.(ForegroundReporter)
+	if !ok {
+		return false, ErrNoForeground
+	}
+	return r.ShellInForeground()
 }
 
 // Tee returns a Process whose Read delegates to p.Read and copies the bytes
@@ -45,4 +70,10 @@ func (t *teeProcess) Read(b []byte) (int, error) {
 		}
 	}
 	return n, err
+}
+
+// ShellInForeground implements ForegroundReporter by asking the wrapped
+// process.
+func (t *teeProcess) ShellInForeground() (bool, error) {
+	return ShellInForeground(t.Process)
 }

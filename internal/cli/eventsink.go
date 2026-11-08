@@ -145,3 +145,9 @@ func (r inputRecorder) Write(p []byte) (int, error) {
 	_ = r.sink.input(p)
 	return r.Process.Write(p)
 }
+
+// ShellInForeground implements live.ForegroundReporter by asking the wrapped
+// process, so recording input does not hide the capability from the session.
+func (r inputRecorder) ShellInForeground() (bool, error) {
+	return live.ShellInForeground(r.Process)
+}
