@@ -121,6 +121,8 @@ Each glyph in `text` mode carries its own x position, so text stays on the termi
 when the viewer's monospace font has a different width. The look of the glyphs still depends on
 the font the viewer picks (JetBrains Mono, then `ui-monospace`, Menlo, `monospace`); use
 `--svg-text paths` when the exact glyphs matter, for example for CJK, symbols or box drawing.
+The exception is Nerd Font icons: in `text` mode they are drawn as outlines, so they show even
+where no Nerd Font is installed; everything else stays text.
 
 Measured sizes on this implementation (80x24 unless noted; the 60x12 scrolling recording is 41
 frames; sizes include everything in the file):

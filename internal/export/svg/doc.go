@@ -33,7 +33,9 @@ type TextMode uint8
 const (
 	// TextText writes glyphs as <text> in a monospace font stack, each
 	// character placed on its cell. It is small and selectable, but the
-	// viewer's font draws the glyphs.
+	// viewer's font draws the glyphs. The exception is a Nerd Font icon (a
+	// private use rune a font of the set has): it is an outline, as in
+	// TextPaths, because a viewer seldom has a Nerd Font.
 	TextText TextMode = iota
 	// TextPaths writes glyphs as outlines from the embedded JetBrains Mono
 	// (and its fallback fonts), so the look does not depend on the viewer's
