@@ -85,6 +85,9 @@ func runRecordScript(cmd *cobra.Command, so scriptOptions, opts captureOptions, 
 		Cols: opts.Cols, ColsChanged: f.Changed("cols"),
 		Rows: opts.Rows, RowsChanged: f.Changed("rows"),
 	}, os.Environ(), termCols, termRows)
+	if so.Watch {
+		ro.warnSizeMismatch(cmd, set.Cols, set.Rows)
+	}
 	return runScript(cmd, so, ro, wopts, plan, set)
 }
 
