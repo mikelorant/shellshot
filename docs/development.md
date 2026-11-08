@@ -14,7 +14,7 @@ The Go binary links libghostty-vt through cgo. libghostty is built from the pinn
 | `make examples` | Records and exports every `contrib/examples/*.sh` into `build/examples/` (fast speed, 80x24) |
 | `make test-scripts` | Runs every `contrib/examples/scripts/*.script` with `--list` and for real (about a minute); not part of `make test` |
 | `make noto-asset`, `make emoji-asset` | Rebuild the embedded colour emoji fonts; see `scripts/README.md`. Needs network, and `uv` for the Apple one |
-| `make showcase` | Records the showcase demo and exports the README image `docs/assets/showcase.png` (on demand; see below) |
+| `make showcase` | Records the agent demo and exports the README image `docs/assets/showcase.png` (on demand; see below) |
 | `make check-showcase` | Fails if `docs/assets/showcase.png` is stale (see "Regenerating the README image") |
 | `make test-examples` | Runs every `contrib/examples/*.sh` under dash, bash, sh and zsh (takes a few minutes); it checks exit status, terminal restore and Ctrl-C handling |
 | `make check-examples` | Records every `contrib/examples/*.sh` at 80x24 with the real binary, follows the cursor through the raw output to find lines that auto-wrap, and lists every non-ASCII character the demos print, flagging those no embedded font has (they render blank). Takes about a minute; needs `bin/shellshot` (it builds it), libghostty and `uv`. Not part of `make test` |
@@ -76,19 +76,21 @@ go test ./internal/recording/...
 
 ## Regenerating the README image
 
-`make showcase` builds the binary, records `contrib/examples/showcase.sh` at 80x24 and speed
+`make showcase` builds the binary, records `contrib/examples/agent.sh` at 80x24 and speed
 `normal` into `build/showcase.shot`, and exports it to `docs/assets/showcase.png` with every
 look and timing flag pinned (`scripts/build-showcase.sh` has the list): `--scale 2 --emoji-set noto`
-(licence-clean artwork), 60 fps, 1.25x speed, pauses capped at 1 s, 2 s final hold. That gives about
-29 s and 1.7 MB. The README shows it at half its pixel width (736 of 1472), so retina screens get
+(licence-clean artwork), 60 fps, normal speed, pauses capped at 1 s, 2 s final hold. That gives about
+57 s and 6.9 MB. `--poster 46s` pins the frame that viewers without animation support show to a frame of the
+dashboard (the demo ends on a bare shell prompt); pick another time with `shellshot export --poster Ns`
+if the demo's timing changes. The README shows it at half its pixel width (736 of 1472), so retina screens get
 sharp text. If you change `--scale` or `--font-size`, update the `width` in `README.md`.
 
 It runs only on demand, never as part of `make build`, because the image is committed and a new
-1.7 MB binary on every build would bloat the history. Regenerate it when the demo or the export
+6.9 MB binary on every build would bloat the history. Regenerate it when the demo or the export
 flags change, and commit it deliberately. The demo runs in real time, so two runs can differ byte for byte
 (frame boundaries move by a few milliseconds) while looking the same.
 
-`docs/assets/showcase.png.src` holds a sha256 of `showcase.sh`, `lib.sh` and the record and export
+`docs/assets/showcase.png.src` holds a sha256 of `agent.sh`, `lib.sh` and the record and export
 settings. `make check-showcase` recomputes it and fails with `showcase.png is stale: run make showcase`
 when they differ; `make test` runs it too. It is a hash comparison, so it is fast and needs no libghostty.
 

@@ -17,7 +17,7 @@ a terminal), `--pause` (wait for Enter at the end), `--help`.
     shellshot export colors.shot --format gif   # or gif, webp, svg
 
 `make examples` does this for every demo into `build/examples/` (fast speed).
-`make showcase` records `showcase.sh` at normal speed into the README image `docs/assets/showcase.png` (on demand; see `docs/development.md`).
+`make showcase` records `agent.sh` at normal speed into the README image `docs/assets/showcase.png` (on demand; see `docs/development.md`).
 `make test-examples` runs each demo under dash, bash, sh and zsh on a pty.
 `make check-examples` renders each demo with the real binary and fails on lines that wrap past column 80 or on characters no embedded font has (they would come out blank); run it after changing a demo. It needs libghostty and `uv`.
 
