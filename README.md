@@ -335,6 +335,7 @@ terminal while it runs.
 | `press KEY...` | Presses keys, such as `enter`, `esc` or `ctrl+c`. Add `x3` after a key to repeat it. |
 | `wait PATTERN [TIMEOUT]` | Waits until the screen shows a quoted text or matches a `/regex/`. With `0s` it checks once and fails at once if there is no match. |
 | `wait idle [DURATION]` | Waits until the screen has had no output for the duration. |
+| `wait done [TIMEOUT]` | Waits until the command running in the shell has finished and the prompt is back. |
 | `sleep DURATION` | Pauses. |
 | `mark LABEL` | Adds a named marker to the recording. |
 

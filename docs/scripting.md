@@ -64,14 +64,26 @@ demo.script:12:3: unknown command "rn" (did you mean "run"?)
 | `press KEY...` | Press keys or chords: `press ctrl+c`, `press up up enter`. `x3` after a key repeats it: `press down x3` |
 | `wait PATTERN [TIMEOUT]` | Wait until the visible screen matches the pattern. `wait "passed" 0s` checks once and fails at once if it does not match: this is the assertion |
 | `wait idle [DURATION]` | Wait until the screen has had no output for `DURATION` (default `settle`) |
+| `wait done [TIMEOUT]` | Wait until the command running in the shell has finished and the shell is back at its prompt. Fails at `TIMEOUT` (default `timeout`) |
 | `sleep DURATION` | Pause |
 | `mark LABEL` | Add a `MARK` event to the recording |
 
 Keys: `enter tab esc space backspace delete insert up down left right home end pageup pagedown`,
 `f1` to `f12`, a single `a`-`z` or `0`-`9`, and chords with `ctrl+`, `alt+` or `shift+` in any order.
 
-`run` waits for a quiet screen, not for the command to finish. A command that prints continuously
-for longer than `timeout` makes the `run` fail. Write it with `settle off` and an explicit wait:
+`run` waits for a quiet screen, not for the command to finish. A command that prints continuously,
+or that stays quiet for longer than `settle`, does not suit it. For a long command write it with
+`settle off` and `wait done`:
+
+```
+settle off
+run make build
+wait done 5m
+```
+
+`wait done` does not look at the screen. It returns once the shell is back at its prompt, however
+quiet or noisy the command was. When the script has to check that the command succeeded, print its
+exit status and wait for that instead:
 
 ```
 settle off
@@ -81,6 +93,27 @@ wait /^BUILD-STATUS=0$/ 5m
 
 Anchor patterns: the typed command is echoed on screen, so an unanchored `wait "DONE"` can match
 the echo of `echo DONE`.
+
+### `wait done`
+
+`wait done` asks the terminal which program is in the foreground. It finishes when the shell has
+been in the foreground for 250 ms without a break, and fails with the `timeout` message of the other
+waits if a program still runs at `TIMEOUT`. The 250 ms bridge the moments in which the shell is
+briefly in the foreground right after Enter, or between the parts of `make && make test`. A
+`TIMEOUT` is therefore at least 250ms, and a `wait done` at the prompt takes 250 ms.
+
+```
+demo.script:9:1: wait done timed out after 3m0s: a program is still running in the foreground
+```
+
+Limits:
+
+- It tells nothing about the exit status. Use the `echo ...=$?` pattern above when that matters.
+- A shell without job control never hands the foreground to a command, so `wait done` returns after
+  250 ms. Interactive `sh`, `bash` and `zsh` have job control.
+- A background job (`make &`) does not hold the foreground, so `wait done` returns at once.
+- Inside `ssh` or `docker exec` the program in the foreground is the `ssh` or `docker` client, so
+  `wait done` waits until that session ends.
 
 ## Text forms for `run` and `type`
 
