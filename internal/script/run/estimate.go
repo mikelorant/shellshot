@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/mikelorant/shellshot/internal/recording/bin/event"
+	"github.com/mikelorant/shellshot/internal/script"
 )
 
 // Estimate is the expected real-time length of a Plan, from the plan alone.
@@ -82,6 +83,8 @@ func opTime(op Op) (lo, hi time.Duration) {
 			return 0, 0
 		case op.Kind == WaitIdle:
 			return op.Quiet, max(op.Timeout, op.Quiet)
+		case op.Kind == WaitDone:
+			return script.DoneDebounce, max(op.Timeout, script.DoneDebounce)
 		}
 		return 0, op.Timeout
 	case OpSettle:

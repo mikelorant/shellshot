@@ -29,6 +29,8 @@ wait /^\$$/ 5s
 wait /a\/b\\/
 wait idle
 wait idle 250ms
+wait done
+wait done 5m
 sleep 500ms
 sleep 2m
 mark done

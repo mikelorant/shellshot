@@ -25,11 +25,14 @@ const (
 	KeyEncode
 	// Internal: the Executor met a state that a valid plan cannot produce.
 	Internal
+	// ForegroundQuery: "wait done" could not find out which process group is
+	// in the foreground of the terminal.
+	ForegroundQuery
 )
 
 // Exit codes of a failed script (docs/research/script-format.md §7.4).
 const (
-	ExitRuntimeError  = 1 // Internal and KeyEncode
+	ExitRuntimeError  = 1 // Internal, KeyEncode and ForegroundQuery
 	ExitScriptFailure = 3 // WaitTimeout, SettleTimeout and ChildExited
 )
 
@@ -41,6 +44,8 @@ func (k ErrorKind) String() string {
 		return "SettleTimeout"
 	case ChildExited:
 		return "ChildExited"
+	case ForegroundQuery:
+		return "ForegroundQuery"
 	case KeyEncode:
 		return "KeyEncode"
 	case Internal:

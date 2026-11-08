@@ -111,7 +111,7 @@ var repeatSyntax = regexp.MustCompile(`^x[0-9]+$`)
 func (p *parser) waitStep(st *Step, ln line) bool {
 	args := ln.toks[1:]
 	if len(args) == 0 {
-		p.errorf(ln.end, "wait needs a pattern", `write wait "text", wait /regex/ or wait idle`)
+		p.errorf(ln.end, "wait needs a pattern", `write wait "text", wait /regex/, wait idle or wait done`)
 		return false
 	}
 	switch first := args[0]; {
@@ -121,12 +121,14 @@ func (p *parser) waitStep(st *Step, ln line) bool {
 		st.Pattern = &Pattern{Regex: true, Source: first.Text}
 	case first.Kind == KindWord && first.Text == "idle":
 		st.Idle = true
+	case first.Kind == KindWord && first.Text == "done":
+		st.Done = true
 	default:
-		hint := DidYouMean(first.Text, []string{"idle"})
+		hint := DidYouMean(first.Text, []string{"idle", "done"})
 		if hint == "" {
 			hint = `to wait for text put it in quotes (wait "text") or in slashes (wait /regex/)`
 		}
-		p.errorf(first.Pos, fmt.Sprintf(`expected a "string", a /regex/ or idle after wait, found %q`, first.Text), hint)
+		p.errorf(first.Pos, fmt.Sprintf(`expected a "string", a /regex/, idle or done after wait, found %q`, first.Text), hint)
 		return false
 	}
 	rest := args[1:]

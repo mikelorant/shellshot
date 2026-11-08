@@ -123,6 +123,8 @@ func (w watchedScreen) Text() string {
 	return *w.last
 }
 
+func (w watchedScreen) ShellForeground() (bool, error) { return w.scr.ShellForeground() }
+
 // termHolder captures the terminal that session.Run makes with the factory
 // from factory, so the key encoder can read its modes. The terminal exists
 // only inside Run, and both it and the encoder belong to the goroutine that

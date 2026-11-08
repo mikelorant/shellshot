@@ -98,6 +98,8 @@ func opText(op Op) string {
 		switch {
 		case op.Kind == WaitIdle:
 			return fmt.Sprintf("wait idle quiet=%s timeout=%s", dur(op.Quiet), dur(op.Timeout))
+		case op.Kind == WaitDone:
+			return fmt.Sprintf("wait done timeout=%s", dur(op.Timeout))
 		case op.Assert:
 			return fmt.Sprintf("wait %s assert", patternText(op))
 		}

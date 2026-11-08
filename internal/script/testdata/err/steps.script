@@ -6,3 +6,4 @@ mark
 mark a b
 sleep
 run lines { x
+wait don

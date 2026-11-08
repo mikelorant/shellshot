@@ -705,3 +705,39 @@ func TestDriverEventsMarkErrorAborts(t *testing.T) {
 	}
 	h.assertClean()
 }
+
+func TestDriverScreenReportsTheProcessForeground(t *testing.T) {
+	var got []bool
+	d := &fakeDriver{fn: func(n int, now time.Duration, scr Screen) (Step, error) {
+		if n >= 1 {
+			fg, err := scr.ShellForeground()
+			if err != nil {
+				t.Errorf("ShellForeground: %v", err)
+			}
+			got = append(got, fg)
+		}
+		return Step{Deadline: now + time.Second}, nil
+	}}
+	h, _ := startDriverRun(t, d, nil)
+	h.polled(d, 1)
+
+	h.clock.advance(time.Second)
+	h.timerAt(0).fire()
+	h.polled(d, 2)
+	h.proc.inForeground.Store(true)
+	h.clock.advance(time.Second)
+	h.timerAt(1).fire()
+	h.polled(d, 3)
+	h.cancel()
+	h.wait()
+	if fmt.Sprint(got) != "[false true]" {
+		t.Errorf("foreground at the polls = %v, want [false true]", got)
+	}
+}
+
+func TestDriverScreenWithoutForegroundReporterFails(t *testing.T) {
+	s := &session{proc: readOnlyProc{newFakeProc()}}
+	if fg, err := (screen{s}).ShellForeground(); !errors.Is(err, ErrNoForeground) || fg {
+		t.Errorf("ShellForeground = (%v, %v), want (false, ErrNoForeground)", fg, err)
+	}
+}

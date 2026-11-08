@@ -120,6 +120,8 @@ func formatPattern(st Step) string {
 	switch {
 	case st.Idle:
 		return "idle"
+	case st.Done:
+		return "done"
 	case st.Pattern.Regex:
 		return "/" + escapeSlashes(st.Pattern.Source) + "/"
 	}

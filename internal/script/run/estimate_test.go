@@ -82,6 +82,13 @@ func TestEstimate(t *testing.T) {
 			waits: 1,
 		},
 		{
+			name: "wait done",
+			src:  "settle 300ms\ntimeout 10s\nwait done\n",
+			// The debounce is the shortest it takes; the exit drain quiets for 300ms.
+			min: 250*ms + 300*ms, max: 10*s + exitMax,
+			waits: 1,
+		},
+		{
 			name: "mark and hint add nothing",
 			src:  "speed 2x\nscene a {\n  mark m\n}\n",
 			min:  exitMin, max: exitMax,

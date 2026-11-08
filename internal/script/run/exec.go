@@ -32,6 +32,7 @@ type Executor struct {
 	last    time.Duration
 
 	screen screenTracker
+	scr    Screen // the screen of the current Poll
 
 	exited     bool
 	exitStatus int
@@ -70,7 +71,7 @@ func New(p *Plan, deps Deps) (*Executor, error) {
 		case OpType, OpPress, OpSleep, OpLinger, OpMark, OpSettle, OpExit, OpSpanBegin, OpSpanEnd:
 		case OpWait:
 			switch op.Kind {
-			case WaitLiteral, WaitIdle:
+			case WaitLiteral, WaitIdle, WaitDone:
 			case WaitRegex:
 				re, err := regexp.Compile("(?m)" + op.Pattern)
 				if err != nil {
@@ -124,6 +125,7 @@ func (e *Executor) Poll(now time.Duration, scr Screen) (Step, error) {
 	if scr != nil {
 		text = scr.Text()
 	}
+	e.scr = scr
 	e.screen.observe(now, text)
 	for {
 		if e.pc >= len(e.ops) {

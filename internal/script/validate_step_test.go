@@ -45,7 +45,7 @@ func TestValidateMark(t *testing.T) {
 
 func TestValidateWait(t *testing.T) {
 	runValidateCases(t, []validateCase{
-		{"valid forms", "wait \"x\"\nwait /a+b/ 5s\nwait \"x\" 0s\nwait /^\\$$/\nwait idle\nwait idle 1s\nwait \"a\\nb\"\nwait /a\\/b/\n", nil},
+		{"valid forms", "wait \"x\"\nwait /a+b/ 5s\nwait \"x\" 0s\nwait /^\\$$/\nwait idle\nwait idle 1s\nwait done\nwait done 250ms\nwait done 5m\nwait \"a\\nb\"\nwait /a\\/b/\n", nil},
 		{"empty string", "wait \"\"\n", []string{`1:1: wait pattern is empty (an empty pattern matches every screen; write the text to wait for)`}},
 		{"invalid UTF-8 string", "wait \"\\xff\"\n", []string{`1:1: wait pattern is not valid UTF-8 (` + utf8Hint + `)`}},
 		{"invalid UTF-8 regex", "wait /\\xff/\n", nil}, // the regex text holds the backslash sequence, which RE2 reads as an escape
@@ -58,6 +58,8 @@ func TestValidateWait(t *testing.T) {
 		{"bad escape", "wait /a\\q/\n", []string{`1:1: bad regular expression /a\q/ (invalid escape sequence near "\q")`}},
 		{"lookahead is not RE2", "wait /a(?=b)/\n", []string{`1:1: bad regular expression /a(?=b)/ (invalid or unsupported Perl syntax near "(?=")`}},
 		{"nested repeat count", "wait /((a{999}){999}){999}/\n", []string{`1:1: bad regular expression /((a{999}){999}){999}/ (invalid repeat count near "{999}")`}},
+		{"done with a timeout below the debounce", "wait done 249ms\n", []string{`1:1: bad timeout "249ms" (wait done needs a timeout of at least 250ms)`}},
+		{"done with zero timeout", "wait done 0s\n", []string{`1:1: bad timeout "0s" (wait done needs a timeout of at least 250ms)`}},
 		{"idle with zero duration", "wait idle 0s\n", []string{`1:1: bad duration "0s" (wait idle needs a duration greater than 0)`}},
 		{"in a block", "scene s {\n  run a\n  wait /(/ 1s\n}\n", []string{`3:3: bad regular expression /(/ (missing closing ))`}},
 	})
@@ -95,7 +97,9 @@ func TestValidatePressAndSleep(t *testing.T) {
 		{"negative sleep", Step{Pos: pos, Kind: StepSleep, HasDuration: true, Duration: -time.Second}, `4:2: bad duration "-1s" (a duration cannot be negative)`},
 		{"negative wait timeout", Step{Pos: pos, Kind: StepWait, Pattern: &Pattern{Source: "x"}, HasDuration: true, Duration: -time.Second}, `4:2: bad duration "-1s" (a duration cannot be negative)`},
 		{"negative wait idle", Step{Pos: pos, Kind: StepWait, Idle: true, HasDuration: true, Duration: -time.Second}, `4:2: bad duration "-1s" (wait idle needs a duration greater than 0)`},
-		{"wait without pattern", Step{Pos: pos, Kind: StepWait}, `4:2: wait needs a pattern (write wait "text", wait /regex/ or wait idle)`},
+		{"wait without pattern", Step{Pos: pos, Kind: StepWait}, `4:2: wait needs a pattern (write wait "text", wait /regex/, wait idle or wait done)`},
+		{"negative wait done", Step{Pos: pos, Kind: StepWait, Done: true, HasDuration: true, Duration: -time.Second}, `4:2: bad timeout "-1s" (wait done needs a timeout of at least 250ms)`},
+		{"wait done with pattern", Step{Pos: pos, Kind: StepWait, Done: true, Pattern: &Pattern{Source: "x"}}, `4:2: wait done takes no pattern`},
 		{"wait idle with pattern", Step{Pos: pos, Kind: StepWait, Idle: true, Pattern: &Pattern{Source: "x"}}, `4:2: wait idle takes no pattern`},
 		{"empty regex", Step{Pos: pos, Kind: StepWait, Pattern: &Pattern{Regex: true}}, `4:2: wait pattern is empty (an empty pattern matches every screen; write the text to wait for)`},
 		{"empty run text in a block form", Step{Pos: pos, Kind: StepRun, Form: FormLines}, `4:2: run text is empty (` + emptyTextHint + `)`},

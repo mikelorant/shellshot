@@ -82,6 +82,8 @@ type fakeProc struct {
 	writes   [][]byte
 	writeErr error
 	onWrite  func(p []byte) // called on each successful Write, if set
+
+	inForeground atomic.Bool // the answer of ShellInForeground
 }
 
 func newFakeProc() *fakeProc {
@@ -146,6 +148,8 @@ func (p *fakeProc) Wait() (int, error) {
 	<-p.closedCh
 	return p.exit, p.waitErr
 }
+
+func (p *fakeProc) ShellInForeground() (bool, error) { return p.inForeground.Load(), nil }
 
 func (p *fakeProc) Close() error {
 	p.once.Do(func() { close(p.closedCh) })

@@ -123,8 +123,16 @@ func (v *validator) waitStep(st Step) {
 			v.add(st.Pos, fmt.Sprintf("bad duration %q", st.Duration.String()), "wait idle needs a duration greater than 0")
 		}
 		return
+	case st.Done && st.Pattern != nil:
+		v.add(st.Pos, "wait done takes no pattern", "")
+		return
+	case st.Done:
+		if st.HasDuration && st.Duration < DoneDebounce {
+			v.add(st.Pos, fmt.Sprintf("bad timeout %q", st.Duration.String()), fmt.Sprintf("wait done needs a timeout of at least %s", DoneDebounce))
+		}
+		return
 	case st.Pattern == nil:
-		v.add(st.Pos, "wait needs a pattern", `write wait "text", wait /regex/ or wait idle`)
+		v.add(st.Pos, "wait needs a pattern", `write wait "text", wait /regex/, wait idle or wait done`)
 		return
 	}
 	if st.HasDuration && st.Duration < 0 {

@@ -286,6 +286,8 @@ wait idle
 wait idle 1s
 settle off
 wait idle
+wait done
+wait done 20s
 `
 	var waits []OpWait
 	for _, op := range body(t, lowerSrc(t, src)) {
@@ -301,6 +303,8 @@ wait idle
 		{Kind: WaitIdle, Quiet: 300 * time.Millisecond, Timeout: 7 * time.Second},
 		{Kind: WaitIdle, Quiet: time.Second, Timeout: 7 * time.Second},
 		{Kind: WaitIdle, Quiet: 200 * time.Millisecond, Timeout: 7 * time.Second},
+		{Kind: WaitDone, Timeout: 7 * time.Second},
+		{Kind: WaitDone, Timeout: 20 * time.Second},
 	}
 	if len(waits) != len(want) {
 		t.Fatalf("got %d waits, want %d", len(waits), len(want))

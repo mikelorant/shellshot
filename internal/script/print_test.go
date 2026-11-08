@@ -68,7 +68,7 @@ func TestFormatRoundTripAwkward(t *testing.T) {
 		"run a\\r\r\nrun \"trailing \"\ntype \"  lead\"\nrun \"\\\"q\\\"\"\nrun # not a comment\n",
 		"run x\r\r\ntype lines {\n  a\r\n  b\n}\n",
 		"wait /a\\/b\\\\\\/c/ 1ms\nwait /(?m)^$/\nwait \"\\n\"\nwait \"\\x01\"\n",
-		"sleep 0.000000001s\nsleep 1.5m\nwait idle 90s\nwait \"x\" 0.001s\n",
+		"sleep 0.000000001s\nsleep 1.5m\nwait idle 90s\nwait done\nwait done 90s\nwait \"x\" 0.001s\n",
 		"press x x2 x ctrl+x x5 x\n",
 		"run lines {\n\n    deep\n  \n\n  }\n  }\n}\n",
 		"run lines {\n\ta\n\t\tb\n}\n",

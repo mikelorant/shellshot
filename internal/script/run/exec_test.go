@@ -17,6 +17,10 @@ type textScreen string
 
 func (s textScreen) Text() string { return string(s) }
 
+func (s textScreen) ShellForeground() (bool, error) {
+	return false, errors.New("textScreen has no terminal line")
+}
+
 func testMeta(scene string) Meta {
 	return Meta{Pos: script.Pos{Line: 3, Col: 5}, Scene: scene}
 }

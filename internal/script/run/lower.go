@@ -202,6 +202,11 @@ func (l *lowerer) step(st script.Step, sc Settings, in span) error {
 			if st.HasDuration && st.Duration > 0 {
 				op.Quiet = st.Duration
 			}
+		case st.Done:
+			op.Kind = WaitDone
+			if st.HasDuration {
+				op.Timeout = st.Duration
+			}
 		case st.Pattern != nil:
 			op.Kind, op.Pattern = WaitLiteral, st.Pattern.Source
 			if st.Pattern.Regex {

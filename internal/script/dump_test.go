@@ -90,6 +90,8 @@ func dumpPattern(st Step) string {
 	switch {
 	case st.Idle:
 		return "idle"
+	case st.Done:
+		return "done"
 	case st.Pattern.Regex:
 		return fmt.Sprintf("regex %q", st.Pattern.Source)
 	}
