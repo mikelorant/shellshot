@@ -18,7 +18,7 @@ AAT `morx` table, no GSUB). No Mac is needed. The script:
   5. writes a font with head hhea hmtx maxp OS/2 post cmap name CBLC CBDT GSUB
      only (a `ccmp` ligature lookup maps each multi-codepoint sequence to its
      glyph). OS/2.fsType is left exactly as in the source font (4);
-  6. zstd-compresses it (level 19) into the embeddable asset and records the
+  6. zstd-compresses it (level 9) into the embeddable asset and records the
      sha256 of the decompressed font.
 
 Run through `make emoji-asset`, which initialises the submodule and supplies the
@@ -50,6 +50,8 @@ KEEP_TABLES = ("head", "hhea", "hmtx", "maxp", "OS/2", "post", "cmap", "name", "
 ASSET_STEM = "AppleColorEmoji-shellshot"
 ZWJ = 0x200D
 VS16 = 0xFE0F
+# 19 saves 0.1% over 9 on PNG-dominated data and takes 17x longer.
+ZSTD_LEVEL = 9
 
 LOG = logging.getLogger("build-apple-emoji-asset")
 
@@ -235,7 +237,7 @@ def build(args: argparse.Namespace) -> bytes:
 def write_asset(data: bytes, args: argparse.Namespace) -> None:
     import zstandard
 
-    compressed = zstandard.ZstdCompressor(level=19, write_checksum=True).compress(data)
+    compressed = zstandard.ZstdCompressor(level=ZSTD_LEVEL, write_checksum=True).compress(data)
     args.asset_dir.mkdir(parents=True, exist_ok=True)
     (args.asset_dir / f"{ASSET_STEM}.ttf.zst").write_bytes(compressed)
     digest = hashlib.sha256(data).hexdigest()
