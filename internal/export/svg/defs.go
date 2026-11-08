@@ -185,8 +185,8 @@ func (d *defs) glyph(a Assets, l raster.Layout, r rune, bold, italic bool, cells
 			if !math.IsInf(fit, 1) {
 				scale *= fit
 			}
-			ox = math.Round(budgetW/2 - (minX+maxX)/2*scale)
-			oy = math.Round(float64(l.CellHeight)/2 - (minY+maxY)/2*scale)
+			ox = math.Round(math.FMA(-(minX+maxX)/2, scale, budgetW/2))
+			oy = math.Round(math.FMA(-(minY+maxY)/2, scale, float64(l.CellHeight)/2))
 		}
 	}
 	id := "g" + strconv.Itoa(d.nGlyphs)
@@ -224,6 +224,9 @@ func argCount(op sfnt.SegmentOp) int {
 
 // pathData writes segs, in font units with y down from the baseline, as SVG
 // path data: scaled by scale and moved so the glyph origin is at (ox, oy).
+// Each scale-and-move is one explicit fused multiply-add: Go fuses x*y+z on
+// arm64 but not on amd64, which changes the last bit and so, at a rounding
+// tie, a printed digit. math.FMA gives every architecture the same bits.
 func pathData(segs sfnt.Segments, scale, ox, oy float64) string {
 	var sb strings.Builder
 	open := false
@@ -236,7 +239,7 @@ func pathData(segs sfnt.Segments, scale, ox, oy float64) string {
 			if i > 0 {
 				sb.WriteByte(' ')
 			}
-			sb.WriteString(num(ox+float64(p.X)/64*scale) + " " + num(oy+float64(p.Y)/64*scale))
+			sb.WriteString(num(math.FMA(float64(p.X)/64, scale, ox)) + " " + num(math.FMA(float64(p.Y)/64, scale, oy)))
 		}
 		open = true
 	}
