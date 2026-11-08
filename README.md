@@ -64,11 +64,9 @@ recording does not depend on your typing.
 ## 🐾 First steps [⭡](#shellshot)
 
 1. Go to the [latest release](https://github.com/mikelorant/shellshot/releases/latest) and download
-   the archive for your platform: macOS Apple silicon (`shellshot_darwin_arm64.tar.gz`), macOS Intel
-   (`shellshot_darwin_amd64.tar.gz`), Linux 64-bit (`shellshot_linux_amd64.tar.gz`) or Linux ARM
-   (`shellshot_linux_arm64.tar.gz`). Extract it in the folder you are working in, so that
-   `./shellshot` is there. Opening the archive in a file manager or running `tar -xzf` on it both
-   work.
+   the archive for your platform: macOS (Apple silicon or Intel) or Linux (amd64 or arm64). Extract
+   it in the folder you are working in, so that `./shellshot` is there. Opening the archive in a
+   file manager or running `tar -xzf` on it both work.
 
 2. Record a session. This starts your shell. Run a few commands, then type `exit` to stop.
 
@@ -104,10 +102,9 @@ parts to install or break.
 ## 💾 Installation [⭡](#shellshot)
 
 Go to the [latest release](https://github.com/mikelorant/shellshot/releases/latest) and download
-the archive for your platform: macOS Apple silicon (`shellshot_darwin_arm64.tar.gz`), macOS Intel
-(`shellshot_darwin_amd64.tar.gz`), Linux 64-bit (`shellshot_linux_amd64.tar.gz`) or Linux ARM
-(`shellshot_linux_arm64.tar.gz`). Extract it in the folder you are working in, so that
-`./shellshot` is there. Opening the archive in a file manager or running `tar -xzf` on it both work.
+the archive for your platform: macOS (Apple silicon or Intel) or Linux (amd64 or arm64). Extract it
+in the folder you are working in, so that `./shellshot` is there. Opening the archive in a file
+manager or running `tar -xzf` on it both work.
 
 ## 🎛 Usage [⭡](#shellshot)
 
