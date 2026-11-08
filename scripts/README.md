@@ -7,6 +7,10 @@
 * `build-apple-emoji-asset.py` - regenerates the embedded Apple Color Emoji
   derivative (`make emoji-asset`).
 
+Both emoji scripts compress at zstd level 9 (level 19 saves at most 1.2% on these PNG-based fonts and
+takes far longer); the currently committed assets were compressed at level 19 and are not rebuilt
+until a font pin changes.
+
 ## Checking the examples render
 
 `make check-examples` (`scripts/check-examples-render.sh [demo ...]`) records each

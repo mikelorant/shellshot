@@ -105,7 +105,7 @@ func BuildDict(samples [][]byte, size int) []byte {
 //
 // The result is for ZstdCodec only; it is larger than size by the table
 // header. The zstd package builds dictionaries for a given encoder level;
-// SpeedBestCompression is used.
+// SpeedDefault is used, the level ZstdCodec's encoders run at.
 func BuildZstdDict(samples [][]byte, size int) ([]byte, error) {
 	hist := BuildDict(samples, size)
 	if len(hist) < 8 {
@@ -116,7 +116,7 @@ func BuildZstdDict(samples [][]byte, size int) ([]byte, error) {
 		Contents: samples,
 		History:  hist,
 		Offsets:  [3]int{1, 4, 8},
-		Level:    zstd.SpeedBestCompression,
+		Level:    zstd.SpeedDefault,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("codec: building zstd dictionary: %w", err)

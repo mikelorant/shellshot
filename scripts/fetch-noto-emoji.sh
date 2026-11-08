@@ -2,7 +2,7 @@
 # Fetches Noto Color Emoji (CBDT/CBLC bitmap font, SIL OFL 1.1) pinned to one
 # commit of https://github.com/googlefonts/noto-emoji, verifies its sha256 and
 # writes the embedded assets:
-#   internal/render/emoji/assets/noto-emoji/NotoColorEmoji.ttf.zst   (zstd -19 of the font)
+#   internal/render/emoji/assets/noto-emoji/NotoColorEmoji.ttf.zst   (zstd -9 of the font)
 #   internal/render/emoji/assets/noto-emoji/NotoColorEmoji-OFL.txt   (2D/fonts/LICENSE)
 # The upstream repo is ~1.5 GB, so only these two files are downloaded.
 # Idempotent: when the committed files already match the pins below, nothing is
@@ -19,6 +19,9 @@
 #      internal/render/emoji/assets/noto-emoji/NOTICE.txt (commit, sha256, sizes, Unicode
 #      version) and check the emoji coverage tests still pass.
 set -euo pipefail
+
+# 19 saves 0.1% over 9 on PNG-dominated data and takes 17x longer.
+ZSTD_LEVEL=9
 
 COMMIT=99701e07d3d1fe1bdbcdb14964547f0fd592966f
 FONT_SHA256=15671215ab769fdc7162a045d56fd7d7e477c51b04e6b3c761d914d8fdd6cc44
@@ -83,7 +86,7 @@ if [[ $(wc -c <"$tmp/NotoColorEmoji.ttf" | tr -d ' ') != "$FONT_SIZE" ]]; then
 fi
 
 mkdir -p "$dest"
-zstd -19 -q -f -o "$tmp/NotoColorEmoji.ttf.zst" "$tmp/NotoColorEmoji.ttf"
+zstd "-$ZSTD_LEVEL" -q -f -o "$tmp/NotoColorEmoji.ttf.zst" "$tmp/NotoColorEmoji.ttf"
 [[ $(zstd -dc "$tmp/NotoColorEmoji.ttf.zst" | sha256) == "$FONT_SHA256" ]] || { echo "fetch-noto-emoji: zstd round trip failed" >&2; exit 1; }
 cp "$tmp/NotoColorEmoji.ttf.zst" "$font_zst"
 cp "$tmp/LICENSE" "$license"
