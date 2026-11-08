@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mikelorant/shellshot/internal/export/spanplan"
 	"github.com/mikelorant/shellshot/internal/recording/bin"
 	"github.com/mikelorant/shellshot/internal/recording/bin/event"
 	"github.com/mikelorant/shellshot/internal/recording/bin/head"
@@ -147,4 +148,38 @@ func openFrames(path string, fps int, boundaries []time.Duration) (*frames.Itera
 		return nil, nil, nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return it, src, func() error { return errors.Join(it.Close(), f.Close()) }, nil
+}
+
+// addSpanFlags registers --no-hints and --show-hidden on cmd, binding them to
+// o. verb is what the command does with a hidden span ("render" or "play").
+func addSpanFlags(cmd *cobra.Command, o *spanplan.Options, verb string) {
+	fl := cmd.Flags()
+	fl.BoolVar(&o.IgnoreHints, "no-hints", false, "ignore the speed, idle and hold hints stored in the recording's scenes (hidden spans are still cut)")
+	fl.BoolVar(&o.ShowHidden, "show-hidden", false, verb+" hidden spans like the rest of the recording instead of cutting them")
+}
+
+// setSpanFlagOverrides records in o which of --speed, --idle-limit and --hold
+// were given on cmd's command line: each beats the scene hint of its name
+// (flag, then scene hint, then default). A command without --hold never
+// reports it.
+func setSpanFlagOverrides(cmd *cobra.Command, o *spanplan.Options) {
+	fl := cmd.Flags()
+	o.FlagSpeed, o.FlagIdleLimit, o.FlagHold = fl.Changed("speed"), fl.Changed("idle-limit"), fl.Changed("hold")
+}
+
+// planSpans reads the scenes and hidden spans of the recording at input and
+// plans them as o asks. It does not open the recording when neither hints nor
+// hidden spans are in play, and it returns the zero plan for a recording
+// without spans. A malformed span ends the list early and is noted on stderr.
+func planSpans(cmd *cobra.Command, input string, o spanplan.Options) (spanplan.Plan, error) {
+	if o.IgnoreHints && o.ShowHidden {
+		return spanplan.Plan{}, nil
+	}
+	found, err := scanSpans(input)
+	if errors.Is(err, event.ErrMalformedSpan) {
+		fmt.Fprintf(cmd.ErrOrStderr(), "shellshot: %v; scenes and hidden spans after it are ignored\n", err)
+	} else if err != nil {
+		return spanplan.Plan{}, err
+	}
+	return spanplan.Build(found, o)
 }

@@ -119,9 +119,9 @@ A block is one step.
 | `timeout` | default for `wait` and `run` settling | 15s | behaviour |
 | `settle` | quiet time `run` waits for, or `off` | 200ms | behaviour |
 | `linger` | pause after every step so a viewer can read | 0s | behaviour |
-| `speed` | export playback speed of a span (`8x`) | export default | export hint |
-| `idle` | export cap on each pause in a span | none | export hint |
-| `hold` | extra export time on the last screen of a span | none | export hint |
+| `speed` | playback speed of a span (`8x`), for export and replay | export default | export hint |
+| `idle` | cap on each pause in a span, for export and replay | none | export hint |
+| `hold` | extra time on the last screen of a span, for export and replay | none | export hint |
 
 - Process settings must appear before the first step.
 - Behaviour settings may appear anywhere. Inside a block, a setting applies from its line to the
@@ -139,7 +139,7 @@ A block is one step.
 scene NAME {      # letters, digits, _ and -; unique
   ...
 }
-hidden [NAME] {   # runs and is recorded; export may drop it; the name is optional
+hidden [NAME] {   # runs and is recorded; export and replay drop it; the name is optional
   ...
 }
 ```

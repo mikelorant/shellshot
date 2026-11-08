@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mikelorant/shellshot/internal/export/spanplan"
 	"github.com/mikelorant/shellshot/internal/replay"
 )
 
@@ -37,6 +38,30 @@ func TestWriteReplaySummary(t *testing.T) {
 			in:   finished,
 			want: `replay finished
 frames       74 shown (of 74)
+time         11.9s played, 27.6s recorded (15.7s saved; speed 1x)
+file         pi.shot, 6.5 KB
+`,
+		},
+		{
+			name: "hidden spans cut",
+			in: with(func(c *replaySummary) {
+				c.stats.HiddenCut, c.stats.HiddenTime = 3, 12400*time.Millisecond
+			}),
+			want: `replay finished
+frames       74 shown (of 74)
+hidden       3 spans cut, 12.4s
+time         11.9s played, 27.6s recorded (15.7s saved; speed 1x)
+file         pi.shot, 6.5 KB
+`,
+		},
+		{
+			name: "one hidden span cut",
+			in: with(func(c *replaySummary) {
+				c.stats.HiddenCut, c.stats.HiddenTime = 1, 3*s
+			}),
+			want: `replay finished
+frames       74 shown (of 74)
+hidden       1 span cut, 3.0s
 time         11.9s played, 27.6s recorded (15.7s saved; speed 1x)
 file         pi.shot, 6.5 KB
 `,
@@ -228,7 +253,7 @@ func TestReplaySummaryCropped(t *testing.T) {
 	cmd.SetContext(t.Context())
 	cmd.SetOut(&out)
 	cmd.SetErr(&errBuf)
-	if err := runReplay(cmd, path, 60, replay.Options{Speed: 1000, Clear: true, Cols: 4, Rows: 1}, false); err != nil {
+	if err := runReplay(cmd, path, 60, replay.Options{Speed: 1000, Clear: true, Cols: 4, Rows: 1}, spanplan.Options{}, false); err != nil {
 		t.Fatalf("runReplay() error = %v", err)
 	}
 	if want := "screen       10x2 recorded, shown at 4x1 (cropped)\n"; !strings.Contains(errBuf.String(), want) {

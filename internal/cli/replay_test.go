@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mikelorant/shellshot/internal/export/spanplan"
 	"github.com/mikelorant/shellshot/internal/recording/bin"
 	"github.com/mikelorant/shellshot/internal/recording/bin/head"
 	"github.com/mikelorant/shellshot/internal/replay"
@@ -110,7 +111,7 @@ func TestReplayCropsToTerminal(t *testing.T) {
 	cmd.SetContext(t.Context())
 	cmd.SetOut(&out)
 	cmd.SetErr(&errBuf)
-	if err := runReplay(cmd, path, 60, replay.Options{Speed: 1000, Clear: true, Cols: 4, Rows: 1}, true); err != nil {
+	if err := runReplay(cmd, path, 60, replay.Options{Speed: 1000, Clear: true, Cols: 4, Rows: 1}, spanplan.Options{}, true); err != nil {
 		t.Fatalf("runReplay() error = %v", err)
 	}
 	if want := "shellshot: replay: recording is 10x2 but the terminal is 4x1: cropping (use --no-crop to disable)\n"; errBuf.String() != want {
@@ -202,7 +203,7 @@ func TestReplayIdleLimitCapsPauses(t *testing.T) {
 		cmd.SetContext(t.Context())
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
-		if err := runReplay(cmd, path, 60, opts, true); err != nil {
+		if err := runReplay(cmd, path, 60, opts, spanplan.Options{}, true); err != nil {
 			t.Fatalf("runReplay() error = %v", err)
 		}
 		return got
