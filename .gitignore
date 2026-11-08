@@ -13,5 +13,8 @@ recordings/
 /*.svg
 /*.apng
 
+# Scratch scripts written at the repo root; the committed ones live in subdirectories
+/*.script
+
 # zig package cache created by setup-zig in CI; goreleaser requires a clean tree
 /.zig-cache/
