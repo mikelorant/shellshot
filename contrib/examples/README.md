@@ -1,6 +1,6 @@
 # Examples
 
-Ten POSIX `sh` demo scripts that print colourful, animated terminal output. They
+Eleven POSIX `sh` demo scripts that print colourful, animated terminal output. They
 are demo material for `shellshot` and a test bed for terminals. Each one needs a
 terminal, fits 80x24, ends by itself and restores the terminal (cursor, alternate
 screen, scroll region, attributes) on exit, Ctrl-C or SIGTERM. They only print
@@ -34,6 +34,7 @@ a terminal), `--pause` (wait for Enter at the end), `--help`.
 | `osc.sh` | window title (OSC 0/2) and hyperlinks (OSC 8) | 8 s |
 | `buildlog.sh` | a fake build log with coloured levels and a retried test | 9 s |
 | `dashboard.sh` | a TUI-style dashboard in the alternate screen | 10 s |
+| `agent.sh` | a fake coding-agent session: typed shell commands, an agent TUI that "writes" a dashboard, then the dashboard runs (nothing is executed) | 55 s |
 | `showcase.sh` | nine short scenes from the others | 34 s |
 
 `lib.sh` holds the shared helpers (sourced, not run). `scripts/*.script` are
