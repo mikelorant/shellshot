@@ -1,4 +1,4 @@
-<h1 id="shellshot"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="Shellshot" src="docs/assets/logo.svg" width="360"></picture></h1>
+<h1 id="shellshot" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="Shellshot" src="docs/assets/logo.svg" width="360"></picture></h1>
 
 [![Release][release-badge]][release]
 [![GoReleaser][goreleaser-badge]][goreleaser]
@@ -28,6 +28,7 @@ recording does not depend on your typing.
 [![Usage][usage-badge]](#-usage-)
 [![Common Tasks][common-tasks-badge]](#-common-tasks-)
 [![Scripting][scripting-badge]](#-scripting-)
+[![Documentation][documentation-badge]](#-documentation-)
 [![Built With][built-with-badge]](#-built-with-)
 
 [highlights-badge]: https://img.shields.io/badge/-💡_Highlights-ff0000
@@ -37,7 +38,8 @@ recording does not depend on your typing.
 [usage-badge]: https://img.shields.io/badge/-🎛_Usage-0000ff
 [common-tasks-badge]: https://img.shields.io/badge/-🧰_Common_Tasks-4b0082
 [scripting-badge]: https://img.shields.io/badge/-📜_Scripting-ee82ee
-[built-with-badge]: https://img.shields.io/badge/-🧱_Built_With-ff69b4
+[documentation-badge]: https://img.shields.io/badge/-📚_Documentation-ff69b4
+[built-with-badge]: https://img.shields.io/badge/-🧱_Built_With-808080
 
 <img src="docs/assets/showcase.png" width="736" alt="A shellshot export of its demo: colours, text styles, Unicode, emoji, cursor control, animation and a dashboard.">
 
@@ -61,32 +63,12 @@ recording does not depend on your typing.
 
 ## 🐾 First steps [⭡](#shellshot)
 
-1. Download the release for your platform. Run the command that matches your computer. It saves
-   the `shellshot` program in the current folder.
-
-   macOS on Apple silicon:
-
-   ```sh
-   curl -fsSL https://github.com/mikelorant/shellshot/releases/latest/download/shellshot_darwin_arm64.tar.gz | tar xz shellshot
-   ```
-
-   macOS on Intel:
-
-   ```sh
-   curl -fsSL https://github.com/mikelorant/shellshot/releases/latest/download/shellshot_darwin_amd64.tar.gz | tar xz shellshot
-   ```
-
-   Linux on amd64 (x86-64):
-
-   ```sh
-   curl -fsSL https://github.com/mikelorant/shellshot/releases/latest/download/shellshot_linux_amd64.tar.gz | tar xz shellshot
-   ```
-
-   Linux on arm64:
-
-   ```sh
-   curl -fsSL https://github.com/mikelorant/shellshot/releases/latest/download/shellshot_linux_arm64.tar.gz | tar xz shellshot
-   ```
+1. Go to the [latest release](https://github.com/mikelorant/shellshot/releases/latest) and download
+   the archive for your platform: macOS Apple silicon (`shellshot_darwin_arm64.tar.gz`), macOS Intel
+   (`shellshot_darwin_amd64.tar.gz`), Linux 64-bit (`shellshot_linux_amd64.tar.gz`) or Linux ARM
+   (`shellshot_linux_arm64.tar.gz`). Extract it in the folder you are working in, so that
+   `./shellshot` is there. Opening the archive in a file manager or running `tar -xzf` on it both
+   work.
 
 2. Record a session. This starts your shell. Run a few commands, then type `exit` to stop.
 
@@ -121,29 +103,11 @@ parts to install or break.
 
 ## 💾 Installation [⭡](#shellshot)
 
-macOS on Apple silicon:
-
-```sh
-curl -fsSL https://github.com/mikelorant/shellshot/releases/latest/download/shellshot_darwin_arm64.tar.gz | tar xz shellshot
-```
-
-macOS on Intel:
-
-```sh
-curl -fsSL https://github.com/mikelorant/shellshot/releases/latest/download/shellshot_darwin_amd64.tar.gz | tar xz shellshot
-```
-
-Linux on amd64 (x86-64):
-
-```sh
-curl -fsSL https://github.com/mikelorant/shellshot/releases/latest/download/shellshot_linux_amd64.tar.gz | tar xz shellshot
-```
-
-Linux on arm64:
-
-```sh
-curl -fsSL https://github.com/mikelorant/shellshot/releases/latest/download/shellshot_linux_arm64.tar.gz | tar xz shellshot
-```
+Go to the [latest release](https://github.com/mikelorant/shellshot/releases/latest) and download
+the archive for your platform: macOS Apple silicon (`shellshot_darwin_arm64.tar.gz`), macOS Intel
+(`shellshot_darwin_amd64.tar.gz`), Linux 64-bit (`shellshot_linux_amd64.tar.gz`) or Linux ARM
+(`shellshot_linux_arm64.tar.gz`). Extract it in the folder you are working in, so that
+`./shellshot` is there. Opening the archive in a file manager or running `tar -xzf` on it both work.
 
 ## 🎛 Usage [⭡](#shellshot)
 
@@ -334,7 +298,7 @@ hidden setup {
 }
 
 scene edit {
-  run vim --cmd 'filetype plugin indent on' main.go
+  run vim main.go
   press i
   type lines {
     package main
@@ -484,6 +448,16 @@ type paragraphs {
 ```
 
 At the end of every script, shellshot exits the shell for you, inside an implicit hidden block.
+
+## 📚 Documentation [⭡](#shellshot)
+
+- [Export reference](docs/export.md): every export option, including formats, fonts, sizes and
+  themes.
+- [Script reference](docs/scripting.md): the full `.script` language.
+- [Recording format](docs/format.md): how a `.shot` file is laid out.
+- [Examples](contrib/examples/README.md): demo programs and scripts to record and try.
+- [Development](docs/development.md): building from source, tests, releases and containers.
+- [Architecture](docs/ARCHITECTURE.md): how the code is organised.
 
 ## 🧱 Built with [⭡](#shellshot)
 

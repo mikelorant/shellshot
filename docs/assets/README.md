@@ -14,8 +14,8 @@ Construction: a scallop seashell (the "shell") carries a `>_` prompt (the termin
 It sits on a hinged, striped clapper stick, so the shell "claps" the shot.
 The wordmark is JetBrains Mono Bold outlined to paths (no font needed) with a block cursor after it.
 
-README top (the logo is the page title, left-aligned, and the `id` is the target of the back-to-top links):
+README top (the logo is the page title, centred, and the `id` is the target of the back-to-top links):
 
 ```html
-<h1 id="shellshot"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="Shellshot" src="docs/assets/logo.svg" width="360"></picture></h1>
+<h1 id="shellshot" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="Shellshot" src="docs/assets/logo.svg" width="360"></picture></h1>
 ```
