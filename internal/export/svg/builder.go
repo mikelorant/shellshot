@@ -159,12 +159,13 @@ func (b *Builder) glyphs(sb *strings.Builder, cells []raster.RowCell, x0, y0 int
 			text.close()
 			continue
 		}
-		if b.mode == TextPaths {
+		if b.mode == TextPaths || b.iconOutline(c) {
 			u, err := b.outlines(c, x, y)
 			if err != nil {
 				return err
 			}
 			uses = append(uses, u...)
+			text.close()
 			continue
 		}
 		text.add(c, x, l)
@@ -172,6 +173,22 @@ func (b *Builder) glyphs(sb *strings.Builder, cells []raster.RowCell, x0, y0 int
 	writeUses(sb, uses, l.Theme.Foreground)
 	text.write(sb, y0+l.Ascent)
 	return nil
+}
+
+// iconOutline reports whether text mode draws c as glyph outlines rather
+// than <text>: its base rune is in a private use area (where Nerd Fonts keep
+// their icons) and a font of the set has a glyph for it. A viewer without a
+// Nerd Font would draw such a rune as a blank or a box, so the outline
+// carries the icon. A private use rune no font has stays text, as does all
+// other text, which the viewer can select and search.
+func (b *Builder) iconOutline(c raster.RowCell) bool {
+	return b.mode == TextText && isPrivateUse(c.Base) && b.g.Covers(c.Base, c.Bold, c.Italic)
+}
+
+// isPrivateUse reports whether r is in the Basic Multilingual Plane private
+// use area (U+E000-U+F8FF) or in private use plane 15 or 16.
+func isPrivateUse(r rune) bool {
+	return r >= 0xE000 && r <= 0xF8FF || r >= 0xF0000 && r <= 0xFFFFD || r >= 0x100000 && r <= 0x10FFFD
 }
 
 // sprite returns the id of the procedural glyph that draws c, if it has one.
