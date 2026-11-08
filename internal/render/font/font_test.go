@@ -591,58 +591,196 @@ func TestMetricsUnaffectedByFallbacks(t *testing.T) {
 }
 
 // FitFace scales a fallback glyph so its advance equals the cell span and
-// its ink box lies within the span and the cell height.
+// its ink box lies within the span and the cell height. This is the rule for
+// every fallback glyph except Nerd Font icons (TestFitFaceSizesIconsByHeight):
+// the CJK subset, and a user font that has the same glyphs as the Nerd Font.
 func TestFitFaceBoundsWithinBudget(t *testing.T) {
-	s := mustDefault(t)
-	for _, basePx := range []float64{14, 20, 28} {
-		m, err := s.Metrics(basePx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, cells := range []int{1, 2} {
-			for _, r := range []rune{0xF015, 0xE725, 0xF0001} {
-				face, ok, err := s.FitFace(r, false, false, basePx, m.CellWidth, m.CellHeight, cells)
-				if err != nil || !ok {
-					t.Fatalf("FitFace(%U): ok=%v err=%v", r, ok, err)
+	g := jetBrainsMonoRegular
+	userNerd, err := Load(g, g, g, g, FallbackFont{Name: "user", Data: symbolsNerdFontMono})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name  string
+		set   *Set
+		runes []rune
+	}{
+		{"embedded CJK", mustDefault(t), []rune{0x4E16, 0xC548, 0x3053}},
+		{"user Nerd Font", userNerd, []rune{0xF015, 0xE725, 0xF0001}},
+	} {
+		for _, r := range tc.runes {
+			if tc.set.IsIcon(r, false, false) {
+				t.Errorf("%s: IsIcon(%U) = true", tc.name, r)
+			}
+			for _, basePx := range []float64{14, 20, 28} {
+				m, err := tc.set.Metrics(basePx)
+				if err != nil {
+					t.Fatal(err)
 				}
-				b, adv, ok := face.GlyphBounds(r)
-				if !ok {
-					t.Fatalf("%U: no bounds", r)
-				}
-				budget := fixed.I(cells * m.CellWidth)
-				if adv > budget {
-					t.Errorf("%v px %d cells %U: advance %v exceeds %v", basePx, cells, r, adv, budget)
-				}
-				if w := b.Max.X - b.Min.X; w > budget {
-					t.Errorf("%v px %d cells %U: ink width %v exceeds %v", basePx, cells, r, w, budget)
-				}
-				if h := b.Max.Y - b.Min.Y; h > fixed.I(m.CellHeight) {
-					t.Errorf("%v px %d cells %U: ink height %v exceeds cell height %d", basePx, cells, r, h, m.CellHeight)
-				}
-				// 1-cell icons are fitted by width: the advance fills the cell
-				// to within the 1/64 px size quantisation.
-				if cells == 1 && budget-adv > fixed.Int26_6(64)/8 {
-					t.Errorf("%v px %U: advance %v is far below the %v cell", basePx, r, adv, budget)
+				for _, cells := range []int{1, 2} {
+					face, ok, err := tc.set.FitFace(r, false, false, basePx, m.CellWidth, m.CellHeight, cells)
+					if err != nil || !ok {
+						t.Fatalf("%s: FitFace(%U): ok=%v err=%v", tc.name, r, ok, err)
+					}
+					b, adv, ok := face.GlyphBounds(r)
+					if !ok {
+						t.Fatalf("%s: %U: no bounds", tc.name, r)
+					}
+					budget := fixed.I(cells * m.CellWidth)
+					if adv > budget {
+						t.Errorf("%s %v px %d cells %U: advance %v exceeds %v", tc.name, basePx, cells, r, adv, budget)
+					}
+					if w := b.Max.X - b.Min.X; w > budget {
+						t.Errorf("%s %v px %d cells %U: ink width %v exceeds %v", tc.name, basePx, cells, r, w, budget)
+					}
+					if h := b.Max.Y - b.Min.Y; h > fixed.I(m.CellHeight) {
+						t.Errorf("%s %v px %d cells %U: ink height %v exceeds cell height %d", tc.name, basePx, cells, r, h, m.CellHeight)
+					}
+					// 1-cell glyphs are fitted by width: the advance fills the
+					// cell to within the 1/64 px size quantisation.
+					if cells == 1 && budget-adv > fixed.Int26_6(64)/8 {
+						t.Errorf("%s %v px %U: advance %v is far below the %v cell", tc.name, basePx, r, adv, budget)
+					}
 				}
 			}
 		}
 	}
 }
 
+// IsIcon is true only for glyphs of the embedded Nerd Font in a private-use
+// range: not for the primary family, the CJK subset, or Nerd Font glyphs
+// outside those ranges (U+23FB is the IEC power symbol).
+func TestIsIcon(t *testing.T) {
+	s := mustDefault(t)
+	for _, tc := range []struct {
+		r    rune
+		want bool
+	}{
+		{0xF015, true}, {0xE725, true}, {0xE0B6, true}, {0xF0001, true},
+		{'a', false}, {0x4E16, false}, {0x23FB, false}, {0x10FFFE, false}, {0xFFFFE, false},
+	} {
+		if got := s.IsIcon(tc.r, false, false); got != tc.want {
+			t.Errorf("IsIcon(%U) = %v, want %v", tc.r, got, tc.want)
+		}
+	}
+	if o, ok, _ := s.Outline(0xF015, false, false); !ok || !o.Icon {
+		t.Errorf("Outline(U+F015).Icon = %v, want true", o.Icon)
+	}
+	if o, ok, _ := s.Outline(0x4E16, false, false); !ok || o.Icon {
+		t.Errorf("Outline(世).Icon = %v, want false", o.Icon)
+	}
+}
+
+func TestIsPrivateUse(t *testing.T) {
+	for _, tc := range []struct {
+		r    rune
+		want bool
+	}{
+		{0xDFFF, false}, {0xE000, true}, {0xF8FF, true}, {0xF900, false},
+		{0xEFFFF, false}, {0xF0000, true}, {0xFFFFD, true}, {0xFFFFE, false},
+		{0xFFFFF, false}, {0x100000, true}, {0x10FFFD, true}, {0x10FFFE, false},
+	} {
+		if got := isPrivateUse(tc.r); got != tc.want {
+			t.Errorf("isPrivateUse(%U) = %v, want %v", tc.r, got, tc.want)
+		}
+	}
+}
+
+func TestIconScale(t *testing.T) {
+	for _, tc := range []struct{ inkH, cellH, want float64 }{
+		{13, 20, 1},   // fits: never above the font size
+		{20, 20, 1},   // exactly fits
+		{20, 10, 0.5}, // too tall: reduced to the cell height
+		{13.3, 8, 8 / 13.3},
+	} {
+		if got := IconScale(tc.inkH, tc.cellH); got != tc.want {
+			t.Errorf("IconScale(%v, %v) = %v, want %v", tc.inkH, tc.cellH, got, tc.want)
+		}
+	}
+}
+
+// A Nerd Font icon is sized by height only: its face is the font size (one
+// em), reduced when its ink is taller than the cell so that the ink is as tall
+// as the cell. The cell width and the number of cells do not matter, so the
+// icon may be wider than its cell.
+func TestFitFaceSizesIconsByHeight(t *testing.T) {
+	s := mustDefault(t)
+	for _, tc := range []struct {
+		name    string
+		basePx  float64
+		cellW   int
+		cellH   int
+		cells   int
+		limited bool // the cell height, not the font size, limits the icon
+	}{
+		{"15px 1 cell", 15, 9, 20, 1, false},
+		{"15px 2 cells", 15, 9, 20, 2, false},
+		{"30px 1 cell", 30, 18, 40, 1, false},
+		{"30px 2 cells", 30, 18, 40, 2, false},
+		{"15px short cell", 15, 9, 10, 1, true},
+		{"15px short cell 2 cells", 15, 9, 10, 2, true},
+		{"30px short cell", 30, 18, 20, 1, true},
+		{"30px narrow cell", 30, 4, 40, 1, false},
+	} {
+		for _, r := range []rune{0xF015, 0xE725, 0xF0001} {
+			nativeFace, ok, err := s.FaceFor(r, false, false, tc.basePx)
+			if err != nil || !ok {
+				t.Fatal(ok, err)
+			}
+			native, _, _ := nativeFace.GlyphBounds(r)
+			nativeH := float64(native.Max.Y-native.Min.Y) / 64
+			nativeW := float64(native.Max.X-native.Min.X) / 64
+			want := math.Min(1, float64(tc.cellH)/nativeH)
+			if (want < 1) != tc.limited {
+				t.Fatalf("%s %U: test expects limited=%v but the ink is %v px tall in a %d px cell", tc.name, r, tc.limited, nativeH, tc.cellH)
+			}
+			face, ok, err := s.FitFace(r, false, false, tc.basePx, tc.cellW, tc.cellH, tc.cells)
+			if err != nil || !ok {
+				t.Fatalf("%s %U: FitFace ok=%v err=%v", tc.name, r, ok, err)
+			}
+			b, _, ok := face.GlyphBounds(r)
+			if !ok {
+				t.Fatalf("%s %U: no bounds", tc.name, r)
+			}
+			h := float64(b.Max.Y-b.Min.Y) / 64
+			w := float64(b.Max.X-b.Min.X) / 64
+			if math.Abs(h-nativeH*want) > 0.1 || math.Abs(w-nativeW*want) > 0.1 {
+				t.Errorf("%s %U: ink %.2f x %.2f px, want %.2f x %.2f (scale %.3f)", tc.name, r, w, h, nativeW*want, nativeH*want, want)
+			}
+			if h > float64(tc.cellH) {
+				t.Errorf("%s %U: ink height %.2f exceeds the cell height %d", tc.name, r, h, tc.cellH)
+			}
+		}
+	}
+
+	// The 15 px home icon is about 15 x 13, in a 9 px wide cell.
+	face, _, _ := s.FitFace(0xF015, false, false, 15, 9, 20, 1)
+	b, _, _ := face.GlyphBounds(0xF015)
+	if w, h := (b.Max.X - b.Min.X).Round(), (b.Max.Y - b.Min.Y).Round(); w != 15 || h != 13 {
+		t.Errorf("home icon at 15 px is %d x %d, want 15 x 13", w, h)
+	}
+}
+
 func TestFitFaceCachesFaces(t *testing.T) {
 	s := mustDefault(t)
-	a, _, err := s.FitFace(0xF015, false, false, 14, 9, 20, 1)
+	// Bold/italic requests of one fallback rune share the face.
+	a, _, err := s.FitFace(0x4E16, false, false, 14, 9, 20, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Bold/italic requests and other icons fitted to the same size share the face.
-	b, _, _ := s.FitFace(0xF015, true, true, 14, 9, 20, 1)
+	b, _, _ := s.FitFace(0x4E16, true, true, 14, 9, 20, 1)
 	if a != b {
 		t.Error("FitFace returned different faces for the same fit")
 	}
-	wide, _, _ := s.FitFace(0xF015, false, false, 14, 9, 20, 2)
+	wide, _, _ := s.FitFace(0x4E16, false, false, 14, 9, 20, 2)
 	if a == wide {
 		t.Error("1-cell and 2-cell fits share a face")
+	}
+	// An icon's size does not depend on the cells: one face for all.
+	i1, _, _ := s.FitFace(0xF015, false, false, 14, 9, 20, 1)
+	i2, _, _ := s.FitFace(0xF015, true, true, 14, 9, 20, 2)
+	if i1 != i2 {
+		t.Error("FitFace returned different faces for an icon in 1 and 2 cells")
 	}
 }
 

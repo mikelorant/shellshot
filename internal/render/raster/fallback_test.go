@@ -3,6 +3,7 @@ package raster
 import (
 	"errors"
 	"image"
+	"math"
 	"testing"
 
 	xfont "golang.org/x/image/font"
@@ -36,31 +37,104 @@ func inkOutsideCells(r *Renderer, img *image.RGBA, cols ...int) int {
 }
 
 // A Nerd Font icon the primary font lacks is drawn by the fallback font
-// inside its own cell only, even though the icon is wider than the cell.
-func TestFallbackNerdGlyphInksOnlyItsCell(t *testing.T) {
+// starting at the left edge of its cell and overflowing to the right: nothing
+// is inked left of its cell, and the ink reaches into the next cell.
+func TestFallbackNerdGlyphOverflowsToTheRight(t *testing.T) {
 	r, _ := newTestRenderer(t, Options{})
 	for _, c := range []rune{0xF015, 0xE725, 0xF0001} {
 		img := mustRender(t, r, plainSnapshot(5, " "+string(c)+"  "))
+		cell, next := cellSpan(r, 1, 1), cellSpan(r, 2, 1)
 		if inkInCell(r, img, 1, 0) == 0 {
 			t.Errorf("%U: no ink in its cell", c)
 		}
-		if out := inkOutsideCells(r, img, 1); out != 0 {
-			t.Errorf("%U: %d inked pixels outside its cell", c, out)
+		if inkInCell(r, img, 2, 0) == 0 {
+			t.Errorf("%U: no overflow into the next cell", c)
+		}
+		if inkInCell(r, img, 0, 0) != 0 {
+			t.Errorf("%U: ink left of its cell", c)
+		}
+		box := inkBox(r, img, cellSpan(r, 0, 5))
+		if box.Min.X < cell.Min.X || box.Min.X > cell.Min.X+2 {
+			t.Errorf("%U: ink starts at x %d, want within 2 px of the cell's left edge %d", c, box.Min.X, cell.Min.X)
+		}
+		if box.Max.X <= cell.Max.X || box.Max.X > next.Max.X+r.metrics.CellWidth {
+			t.Errorf("%U: ink ends at x %d, cell ends at %d", c, box.Max.X, cell.Max.X)
 		}
 	}
 }
 
-// A wide rune is clipped to two cells, not one and not three.
-func TestFallbackWideNerdGlyphClipsToTwoCells(t *testing.T) {
+// A wide icon cell keeps the left edge too: the icon is not centred in the
+// two cells.
+func TestFallbackWideNerdGlyphKeepsLeftEdge(t *testing.T) {
 	r, _ := newTestRenderer(t, Options{})
+	narrow := mustRender(t, r, plainSnapshot(5, " \uf015  "))
 	s := plainSnapshot(5, " \uf015 ")
 	s.Widths = [][]snapshot.Wide{{{Rune: 1, Cells: 2}}}
+	wide := mustRender(t, r, s)
+	if string(narrow.Pix) != string(wide.Pix) {
+		t.Error("a wide icon cell draws differently from a narrow one")
+	}
+}
+
+// The icon is painted over the background of the cell it overflows into, and
+// that cell's background is otherwise left as it was.
+func TestFallbackNerdGlyphOverflowsOverNeighbourBackground(t *testing.T) {
+	r, _ := newTestRenderer(t, Options{})
+	s := plainSnapshot(5, " \uf015  ")
+	s.Spans = [][]snapshot.Span{{{Start: 2, End: 3, Style: snapshot.Style{Bg: blueBg}}}}
 	img := mustRender(t, r, s)
-	if inkInCell(r, img, 1, 0) == 0 || inkInCell(r, img, 2, 0) == 0 {
-		t.Errorf("wide icon ink = %d, %d cells; want both inked", inkInCell(r, img, 1, 0), inkInCell(r, img, 2, 0))
+	next := cellSpan(r, 2, 1)
+	bg := img.RGBAAt(next.Max.X-1, next.Max.Y-1)
+	if bg == r.theme.Background {
+		t.Fatal("neighbour background not painted")
+	}
+	over := 0
+	for y := next.Min.Y; y < next.Max.Y; y++ {
+		for x := next.Min.X; x < next.Max.X; x++ {
+			if img.RGBAAt(x, y) != bg {
+				over++
+			}
+		}
+	}
+	if over == 0 {
+		t.Error("icon does not show over the next cell's background")
+	}
+}
+
+// An icon in the last column overflows past the grid, as far as the padding
+// and no further: it is clipped to the image, with no out-of-range write.
+func TestFallbackNerdGlyphInLastColumnIsClippedToImage(t *testing.T) {
+	r, _ := newTestRenderer(t, Options{Padding: 1})
+	img := mustRender(t, r, plainSnapshot(3, "  \uf015"))
+	w, h := r.Size(3, 1)
+	if img.Bounds() != image.Rect(0, 0, w, h) {
+		t.Fatalf("image bounds %v, want %dx%d", img.Bounds(), w, h)
+	}
+	if inkInCell(r, img, 2, 0) == 0 {
+		t.Error("no ink in the last column")
+	}
+	if img.RGBAAt(w-1, h/2) == r.theme.Background {
+		t.Error("the overflow does not reach the right edge of the image")
+	}
+}
+
+// A CJK glyph, which is not an icon, is still fitted to the cells it occupies
+// and clipped to them.
+func TestFallbackCJKStillFitsItsCells(t *testing.T) {
+	r, _ := newTestRenderer(t, Options{})
+	s := plainSnapshot(5, " \u4e16  ")
+	s.Widths = [][]snapshot.Wide{{{Rune: 1, Cells: 2}}}
+	img := mustRender(t, r, s)
+	span := cellSpan(r, 1, 2)
+	box := inkBox(r, img, span)
+	if box.Empty() || !box.In(span) {
+		t.Errorf("ink box %v not within span %v", box, span)
 	}
 	if out := inkOutsideCells(r, img, 1, 2); out != 0 {
 		t.Errorf("%d inked pixels outside the two cells", out)
+	}
+	if dx := box.Min.X + box.Max.X - span.Min.X - span.Max.X; dx < -3 || dx > 3 {
+		t.Errorf("ink box %v not centred horizontally in %v", box, span)
 	}
 }
 
@@ -176,12 +250,11 @@ func cellSpan(r *Renderer, col, cells int) image.Rectangle {
 	return image.Rect(o.X, o.Y, o.X+cells*r.metrics.CellWidth, o.Y+r.metrics.CellHeight)
 }
 
-// Fallback icons are scaled to fit their cell: the ink covers most of the
-// cell width, stays inside the cell span and is centred in it, at several
-// sizes and scales, for one and two cells. (An icon designed to fill its
-// advance legitimately inks the edge columns; TestFitFaceBoundsWithinBudget
-// proves the fitted glyph is not cut off by the clip.)
-func TestFallbackIconsFitTheirCells(t *testing.T) {
+// Nerd Font icons are sized by height: at the font size unless that is taller
+// than the cell, centred vertically, never wider than the font size (one em)
+// and never clipped to the cell, at several sizes and scales, for one and
+// two cells.
+func TestFallbackIconsAreSizedByHeight(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		opts  Options
@@ -194,36 +267,35 @@ func TestFallbackIconsFitTheirCells(t *testing.T) {
 		{"scale2 wide", Options{FontSize: 14, Scale: 2}, 2},
 	} {
 		r, _ := newTestRenderer(t, tc.opts)
+		em := int(math.Round(r.sizePx))
 		for _, c := range []rune{0xF015, 0xE725} {
-			s := plainSnapshot(5, " "+string(c)+"  ")
+			s := plainSnapshot(6, " "+string(c)+"   ")
 			if tc.cells == 2 {
 				s.Widths = [][]snapshot.Wide{{{Rune: 1, Cells: 2}}}
 			}
 			img := mustRender(t, r, s)
 			span := cellSpan(r, 1, tc.cells)
-			box := inkBox(r, img, span)
+			box := inkBox(r, img, cellSpan(r, 0, 6))
 			if box.Empty() {
 				t.Errorf("%s %U: no ink", tc.name, c)
 				continue
 			}
-			if w := float64(box.Dx()) / float64(span.Dx()); w <= 0.6 {
-				t.Errorf("%s %U: ink width %d is %.0f%% of the %d px span, want > 60%%", tc.name, c, box.Dx(), w*100, span.Dx())
+			if box.Dy() > r.metrics.CellHeight {
+				t.Errorf("%s %U: ink height %d exceeds the cell height %d", tc.name, c, box.Dy(), r.metrics.CellHeight)
 			}
-			if !box.In(span) {
-				t.Errorf("%s %U: ink box %v exceeds cell span %v", tc.name, c, box, span)
+			if box.Dx() > em+1 {
+				t.Errorf("%s %U: ink width %d exceeds the font size %d", tc.name, c, box.Dx(), em)
 			}
-			cols := []int{1}
-			if tc.cells == 2 {
-				cols = append(cols, 2)
+			if tc.cells == 1 && box.Dx() <= r.metrics.CellWidth {
+				t.Errorf("%s %U: ink width %d does not exceed the %d px cell: icon was fitted to the cell", tc.name, c, box.Dx(), r.metrics.CellWidth)
 			}
-			if out := inkOutsideCells(r, img, cols...); out != 0 {
-				t.Errorf("%s %U: %d inked pixels outside its cells", tc.name, c, out)
+			// The ink starts at the glyph's own left bearing, up to a quarter em.
+			if box.Min.X < span.Min.X || box.Min.X > span.Min.X+em/4 {
+				t.Errorf("%s %U: ink starts at x %d, want near the cell's left edge %d", tc.name, c, box.Min.X, span.Min.X)
 			}
-			// centred: the ink box midpoint is within a pixel of the span's.
-			dx := box.Min.X + box.Max.X - span.Min.X - span.Max.X
 			dy := box.Min.Y + box.Max.Y - span.Min.Y - span.Max.Y
-			if dx < -3 || dx > 3 || dy < -3 || dy > 3 {
-				t.Errorf("%s %U: ink box %v not centred in %v", tc.name, c, box, span)
+			if dy < -3 || dy > 3 {
+				t.Errorf("%s %U: ink box %v not centred vertically in %v", tc.name, c, box, span)
 			}
 		}
 	}

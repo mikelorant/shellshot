@@ -69,6 +69,9 @@ type Set struct {
 	fallbacks     []*opentype.Font
 	fallbackNames []string
 	emoji         emoji.Backend // nil without colour emoji
+	// nerdIcons reports that fallbacks[0] is the embedded Symbols Nerd Font
+	// Mono (see IsIcon).
+	nerdIcons bool
 
 	mu    sync.Mutex
 	faces map[faceKey]xfont.Face
@@ -99,6 +102,7 @@ func Default(extra ...FallbackFont) (*Set, error) {
 		return nil, err
 	}
 	s.emoji = emojiChain
+	s.nerdIcons = true
 	return s, nil
 }
 

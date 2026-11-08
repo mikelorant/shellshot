@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/image/font/sfnt"
 
+	"github.com/mikelorant/shellshot/internal/render/font"
 	"github.com/mikelorant/shellshot/internal/render/raster"
 	"github.com/mikelorant/shellshot/internal/render/sprite"
 )
@@ -152,6 +153,16 @@ func (d *defs) emojiImage(g Assets, cluster string, side int) string {
 // where the raster renderer puts it: on the baseline, moved right by the
 // layout's glyph offset. A fallback glyph is scaled and centred in the cells
 // it spans, as font.FitFace and the raster fallback do.
+//
+// A Nerd Font icon (Outline.Icon) is the exception, again as in the raster
+// renderer: it is scaled by font.IconScale (by height only, never above the
+// font size), its origin is the left edge of the cell so the ink starts at
+// the glyph's own left bearing and overflows to the right, and it is centred
+// vertically. Nothing in the SVG clips a glyph to its cell, and glyphs are
+// drawn after all backgrounds, so the overflow shows over the next cells.
+// This applies wherever glyph is used, which is the "paths" text mode. A
+// text mode that routes private-use icons to outlines must use glyph for
+// them and so gets this placement without further work.
 func (d *defs) glyph(a Assets, l raster.Layout, r rune, bold, italic bool, cells int) (glyphDef, error) {
 	k := glyphKey{r, bold, italic, cells}
 	if g, ok := d.glyphs[k]; ok {
@@ -170,7 +181,12 @@ func (d *defs) glyph(a Assets, l raster.Layout, r rune, bold, italic bool, cells
 	ox, oy := l.GlyphOffsetX, float64(l.Ascent)
 	if !o.Primary {
 		minX, minY, maxX, maxY, any := bounds(o.Segments)
-		if any {
+		switch {
+		case any && o.Icon:
+			scale *= font.IconScale((maxY-minY)*scale, float64(l.CellHeight))
+			ox = 0
+			oy = math.Round(math.FMA(-(minY+maxY)/2, scale, float64(l.CellHeight)/2))
+		case any:
 			budgetW := float64(cells * l.CellWidth)
 			fit := math.Inf(1)
 			for _, c := range [...]struct{ have, budget float64 }{

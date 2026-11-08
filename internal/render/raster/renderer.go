@@ -34,6 +34,10 @@ type Fonts interface {
 	// cells (cells wide, cellW x cellH pixels each) r occupies. ok is false
 	// if no font has r.
 	FitFace(r rune, bold, italic bool, sizePx float64, cellW, cellH, cells int) (face xfont.Face, ok bool, err error)
+	// IsIcon reports whether FitFace sizes r by height and not to its cells:
+	// r is a Nerd Font icon, which the renderer starts at the left edge of
+	// its cell and lets overflow to the right.
+	IsIcon(r rune, bold, italic bool) bool
 	// Emoji renders a grapheme cluster as a side x side colour image, or
 	// reports false if no colour emoji font has a glyph for it. The image is
 	// shared and must not be modified.
