@@ -110,8 +110,11 @@ make docker-build     # docker build, tag shellshot:dev, VERSION from git descri
 make docker-smoke     # version, record -c 'echo hi', export to PNG in a temp dir
 ```
 
-Use it from the `docker-compose.yaml` at the repository root (files go to `./recordings`, which is
-git-ignored). `record -c` and `export` need no `-t`; a bare `record` starts a shell and needs `-it`:
+`docker-compose.yaml` at the repository root runs the published image
+`ghcr.io/mikelorant/shellshot:latest`, so trying shellshot needs only Docker and that file (files go
+to `./recordings`, which is git-ignored). `record -c` and `export` need no `-t`; a bare `record`
+starts a shell and needs `-it`. The `demo` profile mounts `./contrib/examples`, so it needs the
+checkout:
 
 ```sh
 mkdir -p recordings
@@ -119,7 +122,20 @@ docker compose run --rm shellshot record -o demo.shot -c 'echo hello'
 docker compose run --rm shellshot export demo.shot -o demo.png
 docker compose run --rm -it shellshot record -o session.shot
 docker compose run --rm demo      # profile `demo`: records and exports contrib/examples/showcase.sh
+docker compose pull               # update to the newest published image
+SHELLSHOT_IMAGE=ghcr.io/mikelorant/shellshot:0.1.0 docker compose run --rm shellshot --version   # pin a version
 ```
+
+To run your own build instead, add the `docker-compose.build.yaml` override (it sets
+`image: shellshot:dev` plus a `build:` section) after the submodule is initialised as above:
+
+```sh
+docker compose -f docker-compose.yaml -f docker-compose.build.yaml build
+docker compose -f docker-compose.yaml -f docker-compose.build.yaml run --rm shellshot --version
+```
+
+`export COMPOSE_FILE=docker-compose.yaml:docker-compose.build.yaml` makes plain `docker compose`
+commands use the pair.
 
 Ownership: Docker Desktop and OrbStack show bind-mounted files as yours. On Linux the container
 writes as uid 1000; run with `SHELLSHOT_UID=$(id -u) SHELLSHOT_GID=$(id -g)` set to write as yourself.

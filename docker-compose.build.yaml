@@ -1,0 +1,21 @@
+# Override that builds the shellshot image from source instead of pulling the published one.
+# For developers; it needs the repository checkout and the ghostty submodule:
+#
+#   git submodule update --init --depth 1 third_party/ghostty
+#   docker compose -f docker-compose.yaml -f docker-compose.build.yaml build
+#
+# Run the local build with the same pair of files:
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.build.yaml run --rm shellshot --version
+#
+# or set it once for the shell, then use plain `docker compose` commands:
+#
+#   export COMPOSE_FILE=docker-compose.yaml:docker-compose.build.yaml
+
+services:
+  shellshot:
+    image: shellshot:dev
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
