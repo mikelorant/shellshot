@@ -15,7 +15,6 @@ import (
 	"github.com/mikelorant/shellshot/internal/export/pipeline"
 	"github.com/mikelorant/shellshot/internal/export/spanplan"
 	"github.com/mikelorant/shellshot/internal/export/timeline"
-	"github.com/mikelorant/shellshot/internal/recording/bin/event"
 	"github.com/mikelorant/shellshot/internal/render/emoji"
 	"github.com/mikelorant/shellshot/internal/render/font"
 	"github.com/mikelorant/shellshot/internal/render/fontchain"
@@ -50,11 +49,9 @@ type exportFlags struct {
 	// fallbackFonts are --fallback-font files, in the order given.
 	fallbackFonts []string
 	systemFonts   bool
-	// noHints and showHidden are --no-hints and --show-hidden.
-	noHints, showHidden bool
-	// speedSet, idleLimitSet and holdSet report that the matching flag was
-	// given on the command line; it then beats the scene hint of that name.
-	speedSet, idleLimitSet, holdSet bool
+	// spans holds --no-hints, --show-hidden and which of --speed,
+	// --idle-limit and --hold were given (see setSpanFlagOverrides).
+	spans spanplan.Options
 	// emojiSet is the --emoji-set value ("apple" or "noto") and emojiFont
 	// the --emoji-font file, empty for none.
 	emojiSet  string
@@ -71,8 +68,7 @@ func newExportCmd() *cobra.Command {
 		Short: "Render a recording as an animated PNG",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fl := cmd.Flags()
-			f.speedSet, f.idleLimitSet, f.holdSet = fl.Changed("speed"), fl.Changed("idle-limit"), fl.Changed("hold")
+			setSpanFlagOverrides(cmd, &f.spans)
 			return runExport(cmd, args[0], f)
 		},
 	}
@@ -96,8 +92,7 @@ func newExportCmd() *cobra.Command {
 	fl.StringVar(&f.cursor, "cursor", "block", "cursor shape: block, bar, underline or none")
 	fl.StringArrayVar(&f.fallbackFonts, "fallback-font", nil, "TTF/OTF/TTC `file` for glyphs the built-in fonts lack (repeatable; tried in order, after the built-in fonts)")
 	fl.BoolVar(&f.systemFonts, "system-fonts", false, "also use installed CJK and symbol fonts (macOS and Linux font folders); the output then depends on this machine's fonts")
-	fl.BoolVar(&f.noHints, "no-hints", false, "ignore the speed, idle and hold hints stored in the recording's scenes (hidden spans are still cut)")
-	fl.BoolVar(&f.showHidden, "show-hidden", false, "render hidden spans like the rest of the recording instead of cutting them")
+	addSpanFlags(cmd, &f.spans, "render")
 	fl.StringVar(&f.emojiSet, "emoji-set", emoji.SetApple.String(), "colour emoji artwork: apple or noto. apple draws Apple Color Emoji, whose artwork belongs to Apple Inc. and is not open source, and takes the few emoji it lacks from Noto. noto draws Noto Color Emoji only (SIL OFL 1.1): the licence-clean choice for exports you share")
 	fl.StringVar(&f.emojiFont, "emoji-font", "", "COLR v0 or CBDT/CBLC colour emoji font `file`, tried before the --emoji-set fonts for every emoji")
 	addGIFFlags(cmd)
@@ -284,7 +279,7 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 		return fmt.Errorf("export: %w", err)
 	}
 
-	plan, err := planSpans(cmd, input, flags)
+	plan, err := planSpans(cmd, input, flags.spans)
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
@@ -341,29 +336,6 @@ func runExport(cmd *cobra.Command, input string, flags exportFlags) error {
 	}
 	fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d frames (%.1f KB) to %s\n", frames(), float64(size)/1024, output)
 	return nil
-}
-
-// planSpans reads the scenes and hidden spans of the recording at input and
-// plans them as the flags ask. It does not open the recording when neither
-// hints nor hidden spans are in play, and it returns the zero plan for a
-// recording without spans.
-func planSpans(cmd *cobra.Command, input string, flags exportFlags) (spanplan.Plan, error) {
-	if flags.noHints && flags.showHidden {
-		return spanplan.Plan{}, nil
-	}
-	found, err := scanSpans(input)
-	if errors.Is(err, event.ErrMalformedSpan) {
-		fmt.Fprintf(cmd.ErrOrStderr(), "shellshot: %v; scenes and hidden spans after it are ignored\n", err)
-	} else if err != nil {
-		return spanplan.Plan{}, err
-	}
-	return spanplan.Build(found, spanplan.Options{
-		IgnoreHints:   flags.noHints,
-		ShowHidden:    flags.showHidden,
-		FlagSpeed:     flags.speedSet,
-		FlagIdleLimit: flags.idleLimitSet,
-		FlagHold:      flags.holdSet,
-	})
 }
 
 // sameFile reports whether a and b name the same existing file, or the same
