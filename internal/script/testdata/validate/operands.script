@@ -12,3 +12,4 @@ wait /(/
 wait /a(?=b)/
 wait idle 0s
 press enter
+wait done 100ms

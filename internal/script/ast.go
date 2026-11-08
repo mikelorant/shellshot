@@ -58,6 +58,13 @@ const (
 	FormParagraphs = "paragraphs" // a "paragraphs" text block
 )
 
+// DoneDebounce is how long "wait done" needs the shell to be the foreground
+// process group of the terminal, without a break, before it counts the
+// command as finished. A shell is briefly in the foreground right after
+// Enter, before it starts the command, and between the parts of a chain such
+// as "make && make test". The timeout of "wait done" cannot be shorter.
+const DoneDebounce = 250 * time.Millisecond
+
 // Step is one command: run, type, press, wait, sleep or mark. Only the fields
 // of its Kind are set.
 type Step struct {
@@ -70,12 +77,14 @@ type Step struct {
 	Text string
 	// Keys is for press.
 	Keys []KeyPress
-	// Pattern is for wait; nil for "wait idle".
+	// Pattern is for wait; nil for "wait idle" and "wait done".
 	Pattern *Pattern
 	// Idle is true for "wait idle".
 	Idle bool
-	// Duration is the sleep time, or the wait timeout, or the idle time of
-	// "wait idle". HasDuration tells a written "0s" (a one-shot check) from
+	// Done is true for "wait done".
+	Done bool
+	// Duration is the sleep time, or the wait timeout (also of "wait done"),
+	// or the idle time of "wait idle". HasDuration tells a written "0s" (a one-shot check) from
 	// no duration (use the setting).
 	Duration    time.Duration
 	HasDuration bool

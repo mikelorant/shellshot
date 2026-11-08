@@ -145,7 +145,7 @@ func TestParseHiddenNameErrors(t *testing.T) {
 }
 
 func TestParseStepOperands(t *testing.T) {
-	const src = "press ctrl+c up x3 shift+tab\nwait \"a\"\nwait /b\\/c/ 0s\nwait idle\nwait idle 1.5s\nsleep 2m\nmark \"a b\"\nrun \"x\\n\"  # c\n"
+	const src = "press ctrl+c up x3 shift+tab\nwait \"a\"\nwait /b\\/c/ 0s\nwait idle\nwait idle 1.5s\nwait done\nwait done 90s\nsleep 2m\nmark \"a b\"\nrun \"x\\n\"  # c\n"
 	s, diags := ParseString("", src)
 	if len(diags) > 0 {
 		t.Fatal(renderDiags(diags))
@@ -157,6 +157,8 @@ func TestParseStepOperands(t *testing.T) {
     Step wait regex "b/c" 0s
     Step wait idle
     Step wait idle 1500ms
+    Step wait done
+    Step wait done 90s
     Step sleep 2m
     Step mark "a b"
     Step run quoted "x\n"
