@@ -34,11 +34,13 @@ type replaySummary struct {
 //
 //	replay finished
 //	frames       74 shown (of 74)
+//	hidden       2 spans cut, 3.2s
 //	time         11.9s played, 27.6s recorded (15.7s saved; 2 pauses capped at 2s; speed 1x)
 //	screen       182x79 recorded, shown at 120x40 (cropped)
 //	file         pi.shot, 6.5 KB
 //
-// The screen line only appears when frames were cropped. The block is plain
+// The hidden line only appears when hidden spans were cut, and the time they
+// took counts as saved. The screen line only appears when frames were cropped. The block is plain
 // text.
 func writeReplaySummary(w io.Writer, s replaySummary) {
 	st := s.stats
@@ -60,6 +62,14 @@ func writeReplaySummary(w io.Writer, s replaySummary) {
 	}
 
 	line("frames", "%d shown (of %d)", st.Shown, st.Steps)
+
+	if st.HiddenCut > 0 {
+		noun := "spans"
+		if st.HiddenCut == 1 {
+			noun = "span"
+		}
+		line("hidden", "%d %s cut, %s", st.HiddenCut, noun, secondsText(st.HiddenTime))
+	}
 
 	var notes []string
 	if saved := st.Recorded - st.Planned; saved >= 100*time.Millisecond {

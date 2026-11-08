@@ -243,3 +243,45 @@ func TestBuildTwoScenesAndHiddenBetween(t *testing.T) {
 		t.Errorf("Boundaries = %v, want %v", p.Boundaries, wantB)
 	}
 }
+
+func TestBuildSegmentsTable(t *testing.T) {
+	t.Parallel()
+	openHidden := hidden(1, 0, 4*sec, 6*sec)
+	openHidden.Open = true
+	hintScene := scene(1, 2*sec, 5*sec, allHints)
+	tests := []struct {
+		name  string
+		found []spans.Span
+		opts  Options
+		want  []timeline.Segment
+	}{
+		{"no spans", nil, Options{}, nil},
+		{"hidden at the start", []spans.Span{hidden(1, 0, 0, 2*sec)}, Options{},
+			[]timeline.Segment{{From: 0, To: 2 * sec, Skip: true}}},
+		{"hidden in the middle", []spans.Span{hidden(1, 0, 2*sec, 3*sec)}, Options{},
+			[]timeline.Segment{{From: 2 * sec, To: 3 * sec, Skip: true}}},
+		{"unclosed hidden runs to the end of the recording", []spans.Span{openHidden}, Options{},
+			[]timeline.Segment{{From: 4 * sec, To: 6 * sec, Skip: true}}},
+		{"scene hints", []spans.Span{hintScene}, Options{},
+			[]timeline.Segment{{From: 2 * sec, To: 5 * sec, Speed: 8, IdleLimit: 500 * time.Millisecond, Hold: sec}}},
+		{"no hints ignores the scene", []spans.Span{hintScene}, Options{IgnoreHints: true}, nil},
+		{"no hints still cuts hidden", []spans.Span{hintScene, hidden(2, 1, 3*sec, 4*sec)}, Options{IgnoreHints: true},
+			[]timeline.Segment{{From: 3 * sec, To: 4 * sec, Skip: true}}},
+		{"speed flag replaces the speed hint", []spans.Span{hintScene}, Options{FlagSpeed: true},
+			[]timeline.Segment{{From: 2 * sec, To: 5 * sec, IdleLimit: 500 * time.Millisecond, Hold: sec}}},
+		{"all flags replace the hints", []spans.Span{hintScene}, Options{FlagSpeed: true, FlagIdleLimit: true, FlagHold: true}, nil},
+		{"show hidden plays the hidden span", []spans.Span{hidden(1, 0, 2*sec, 3*sec)}, Options{ShowHidden: true}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p, err := Build(tt.found, tt.opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(p.Segments, tt.want) {
+				t.Errorf("Segments = %+v, want %+v", p.Segments, tt.want)
+			}
+		})
+	}
+}

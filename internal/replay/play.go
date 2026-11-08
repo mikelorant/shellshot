@@ -43,6 +43,10 @@ type Options struct {
 	// wider than the terminal would scroll or wrap on every redraw. Only used
 	// with Clear.
 	Cols, Rows int
+	// Segments give ranges of the recording clock their own speed and idle
+	// limit and cut hidden ranges out, exactly as for export; see
+	// timeline.Options.Segments. Nil plays the recording as it is.
+	Segments []timeline.Segment
 	// Color renders style spans as SGR escapes; when false, output is plain
 	// text. See Render.
 	Color bool
@@ -63,7 +67,12 @@ type Stats struct {
 	// time of the last frame in the recording.
 	Played, Planned, Recorded time.Duration
 	// IdleCapped is the number of pauses between frames that IdleLimit cut.
+	// Time inside a hidden range does not count towards a pause.
 	IdleCapped int
+	// HiddenCut is the number of hidden ranges (Skip segments) cut out of the
+	// recording and HiddenTime their total length on the recording clock.
+	HiddenCut  int
+	HiddenTime time.Duration
 	// Cropped reports that a frame was cut to fit Options.Cols x Rows.
 	Cropped bool
 	// Interrupted reports that ctx was done before playback ended.
@@ -72,7 +81,8 @@ type Stats struct {
 
 // Play reads frames from src and writes each rendered frame to w, waiting
 // between frames for the difference in their At times, capped at IdleLimit and
-// divided by Speed (the timeline package applies this policy, as for export).
+// divided by Speed (the timeline package applies this policy, as for export,
+// together with Options.Segments).
 // The first frame is shown immediately. Frames whose At does not advance are
 // shown without waiting. Consecutive frames with equal snapshots are shown
 // once (a frames.Iterator never yields them). Play reads all of src before it shows anything, so a
@@ -127,17 +137,13 @@ func PlayWithStats(ctx context.Context, src Source, w io.Writer, opts Options) (
 	if n := len(frames); n > 0 {
 		stats.Recorded = frames[n-1].At
 	}
-	if opts.IdleLimit > 0 {
-		for i := 1; i < len(frames); i++ {
-			if frames[i].At-frames[i-1].At > opts.IdleLimit {
-				stats.IdleCapped++
-			}
-		}
-	}
+	stats.IdleCapped = countIdleCapped(frames, opts.Segments, opts.IdleLimit)
+	stats.HiddenCut, stats.HiddenTime = hiddenCut(opts.Segments, stats.Recorded)
 	steps, err := timeline.Build(frames, timeline.Options{
 		Speed:            speed,
 		IdleLimit:        opts.IdleLimit,
 		TrimLeadingBlank: opts.TrimLeadingBlank,
+		Segments:         opts.Segments,
 	})
 	if err != nil {
 		return stats, fmt.Errorf("replay: %w", err)
