@@ -330,29 +330,37 @@ The trim is the boolean timeline option `TrimLeadingBlank`; the command line set
 
 `shellshot replay` shares this timing policy: it takes `--idle-limit` (default 2s, 0 for no
 limit, applied before `--speed`) and `--keep-leading-blank`, and builds its waits with the same
-timeline code. A recording with a long pause, or a long wait before the first output, therefore
+timeline code. It also cuts hidden spans and applies scene hints like `export` (see
+[Scenes and hidden spans](#scenes-and-hidden-spans)), so it shows what the export will show. A recording with a long pause, or a long wait before the first output, therefore
 replays with no wait longer than `--idle-limit` and starts at the first output. `replay` holds
 the whole recording in memory while it plays. When it draws in place (stdout is a terminal, or
 `--clear`), it ends by showing the cursor, moving below the last frame and printing a summary to
 stderr: how it ended, frames shown, wall time played against time recorded (and saved), idle
-pauses capped, the crop, and the file. `-q`/`--quiet` suppresses it; a piped stdout gets none.
+pauses capped, hidden spans cut, the crop, and the file. `-q`/`--quiet` suppresses it; a piped stdout gets none.
 Ctrl-C is a normal end: the summary says where it stopped, and the exit status is 130.
 
 ## Scenes and hidden spans
 
 A recording can carry spans, marked by a script run. `export` applies the speed, idle and hold
-hints stored in scenes and cuts hidden spans from the output. A recording without spans exports
-as before.
+hints stored in scenes and cuts hidden spans from the output. `replay` does the same with the same
+code, so replaying a recording shows the frames and the waits the export will have. A recording
+without spans exports and replays as before.
 
 | Flag | Meaning |
 |---|---|
 | `--no-hints` | Ignore the hints stored in scenes. Hidden spans are still cut |
-| `--show-hidden` | Render hidden spans instead of cutting them |
+| `--show-hidden` | Render (`replay`: play) hidden spans instead of cutting them |
 
-`--speed`, `--idle-limit` and `--hold`, when given, each apply to the whole recording and replace
-the matching scene hint. An explicit `--hold` also drops scene hold hints. Without `--hold`, a
-scene hold is added to the default 2s final hold where a scene ends. The precedence is flag, then
-scene hint, then default.
+Both commands take both flags. `--speed`, `--idle-limit` and `--hold`, when given, each apply to
+the whole recording and replace the matching scene hint. An explicit `--hold` also drops scene
+hold hints. Without `--hold`, a scene hold is added to the default 2s final hold where a scene
+ends. The precedence is flag, then scene hint, then default. `replay` has no `--hold` and no final
+hold: it pauses on the last screen of a scene for the scene's hold hint, if any.
+
+Cutting a hidden span removes its time, not its effects: the screen after the span is the next
+frame, and `replay` draws it like any other change, with no extra frame. `replay`'s summary
+counts the time it removed as saved and adds a `hidden` line (`3 spans cut, 12.4s`) when it cut
+any.
 
 A scene or hidden span that was never closed (the recorder was killed) ends at the last event. A
 malformed span event ends the span list, and export warns on stderr.

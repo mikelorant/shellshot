@@ -139,7 +139,7 @@ A block is one step.
 scene NAME {      # letters, digits, _ and -; unique
   ...
 }
-hidden [NAME] {   # runs and is recorded; export may drop it; the name is optional
+hidden [NAME] {   # runs and is recorded; export and replay drop it; the name is optional
   ...
 }
 ```

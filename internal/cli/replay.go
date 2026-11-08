@@ -12,7 +12,8 @@ import (
 )
 
 // newReplayCmd builds "shellshot replay", which plays a recording to stdout
-// with its original timing, long pauses capped.
+// with its original timing, long pauses capped, hidden spans cut and scene
+// hints applied as export does.
 func newReplayCmd() *cobra.Command {
 	var (
 		speed            float64
@@ -51,8 +52,8 @@ func newReplayCmd() *cobra.Command {
 			return runReplay(cmd, args[0], fps, opts, spans, quiet)
 		},
 	}
-	cmd.Flags().Float64Var(&speed, "speed", 1, "playback speed multiplier (2 plays twice as fast)")
-	cmd.Flags().DurationVar(&idleLimit, "idle-limit", defaultIdleLimit, "longest pause between frames, before --speed (0 for no limit)")
+	cmd.Flags().Float64Var(&speed, "speed", 1, "playback speed multiplier (2 plays twice as fast); when given, replaces the speed of every scene")
+	cmd.Flags().DurationVar(&idleLimit, "idle-limit", defaultIdleLimit, "longest pause between frames, before --speed (0 for no limit); when given, replaces the idle limit of every scene")
 	cmd.Flags().BoolVar(&keepLeadingBlank, "keep-leading-blank", false, keepLeadingBlankHelp)
 	cmd.Flags().BoolVar(&clearScreen, "clear", false, "clear the screen before each frame (default: only when stdout is a terminal)")
 	cmd.Flags().BoolVar(&noCrop, "no-crop", false, "do not crop frames larger than the terminal (they scroll and wrap on every redraw)")

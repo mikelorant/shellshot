@@ -210,18 +210,20 @@ Flags:
 Play a recording to stdout with its original timing
 
 Usage:
-  shellshot replay FILE [--speed f] [--idle-limit d] [--keep-leading-blank] [--fps n] [--clear] [--no-crop] [-q] [--color auto|always|never] [flags]
+  shellshot replay FILE [--speed f] [--idle-limit d] [--keep-leading-blank] [--show-hidden] [--no-hints] [--fps n] [--clear] [--no-crop] [-q] [--color auto|always|never] [flags]
 
 Flags:
       --clear                 clear the screen before each frame (default: only when stdout is a terminal)
       --color string          colour output: auto (terminal and NO_COLOR unset), always or never (default "auto")
       --fps int               frame sampling rate in frames per second (default 60)
   -h, --help                  help for replay
-      --idle-limit duration   longest pause between frames, before --speed (0 for no limit) (default 2s)
+      --idle-limit duration   longest pause between frames, before --speed (0 for no limit); when given, replaces the idle limit of every scene (default 2s)
       --keep-leading-blank    keep a blank screen at the start of the animation
       --no-crop               do not crop frames larger than the terminal (they scroll and wrap on every redraw)
+      --no-hints              ignore the speed, idle and hold hints stored in the recording's scenes (hidden spans are still cut)
   -q, --quiet                 do not print the summary shown on stderr after a replay that draws in place
-      --speed float           playback speed multiplier (2 plays twice as fast) (default 1)
+      --show-hidden           play hidden spans like the rest of the recording instead of cutting them
+      --speed float           playback speed multiplier (2 plays twice as fast); when given, replaces the speed of every scene (default 1)
 ```
 
 ### export
