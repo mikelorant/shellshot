@@ -191,6 +191,16 @@ func TestProgressUpdateRedrawsTheLineInPlace(t *testing.T) {
 	}
 }
 
+func TestProgressUpdateWithTheSameValuesDoesNotRedraw(t *testing.T) {
+	p, out, _, _ := testProgress()
+	p.Update(1, 4, "demo")
+	p.Update(1, 4, "demo")
+	if got, want := out.String(), "\r"+renderProgress(40, 1, 4, "demo", 0)+"\x1b[K"; got != want {
+		t.Errorf("output = %q, want one frame %q", got, want)
+	}
+	p.Close()
+}
+
 func TestProgressCloseClearsOnlyWhatWasDrawn(t *testing.T) {
 	p, out, _, _ := testProgress()
 	p.Update(0, 0, "") // nothing to count: nothing drawn

@@ -137,11 +137,12 @@ func (p *progress) redrawOnTick() {
 }
 
 // Update sets the steps done of total and the label of the current step, and
-// redraws. A total of 0 or less draws nothing. After Close it does nothing.
+// redraws unless nothing changed. A total of 0 or less draws nothing. After
+// Close it does nothing.
 func (p *progress) Update(done, total int, label string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.closed {
+	if p.closed || p.drawn && done == p.done && total == p.total && label == p.label {
 		return
 	}
 	p.done, p.total, p.label = done, total, label
