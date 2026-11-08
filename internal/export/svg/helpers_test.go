@@ -39,9 +39,15 @@ func testFonts(t testing.TB) *font.Set {
 }
 
 // newRenderer returns the raster renderer for o and the Geometry built on it.
+// It uses a font set of its own: the raster renderer draws with faces without
+// locking them, so parallel tests that render must not share a set (or the
+// sfnt fonts under it).
 func newRenderer(t testing.TB, o raster.Options) (*raster.Renderer, Geometry) {
 	t.Helper()
-	f := testFonts(t)
+	f, err := font.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
 	r, err := raster.New(f, o)
 	if err != nil {
 		t.Fatal(err)
