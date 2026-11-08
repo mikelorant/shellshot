@@ -232,15 +232,6 @@ func runScript(cmd *cobra.Command, so scriptOptions, ro recordOptions, wopts bin
 	errOut := cmd.ErrOrStderr()
 	ctx := cmd.Context()
 
-	holder := &termHolder{}
-	encoder := &lazyKeys{holder: holder}
-	defer encoder.close()
-	exec, err := run.New(plan, run.Deps{Keys: encoder, File: so.File})
-	if err != nil {
-		return fmt.Errorf("prepare script: %w", err)
-	}
-	drv := newScriptDriver(exec)
-
 	id, err := newSessionID()
 	if err != nil {
 		return err
@@ -248,6 +239,21 @@ func runScript(cmd *cobra.Command, so scriptOptions, ro recordOptions, wopts bin
 	if ro.RecordInput {
 		fmt.Fprintln(errOut, inputNotice)
 	}
+	// The progress line must be erased before anything else is written to
+	// errOut: stopProgress is called as soon as the session has ended, and
+	// again on every earlier return.
+	observe, stopProgress := ro.startScriptProgress(errOut, so.Watch, plan)
+	defer stopProgress()
+
+	holder := &termHolder{}
+	encoder := &lazyKeys{holder: holder}
+	defer encoder.close()
+	exec, err := run.New(plan, run.Deps{Keys: encoder, File: so.File, OnProgress: observe})
+	if err != nil {
+		return fmt.Errorf("prepare script: %w", err)
+	}
+	drv := newScriptDriver(exec)
+
 	proc, err := pty.Start(ctx, pty.Config{
 		Command: set.Argv[0],
 		Args:    set.Argv[1:],
@@ -300,6 +306,7 @@ func runScript(cmd *cobra.Command, so scriptOptions, ro recordOptions, wopts bin
 	sink.configure(&cfg)
 
 	status, runErr := session.Run(ctx, p, holder.factory(ghostty.New), cfg, session.SinkFunc(discardFrame))
+	stopProgress()
 	closedByUs := tracked.killed.Load()
 	closeErr := sink.close()
 	if cerr := f.Close(); closeErr == nil {

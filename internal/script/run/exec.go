@@ -37,6 +37,8 @@ type Executor struct {
 	exited     bool
 	exitStatus int
 
+	progress *progressTracker // nil without Deps.OnProgress
+
 	open []uint64 // IDs of the open spans, outermost first
 	err  *ScriptError
 	done bool
@@ -61,7 +63,8 @@ func New(p *Plan, deps Deps) (*Executor, error) {
 	if deps.Keys == nil {
 		return nil, errors.New("run: Deps.Keys is nil")
 	}
-	e := &Executor{ops: p.Ops, keys: deps.Keys, rng: deps.Rand, file: deps.File, res: map[int]*regexp.Regexp{}}
+	e := &Executor{ops: p.Ops, keys: deps.Keys, rng: deps.Rand, file: deps.File, res: map[int]*regexp.Regexp{},
+		progress: newProgressTracker(p.Ops, deps.OnProgress)}
 	if e.rng == nil {
 		seed := uint64(p.Process.Seed)
 		e.rng = rand.New(rand.NewPCG(seed, seed^0x5348454c4c53484f))
@@ -128,6 +131,7 @@ func (e *Executor) Poll(now time.Duration, scr Screen) (Step, error) {
 	e.scr = scr
 	e.screen.observe(now, text)
 	for {
+		e.progress.at(e.pc)
 		if e.pc >= len(e.ops) {
 			e.done = true
 			return Step{Done: true, Deadline: now}, nil
