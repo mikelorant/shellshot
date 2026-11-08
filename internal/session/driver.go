@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/mikelorant/shellshot/internal/live"
 )
 
 // Driver scripts a session (see Config.Driver). It is a non-blocking state
@@ -47,13 +49,14 @@ type Screen interface {
 
 // ForegroundReporter is implemented by a Process that can tell whether it is
 // the foreground process group of its terminal; *pty.Process does.
-type ForegroundReporter interface {
-	ShellInForeground() (bool, error)
-}
+type ForegroundReporter = live.ForegroundReporter
 
 // ErrNoForeground is returned by Screen.ShellForeground when the process
 // cannot report its foreground process group.
-var ErrNoForeground = errors.New("session: the process cannot report its foreground process group")
+//
+// It is live.ErrNoForeground, which the wrappers in package live return, so
+// errors.Is matches either.
+var ErrNoForeground = live.ErrNoForeground
 
 // SpanOp is a span boundary for Events.Span. The session never looks inside
 // it, so it needs no dependency on the recording format: the driver and the

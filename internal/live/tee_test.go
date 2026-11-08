@@ -72,3 +72,47 @@ func TestTeeDelegatesWrite(t *testing.T) {
 		t.Fatalf("Write -> %q, %v", in.String(), err)
 	}
 }
+
+// reportingProcess is a fakeProcess that can report its foreground state.
+type reportingProcess struct {
+	fakeProcess
+	foreground bool
+	err        error
+}
+
+func (r reportingProcess) ShellInForeground() (bool, error) { return r.foreground, r.err }
+
+func TestTeeForwardsShellInForegroundToTheWrappedProcess(t *testing.T) {
+	boom := errors.New("boom")
+	for _, tc := range []struct {
+		name string
+		in   reportingProcess
+		want bool
+		err  error
+	}{
+		{"foreground", reportingProcess{foreground: true}, true, nil},
+		{"background", reportingProcess{}, false, nil},
+		{"error", reportingProcess{err: boom}, false, boom},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, ok := Tee(tc.in, io.Discard).(ForegroundReporter)
+			if !ok {
+				t.Fatal("Tee result is not a ForegroundReporter")
+			}
+			got, err := r.ShellInForeground()
+			if got != tc.want || !errors.Is(err, tc.err) {
+				t.Errorf("ShellInForeground = (%v, %v), want (%v, %v)", got, err, tc.want, tc.err)
+			}
+		})
+	}
+}
+
+func TestTeeShellInForegroundWithoutReporterReturnsErrNoForeground(t *testing.T) {
+	r, ok := Tee(fakeProcess{}, io.Discard).(ForegroundReporter)
+	if !ok {
+		t.Fatal("Tee result is not a ForegroundReporter")
+	}
+	if got, err := r.ShellInForeground(); got || !errors.Is(err, ErrNoForeground) {
+		t.Errorf("ShellInForeground = (%v, %v), want (false, ErrNoForeground)", got, err)
+	}
+}

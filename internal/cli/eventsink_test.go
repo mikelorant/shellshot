@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mikelorant/shellshot/internal/live"
 	"github.com/mikelorant/shellshot/internal/recording/bin"
 	"github.com/mikelorant/shellshot/internal/recording/bin/event"
 	"github.com/mikelorant/shellshot/internal/recording/bin/head"
@@ -229,3 +230,34 @@ func TestBinSinkSpanRejectsOtherOperations(t *testing.T) {
 		t.Errorf("Span(invalid) = %v, want ErrMalformedSpan", err)
 	}
 }
+
+// foregroundProcess is a live.Process that reports its foreground state.
+type foregroundProcess struct {
+	live.Process
+	foreground bool
+}
+
+func (p foregroundProcess) ShellInForeground() (bool, error) { return p.foreground, nil }
+
+func TestInputRecorderForwardsShellInForeground(t *testing.T) {
+	for _, foreground := range []bool{true, false} {
+		r := inputRecorder{Process: foregroundProcess{foreground: foreground}}
+		if got, err := r.ShellInForeground(); err != nil || got != foreground {
+			t.Errorf("ShellInForeground = (%v, %v), want (%v, nil)", got, err, foreground)
+		}
+	}
+}
+
+func TestInputRecorderShellInForegroundWithoutReporterReturnsErrNoForeground(t *testing.T) {
+	r := inputRecorder{Process: struct{ live.Process }{}}
+	if got, err := r.ShellInForeground(); got || !errors.Is(err, session.ErrNoForeground) {
+		t.Errorf("ShellInForeground = (%v, %v), want (false, session.ErrNoForeground)", got, err)
+	}
+}
+
+// Every layer that record --script puts around the pty process must keep the
+// foreground query that wait done needs.
+var (
+	_ live.ForegroundReporter = (*trackedProcess)(nil)
+	_ live.ForegroundReporter = inputRecorder{}
+)

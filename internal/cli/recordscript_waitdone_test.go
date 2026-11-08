@@ -24,37 +24,54 @@ func doneShells(t *testing.T) map[string]string {
 // differently, so ENDED in the recording is the output of the command and
 // nothing else. Without wait done, settle off would type the next command at
 // once, and the terminal would echo NEXT before ENDED.
+//
+// The test runs with every wrapper that record --script puts around the pty
+// process (--watch, --record-input, both), because each must forward the
+// foreground query that wait done relies on.
 func TestRecordScriptWaitDoneHoldsTheScriptUntilTheCommandEnds(t *testing.T) {
 	t.Parallel()
-	for name, shell := range doneShells(t) {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			r := runScriptCLIWith(t, context.Background(), scriptPreludeFor(shell)+`
+	flagSets := map[string][]string{
+		"plain":              nil,
+		"watch":              {"--watch"},
+		"record-input":       {"--record-input"},
+		"watch-record-input": {"--watch", "--record-input"},
+	}
+	for flagName, flags := range flagSets {
+		for name, shell := range doneShells(t) {
+			t.Run(flagName+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				testWaitDoneOrder(t, shell, flags)
+			})
+		}
+	}
+}
+
+func testWaitDoneOrder(t *testing.T, shell string, flags []string) {
+	t.Helper()
+	r := runScriptCLIWith(t, context.Background(), scriptPreludeFor(shell)+`
 wait "$" 20s
 settle off
 run sleep 2; echo END""ED
 wait done 20s
 run echo NEXT
-`)
-			if r.code != 0 {
-				t.Fatalf("exit code = %d, want 0\nstderr: %s", r.code, r.stderr)
-			}
-			s := readShot(t, r.shot)
-			out := s.out()
-			ended, typed := strings.Index(out, "ENDED"), strings.Index(out, "NEXT")
-			if ended < 0 || typed < 0 {
-				t.Fatalf("OUT lacks the output of the first command or the second command:\n%q", out)
-			}
-			if typed < ended {
-				t.Errorf("the second command was typed before the first one ended:\n%q", out)
-			}
-			if got := s.exitStatus(t); got != 0 {
-				t.Errorf("EXIT status = %d, want 0", got)
-			}
-			if r.took > 25*time.Second {
-				t.Errorf("took %v, want a few seconds", r.took)
-			}
-		})
+`, flags...)
+	if r.code != 0 {
+		t.Fatalf("exit code = %d, want 0\nstderr: %s", r.code, r.stderr)
+	}
+	s := readShot(t, r.shot)
+	out := s.out()
+	ended, typed := strings.Index(out, "ENDED"), strings.Index(out, "NEXT")
+	if ended < 0 || typed < 0 {
+		t.Fatalf("OUT lacks the output of the first command or the second command:\n%q", out)
+	}
+	if typed < ended {
+		t.Errorf("the second command was typed before the first one ended:\n%q", out)
+	}
+	if got := s.exitStatus(t); got != 0 {
+		t.Errorf("EXIT status = %d, want 0", got)
+	}
+	if r.took > 25*time.Second {
+		t.Errorf("took %v, want a few seconds", r.took)
 	}
 }
 
