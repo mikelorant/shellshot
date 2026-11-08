@@ -252,11 +252,16 @@ Text is drawn with the embedded JetBrains Mono (regular, bold, italic, bold ital
 block, braille and Powerline characters are drawn as shapes, not from a font. A glyph the main
 font lacks comes from a chain of fallback fonts; the first font that has it wins:
 
-1. the embedded Symbols Nerd Font Mono (icons, scaled down to fit their cell),
+1. the embedded Symbols Nerd Font Mono (icons),
 2. the embedded Noto Sans Mono CJK SC subset (about 3,750 hanzi, Hangul syllables, kana and CJK
    punctuation, with Simplified Chinese shapes for Han characters that differ between languages),
 3. each `--fallback-font FILE`, in the order given,
 4. with `--system-fonts`, installed CJK and symbol fonts.
+
+Nerd Font icons are sized by height, not width: an icon is drawn at the font size, or smaller if
+that would make it taller than the cell. It starts at the left edge of its cell and may extend into
+the next cell, as in a terminal that uses the non-Mono Nerd Font. Other fallback glyphs are scaled
+to fit their cells.
 
 `--fallback-font FILE` takes a TTF, OTF or TTC file and can be repeated. An unreadable or invalid
 file is an error. User fonts are drawn as monochrome outlines, so colour-only fonts do not work

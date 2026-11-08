@@ -35,7 +35,12 @@ func (c cell) cluster() string {
 // face is scaled to fit the c.width cells c occupies (see Fonts.FitFace) and
 // its ink box is centred in that cell span, horizontally and vertically, on
 // whole pixels. The result is still clipped to the cell rect as a safety
-// net. A rune no font has is left blank.
+// net. A Nerd Font icon (see Fonts.IsIcon) is the exception: it is sized by
+// height, its glyph origin sits on the left edge of the cell (so the ink
+// starts at the glyph's own left bearing) and it is not clipped to the cell,
+// so it can overflow into the cells to the right; it is drawn after every
+// background of the row, so it lies over the background of those cells, and
+// is clipped only to the image. A rune no font has is left blank.
 func (r *Renderer) fallback(img *image.RGBA, c cell) bool {
 	face, ok, err := r.fonts.FitFace(c.c, c.st.bold, c.st.italic, r.sizePx, r.metrics.CellWidth, r.metrics.CellHeight, c.width)
 	if err != nil || !ok {
@@ -44,6 +49,11 @@ func (r *Renderer) fallback(img *image.RGBA, c cell) bool {
 	o := r.cellOrigin(c.col, c.row)
 	cellRect := image.Rect(o.X, o.Y, o.X+c.width*r.metrics.CellWidth, o.Y+r.metrics.CellHeight)
 	dot := r.baselineDot(c.col, c.row)
+	icon := r.fonts.IsIcon(c.c, c.st.bold, c.st.italic)
+	dst := img.SubImage(cellRect).(*image.RGBA)
+	if icon {
+		dst = img
+	}
 	if bounds, _, ok := face.GlyphBounds(c.c); ok {
 		// bounds are relative to the dot, y growing downwards (top is negative).
 		inkMidX := (bounds.Min.X + bounds.Max.X) / 2
@@ -52,9 +62,12 @@ func (r *Renderer) fallback(img *image.RGBA, c cell) bool {
 		dot.Y = fixed.I((cellRect.Min.Y+cellRect.Max.Y)/2) - inkMidY
 		dot.X = fixed.I(dot.X.Round())
 		dot.Y = fixed.I(dot.Y.Round())
+		if icon {
+			dot.X = fixed.I(cellRect.Min.X)
+		}
 	}
 	d := &xfont.Drawer{
-		Dst:  img.SubImage(cellRect).(*image.RGBA),
+		Dst:  dst,
 		Src:  image.NewUniform(c.st.fg),
 		Face: r.contrastFace(face, c.st.fg, c.st.bg),
 		Dot:  dot,

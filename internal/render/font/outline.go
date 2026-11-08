@@ -24,6 +24,9 @@ type Outline struct {
 	// from a font of another design and needs fitting to its cells (see
 	// FitFace).
 	Primary bool
+	// Icon reports that the glyph is a Nerd Font icon (see Set.IsIcon):
+	// sized by height, not width, and placed at the left edge of its cell.
+	Icon bool
 }
 
 // Covers reports whether some font of the Set (the primary family in the
@@ -61,5 +64,6 @@ func (s *Set) Outline(r rune, bold, italic bool) (o Outline, ok bool, err error)
 		UnitsPerEm: upem,
 		Advance:    adv.Round(),
 		Primary:    idx < int(styleCount),
+		Icon:       s.isIcon(idx, r),
 	}, true, nil
 }
