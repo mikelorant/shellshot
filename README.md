@@ -14,29 +14,25 @@
 [ai]: https://www.anthropic.com/claude
 [ai-badge]: https://img.shields.io/badge/AI_Coded-Claude_5.5-D97757?logo=anthropic&logoColor=white
 
-Shellshot records a terminal session and turns it into an image. It runs your shell, or a single
-command, on a pseudo-terminal (a fake terminal that a program can write to). A headless terminal
-(one with no window), [libghostty](https://github.com/ghostty-org/ghostty), reads the output.
-Shellshot stores it as a compact event log, a `.shot` file. You can replay the file in your
-terminal, or export it as an animated PNG, GIF, WebP or SVG. A script can drive the session, so a
-recording does not depend on your typing.
+Shellshot records a terminal session, your shell or one command, into a small `.shot` log. Replay it
+in your terminal, or export it as an animated PNG, GIF, WebP or SVG. A script can drive the session.
 
 [![Highlights][highlights-badge]](#-highlights-)
-[![First Steps][first-steps-badge]](#-first-steps-)
 [![Why Shellshot][why-shellshot-badge]](#-why-shellshot-)
+[![First Steps][first-steps-badge]](#-first-steps-)
 [![Installation][installation-badge]](#-installation-)
-[![Usage][usage-badge]](#-usage-)
 [![Common Tasks][common-tasks-badge]](#-common-tasks-)
+[![Usage][usage-badge]](#-usage-)
 [![Scripting][scripting-badge]](#-scripting-)
 [![Documentation][documentation-badge]](#-documentation-)
 [![Built With][built-with-badge]](#-built-with-)
 
 [highlights-badge]: https://img.shields.io/badge/-💡_Highlights-ff0000
-[first-steps-badge]: https://img.shields.io/badge/-🐾_First_Steps-ffa500
-[why-shellshot-badge]: https://img.shields.io/badge/-💬_Why_Shellshot-ffff00
+[why-shellshot-badge]: https://img.shields.io/badge/-💬_Why_Shellshot-ffa500
+[first-steps-badge]: https://img.shields.io/badge/-🐾_First_Steps-ffff00
 [installation-badge]: https://img.shields.io/badge/-💾_Installation-008000
-[usage-badge]: https://img.shields.io/badge/-🎛_Usage-0000ff
-[common-tasks-badge]: https://img.shields.io/badge/-🧰_Common_Tasks-4b0082
+[common-tasks-badge]: https://img.shields.io/badge/-🧰_Common_Tasks-0000ff
+[usage-badge]: https://img.shields.io/badge/-🎛_Usage-4b0082
 [scripting-badge]: https://img.shields.io/badge/-📜_Scripting-ee82ee
 [documentation-badge]: https://img.shields.io/badge/-📚_Documentation-ff69b4
 [built-with-badge]: https://img.shields.io/badge/-🧱_Built_With-808080
@@ -45,21 +41,26 @@ recording does not depend on your typing.
 
 ## 💡 Highlights [⭡](#shellshot)
 
-- **Records any session:** Captures your interactive shell, or a single command, through a headless
-  libghostty terminal.
-- **Compact `.shot` log:** Stores events in a binary log with zstd compression. It stays small, and
-  it survives a crash.
-- **Replay in your terminal:** Plays a recording back with its original timing. It caps long idle
-  gaps and prints a summary when it ends.
-- **Exports four formats:** Writes an animated PNG (the default), GIF, WebP or SVG (still or
-  animated). The encoders are written in Go, so you need no browser and no ffmpeg.
-- **Faithful rendering:** Draws colours and text styles, wide characters and CJK, colour emoji
-  (Apple-style or Noto), box-drawing and Powerline glyphs, and JetBrains Mono with Nerd Font
-  symbols.
-- **Scriptable recordings:** Uses a `.script` language to drive the session, so a recording does not
-  depend on your typing.
-- **Runs anywhere:** Ships release binaries for macOS and Linux (amd64 and arm64), and a multi-arch
-  container image.
+- **Records any session:** Captures your shell or a single command.
+- **Compact `.shot` log:** Keeps the full session in a small, compressed file.
+- **Replay in your terminal:** Plays back with the original timing.
+- **Exports four formats:** Animated PNG, GIF, WebP or SVG, with no browser or ffmpeg.
+- **Faithful rendering:** Colours, wide characters, emoji and Nerd Font symbols.
+- **Scriptable recordings:** A `.script` file drives the session for you.
+- **Runs anywhere:** Binaries for macOS and Linux, plus a container image.
+
+## 💬 Why Shellshot? [⭡](#shellshot)
+
+Many tools that make terminal images drive a headless browser, such as Chrome, to draw the
+terminal. That is heavy to install and to run. The result can also be unreliable: the timing or the
+drawing often does not match what a real terminal shows. Many of these tools also tie recording and
+image-making together, so a small change to the image means a new recording.
+
+Shellshot takes a different route. It uses libghostty, the engine of the Ghostty terminal, so the
+screen is accurate. It also splits recording from encoding. Record once to a small `.shot` file,
+then export it as many times, and in as many formats, as you like. You never run the session again.
+Shellshot is one self-contained program. It needs no browser and no ffmpeg, so there are few outside
+parts to install or break.
 
 ## 🐾 First steps [⭡](#shellshot)
 
@@ -86,25 +87,66 @@ recording does not depend on your typing.
    ./shellshot export example.shot
    ```
 
-## 💬 Why Shellshot? [⭡](#shellshot)
-
-Many tools that make terminal images drive a headless browser, such as Chrome, to draw the
-terminal. That is heavy to install and to run. The result can also be unreliable: the timing or the
-drawing often does not match what a real terminal shows. Many of these tools also tie recording and
-image-making together, so a small change to the image means a new recording.
-
-Shellshot takes a different route. It uses libghostty, the engine of the Ghostty terminal, so the
-screen is accurate. It also splits recording from encoding. Record once to a small `.shot` file,
-then export it as many times, and in as many formats, as you like. You never run the session again.
-Shellshot is one self-contained program. It needs no browser and no ffmpeg, so there are few outside
-parts to install or break.
-
 ## 💾 Installation [⭡](#shellshot)
 
 Go to the [latest release](https://github.com/mikelorant/shellshot/releases/latest) and download
 the archive for your platform: macOS (Apple silicon or Intel) or Linux (amd64 or arm64). Extract it
 in the folder you are working in, so that `./shellshot` is there. Opening the archive in a file
 manager or running `tar -xzf` on it both work.
+
+## 🧰 Common tasks [⭡](#shellshot)
+
+### Record
+
+Run one command instead of a shell. The recording ends when the command does.
+
+```sh
+./shellshot record --command 'ls -la' --output ls.shot
+```
+
+Fix the terminal size, in columns and rows.
+
+```sh
+./shellshot record --cols 100 --rows 30 --output wide.shot
+```
+
+Choose the file name with `--output`. Without it, the name comes from the start time, such as
+`shellshot-20261108-093045.shot`.
+
+Record a full-screen program, such as `vim`. Put the command after `--`. The recording ends when you
+quit the program.
+
+```sh
+./shellshot record --output vim.shot -- vim notes.txt
+```
+
+### Export
+
+Pick a format: `png` (the default), `gif`, `webp` or `svg`. The file takes the recording's name with
+the format's extension.
+
+```sh
+./shellshot export example.shot --format gif
+```
+
+Choose the still image that viewers without animation support show, such as macOS Preview. Use
+`first`, `last` (the default), `none` or a time. This works for PNG only.
+
+```sh
+./shellshot export example.shot --poster first
+```
+
+Change the theme (`dark` or `light`), the font size and the emoji artwork (`apple` or `noto`).
+
+```sh
+./shellshot export example.shot --theme light --font-size 18 --emoji-set noto
+```
+
+Play faster, and cap the pauses. `--idle-limit 0` keeps every pause.
+
+```sh
+./shellshot export example.shot --speed 2 --idle-limit 1s
+```
 
 ## 🎛 Usage [⭡](#shellshot)
 
@@ -216,60 +258,6 @@ Flags:
       --svg-text string             how svg draws text: text (small, selectable, drawn in the viewer's monospace font) or paths (glyph outlines of the built-in fonts, exact but larger) (default "text")
       --system-fonts                also use installed CJK and symbol fonts (macOS and Linux font folders); the output then depends on this machine's fonts
       --theme string                built-in theme name (dark, light) or a theme JSON file (default: dark)
-```
-
-## 🧰 Common tasks [⭡](#shellshot)
-
-### Record
-
-Run one command instead of a shell. The recording ends when the command does.
-
-```sh
-./shellshot record --command 'ls -la' --output ls.shot
-```
-
-Fix the terminal size, in columns and rows.
-
-```sh
-./shellshot record --cols 100 --rows 30 --output wide.shot
-```
-
-Choose the file name with `--output`. Without it, the name comes from the start time, such as
-`shellshot-20261108-093045.shot`.
-
-Record a full-screen program, such as `vim`. Put the command after `--`. The recording ends when you
-quit the program.
-
-```sh
-./shellshot record --output vim.shot -- vim notes.txt
-```
-
-### Export
-
-Pick a format: `png` (the default), `gif`, `webp` or `svg`. The file takes the recording's name with
-the format's extension.
-
-```sh
-./shellshot export example.shot --format gif
-```
-
-Choose the still image that viewers without animation support show, such as macOS Preview. Use
-`first`, `last` (the default), `none` or a time. This works for PNG only.
-
-```sh
-./shellshot export example.shot --poster first
-```
-
-Change the theme (`dark` or `light`), the font size and the emoji artwork (`apple` or `noto`).
-
-```sh
-./shellshot export example.shot --theme light --font-size 18 --emoji-set noto
-```
-
-Play faster, and cap the pauses. `--idle-limit 0` keeps every pause.
-
-```sh
-./shellshot export example.shot --speed 2 --idle-limit 1s
 ```
 
 ## 📜 Scripting [⭡](#shellshot)
