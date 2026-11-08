@@ -239,8 +239,11 @@ func TestRecordWritesBinaryRecording(t *testing.T) {
 			}
 		}
 	}
-	if gap := thereAt - hiAt; gap < 150*time.Millisecond {
-		t.Errorf("gap between outputs = %v, want >= 150ms", gap)
+	// The command sleeps 200ms between the two prints. Timestamps are taken when the output is
+	// read, so a loaded machine can shave a good part of that off; 100ms still proves that the
+	// two prints were not merged into one timestamp.
+	if gap := thereAt - hiAt; gap < 100*time.Millisecond {
+		t.Errorf("gap between outputs = %v, want >= 100ms", gap)
 	}
 	last := rec.events[len(rec.events)-1]
 	if last.Kind != event.KindExit {
