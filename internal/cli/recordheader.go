@@ -15,7 +15,7 @@ import (
 // commit together with the submodule pointer (see docs/ARCHITECTURE.md).
 const (
 	engineName    = "libghostty-vt"
-	ghosttyCommit = "66af4c7458db7e19ae7adb44aa7054879be58b6b"
+	ghosttyCommit = "0fa3d577a5614150ff8e2c152de5fb9d5c6d2dec"
 )
 
 // recordedEnv lists the only environment variables written to a recording.
