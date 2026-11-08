@@ -239,20 +239,32 @@ before making the image public.
 ## Bumping the libghostty pin
 
 `go.mitchellh.com/libghostty` is written against one libghostty-vt C API, so the submodule is pinned
-to the commit the binding pins (`66af4c7`). The rolling `tip` release of libghostty no longer
-matches, so prebuilt downloads do not work.
+to a release tag of ghostty, `vt-X.Y.Z` (now `vt-1.0.0`, commit `0fa3d57`), not to a branch tip. The
+binding's `CMakeLists.txt` names the ghostty commit it was written for; use the binding commit whose
+pin is the tag or closest after it. From 1.0 only a new major version breaks the C API. The rolling
+`tip` release of libghostty does not match, so prebuilt downloads do not work.
 
 ```sh
+git ls-remote https://github.com/ghostty-org/ghostty 'vt-*'     # find the tag and its commit
 git -C third_party/ghostty fetch --depth 1 origin <commit>
 git -C third_party/ghostty checkout <commit>
-git add third_party/ghostty
-go get go.mitchellh.com/libghostty@<version> && go mod tidy   # a version built for that commit
+git add third_party/ghostty                                     # before make deps: the script runs
+                                                                # git submodule update, which resets
+                                                                # the checkout to the staged pointer
+go get go.mitchellh.com/libghostty@<commit> && go mod tidy      # the binding commit for that release
 make deps && make vet test build
 ```
+
+Also update `ghosttyCommit` in `internal/cli/recordheader.go` and the commit asserted in
+`internal/cli/recordheader_test.go`; the recording header records it as the engine.
 
 Check the new commit's `minimum_zig_version` in `third_party/ghostty/build.zig.zon` against your zig.
 Commit the submodule pointer and `go.mod`/`go.sum` together. The key-encoder test in
 `internal/vt/ghostty` asserts exact key bytes for the pinned commit; rerun it after a bump.
+
+The headers of `vt-1.0.0` declare `GHOSTTY_VT_VERSION "1.0.0"`, but the library build still sets
+`lib_version = "1.0.0-dev"`, so `pkg-config --modversion libghostty-vt-static` and `ghostty_version()`
+print `1.0.0-dev+0fa3d57`. That is expected for this tag.
 
 ## Troubleshooting
 
