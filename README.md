@@ -42,7 +42,7 @@ in your terminal, or export it as an animated PNG, GIF, WebP or SVG. A script ca
 ## 💡 Highlights [⭡](#shellshot)
 
 - **Records any session:** Captures your shell or a single command.
-- **Compact `.shot` log:** Small files that survive a crash.
+- **Compact `.shot` log:** Keeps the full session in a small, compressed file.
 - **Replay in your terminal:** Plays back with the original timing.
 - **Exports four formats:** Animated PNG, GIF, WebP or SVG, with no browser or ffmpeg.
 - **Faithful rendering:** Colours, wide characters, emoji and Nerd Font symbols.
