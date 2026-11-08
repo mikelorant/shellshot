@@ -157,6 +157,12 @@ func (l *lowerer) block(b script.Block, outer Settings, in span) error {
 	l.emit(begin)
 
 	sc := outer
+	if b.Kind == script.BlockHidden {
+		// Nobody watches a hidden block, so it types and lingers instantly
+		// unless the block sets otherwise. Settle and timeout stay: they
+		// decide when a step is complete.
+		sc.Typing, sc.Linger = 0, 0
+	}
 	if err := l.items(b.Settings, b.Items, &sc, inner); err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package run
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -614,4 +615,92 @@ func TestLowerErrors(t *testing.T) {
 			t.Errorf("%s: error %q does not name the position", name, err)
 		}
 	}
+}
+
+// typedSettings describes each OpType of p as "text: typing/linger", with an
+// "h" prefix when it is inside a hidden block, and each OpLinger as
+// "linger D" (also "h"-prefixed), so a table can show where the pacing went.
+func typedSettings(p *Plan) []string {
+	var got []string
+	for _, op := range p.Ops {
+		prefix := ""
+		if op.OpMeta().Hidden {
+			prefix = "h "
+		}
+		switch op := op.(type) {
+		case OpType:
+			got = append(got, fmt.Sprintf("%s%s: perchar=%v eff=%v/%v", prefix, op.Text, op.PerChar, op.Eff.Typing, op.Eff.Linger))
+		case OpLinger:
+			got = append(got, fmt.Sprintf("%slinger %v", prefix, op.Duration))
+		}
+	}
+	return got
+}
+
+func TestLowerHiddenTypesAndLingersInstantlyByDefault(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "hidden ignores script typing and linger",
+			src:  "typing 50ms\nlinger 500ms\nhidden {\n  run a\n  type b\n}\n",
+			want: []string{"h a: perchar=0s eff=0s/0s", "h b: perchar=0s eff=0s/0s"},
+		},
+		{
+			name: "setting inside the block applies to its end",
+			src:  "typing 50ms\nlinger 500ms\nhidden {\n  type a\n  typing 20ms\n  type b\n  linger 1s\n  type c\n}\n",
+			want: []string{
+				"h a: perchar=0s eff=0s/0s",
+				"h b: perchar=20ms eff=20ms/0s",
+				"h c: perchar=20ms eff=20ms/1s",
+				"h linger 1s",
+			},
+		},
+		{
+			name: "settings revert after the block",
+			src:  "typing 50ms\nlinger 500ms\ntype a\nhidden {\n  typing 20ms\n  linger 1s\n  type b\n}\ntype c\n",
+			want: []string{
+				"a: perchar=50ms eff=50ms/500ms", "linger 500ms",
+				"h b: perchar=20ms eff=20ms/1s", "h linger 1s",
+				"c: perchar=50ms eff=50ms/500ms", "linger 500ms",
+			},
+		},
+		{
+			name: "hidden in a scene",
+			src:  "typing 50ms\nlinger 500ms\nscene s {\n  typing 30ms\n  type a\n  hidden {\n    type b\n  }\n  type c\n}\n",
+			want: []string{
+				"a: perchar=30ms eff=30ms/500ms", "linger 500ms",
+				"h b: perchar=0s eff=0s/0s",
+				"c: perchar=30ms eff=30ms/500ms", "linger 500ms",
+			},
+		},
+		{
+			name: "named hidden block and scene setting inside it",
+			src:  "typing 50ms\nscene s {\n  hidden setup {\n    typing 10ms\n    type a\n  }\n  type b\n}\n",
+			want: []string{"h a: perchar=10ms eff=10ms/0s", "b: perchar=50ms eff=50ms/0s"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := typedSettings(lowerSrc(t, tt.src))
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got\n%q\nwant\n%q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLowerHiddenKeepsSettleAndTimeout(t *testing.T) {
+	p := lowerSrc(t, "settle 400ms\ntimeout 3s\ntyping 50ms\nlinger 1s\nhidden {\n  run a\n}\n")
+	for _, op := range p.Ops {
+		if s, ok := op.(OpSettle); ok && !s.Drain {
+			if s.Quiet != 400*time.Millisecond || s.Timeout != 3*time.Second || s.Eff.Typing != 0 || s.Eff.Linger != 0 {
+				t.Errorf("settle op %+v, want quiet 400ms, timeout 3s, typing and linger 0", s)
+			}
+			return
+		}
+	}
+	t.Fatal("no settle op")
 }

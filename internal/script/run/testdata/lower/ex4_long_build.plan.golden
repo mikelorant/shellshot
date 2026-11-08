@@ -6,13 +6,13 @@ process
   output  (default)
   seed    1
 estimate
-  total   7.51s to 11m10.91s, 2 waits, 2 scenes
+  total   6.13s to 11m9.53s, 2 waits, 2 scenes
   scene   #2 build: 960ms to 5m0.96s
   scene   #3 check: 4.77s to 4m4.57s
 ops
    1  9:1     hidden           span-begin #1 hidden
-   2  10:3    hidden           type "cd ~/src/app\nmake clean > /dev/null 2>&1\nclear" typing=30ms
-   3  10:3    hidden           press enter after-gap typing=30ms
+   2  10:3    hidden           type "cd ~/src/app\nmake clean > /dev/null 2>&1\nclear" typing=0s
+   3  10:3    hidden           press enter after-gap typing=0s
    4  10:3    hidden           settle quiet=200ms timeout=2m0s (fails at timeout)
    5  15:1    hidden           span-end #1
    6  17:1    build            span-begin #2 scene "build" speed=8x idle=2s hold=1s

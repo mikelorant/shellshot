@@ -2,6 +2,7 @@ package run
 
 import (
 	"errors"
+	"fmt"
 	"math/rand/v2"
 	"reflect"
 	"strings"
@@ -349,5 +350,44 @@ func TestDeadlineNeverInThePastOnExamples(t *testing.T) {
 		if _, err := runWorld(t, lowerSrc(t, src), newFakeShell(), Deps{}); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
+	}
+}
+
+// A hidden run types its whole command in one write, with no typing delay and
+// no linger, even though the script sets both.
+func TestHiddenRunConsumesNoTypingOrLingerTime(t *testing.T) {
+	cmd := "echo " + strings.Repeat("a", 60)
+	src := "typing 50ms\nlinger 500ms\n%s {\n  run " + cmd + "\n}\n"
+	last := func(kind string) (writes int, at, exitBegin time.Duration) {
+		plan := lowerSrc(t, fmt.Sprintf(src, kind))
+		ev, err := runWorld(t, plan, newFakeShell(), Deps{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range ev {
+			switch e.Kind {
+			case "write":
+				writes++
+				at = e.At
+			case "span-begin":
+				exitBegin = e.At // the last begin is the exit span
+			}
+		}
+		return writes, at, exitBegin
+	}
+
+	writes, at, _ := last("hidden")
+	if writes != 2 || at != 0 {
+		t.Errorf("hidden: %d writes, last at %v; want the text and Enter, both at 0", writes, at)
+	}
+	// The fake shell takes 20ms to run the command and the settle quiet time
+	// is 200ms, so the exit span starts there with no linger added.
+	_, _, hiddenExit := last("hidden")
+	_, _, visibleExit := last("scene s")
+	if want := 20*time.Millisecond + DefaultSettle; hiddenExit != want {
+		t.Errorf("hidden: exit span begins at %v, want %v", hiddenExit, want)
+	}
+	if visibleWrites, visibleAt, _ := last("scene s"); visibleWrites <= 2 || visibleAt == 0 || visibleExit <= hiddenExit {
+		t.Errorf("visible control: %d writes, last at %v, exit at %v; want typing delays and a linger", visibleWrites, visibleAt, visibleExit)
 	}
 }

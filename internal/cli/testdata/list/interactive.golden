@@ -6,53 +6,52 @@ process
   output  interactive.shot
   seed    7
 estimate
-  total   18.409s to 2m34.731s, 3 waits, 3 scenes
+  total   17.499s to 2m33.641s, 3 waits, 3 scenes
   scene   #2 greet: 3.27s to 34.13s
   scene   #3 colours: 7.69s to 29.71s
   scene   #4 tour: 6.139s to 1m10.801s
 ops
    1  14:1    hidden           span-begin #1 hidden "setup"
-   2  15:3    hidden           type "clear" typing=60ms jitter=30%
-   3  15:3    hidden           press enter after-gap typing=60ms jitter=30%
+   2  15:3    hidden           type "clear" typing=0s jitter=30%
+   3  15:3    hidden           press enter after-gap typing=0s jitter=30%
    4  15:3    hidden           settle quiet=200ms timeout=15s (fails at timeout)
-   5  15:3    hidden           linger 700ms
-   6  16:1    hidden           span-end #1
-   7  18:1    greet            span-begin #2 scene "greet"
-   8  19:3    greet            type "echo \"hello from shellshot\"" typing=60ms jitter=30%
-   9  19:3    greet            press enter after-gap typing=60ms jitter=30%
-  10  19:3    greet            settle quiet=200ms timeout=15s (fails at timeout)
-  11  19:3    greet            linger 700ms
-  12  20:3    greet            type "date +%Y" typing=60ms jitter=30%
-  13  20:3    greet            press enter after-gap typing=60ms jitter=30%
-  14  20:3    greet            settle quiet=200ms timeout=15s (fails at timeout)
-  15  20:3    greet            linger 700ms
-  16  21:1    greet            span-end #2
-  17  23:1    colours          span-begin #3 scene "colours"
-  18  24:3    colours          type "printf '\\033[31mred\\033[0m \\033[32mgreen\\033[0m \\033[34mblue"... (145 runes) typing=60ms jitter=30%
-  19  24:3    colours          press enter after-gap typing=60ms jitter=30%
-  20  24:3    colours          settle quiet=200ms timeout=15s (fails at timeout)
-  21  24:3    colours          linger 700ms
-  22  28:3    colours          wait "underline" timeout=2s
-  23  28:3    colours          linger 700ms
-  24  29:1    colours          span-end #3
-  25  31:1    tour             span-begin #4 scene "tour"
-  26  33:3    tour             type "sh contrib/examples/colors.sh" typing=30ms jitter=30%
-  27  33:3    tour             press enter after-gap typing=30ms jitter=30%
-  28  33:3    tour             settle quiet=200ms timeout=15s (fails at timeout)
-  29  33:3    tour             linger 700ms
-  30  34:3    tour             wait "truecolour" timeout=20s
-  31  34:3    tour             linger 700ms
-  32  35:3    tour             press ctrl+l typing=30ms jitter=30%
-  33  35:3    tour             linger 700ms
-  34  36:3    tour             type "sh contrib/examples/unicode.sh" typing=30ms jitter=30%
-  35  36:3    tour             press enter after-gap typing=30ms jitter=30%
-  36  36:3    tour             settle quiet=200ms timeout=15s (fails at timeout)
-  37  36:3    tour             linger 700ms
-  38  37:3    tour             wait idle quiet=1s timeout=15s
-  39  37:3    tour             linger 700ms
-  40  38:1    tour             span-end #4
-  41  40:1    -                mark "end"
-  42  -       hidden           span-begin #5 hidden
-  43  -       hidden           drain quiet=200ms timeout=2s (never fails)
-  44  -       hidden           exit grace=2s
-  45  -       hidden           span-end #5
+   5  16:1    hidden           span-end #1
+   6  18:1    greet            span-begin #2 scene "greet"
+   7  19:3    greet            type "echo \"hello from shellshot\"" typing=60ms jitter=30%
+   8  19:3    greet            press enter after-gap typing=60ms jitter=30%
+   9  19:3    greet            settle quiet=200ms timeout=15s (fails at timeout)
+  10  19:3    greet            linger 700ms
+  11  20:3    greet            type "date +%Y" typing=60ms jitter=30%
+  12  20:3    greet            press enter after-gap typing=60ms jitter=30%
+  13  20:3    greet            settle quiet=200ms timeout=15s (fails at timeout)
+  14  20:3    greet            linger 700ms
+  15  21:1    greet            span-end #2
+  16  23:1    colours          span-begin #3 scene "colours"
+  17  24:3    colours          type "printf '\\033[31mred\\033[0m \\033[32mgreen\\033[0m \\033[34mblue"... (145 runes) typing=60ms jitter=30%
+  18  24:3    colours          press enter after-gap typing=60ms jitter=30%
+  19  24:3    colours          settle quiet=200ms timeout=15s (fails at timeout)
+  20  24:3    colours          linger 700ms
+  21  28:3    colours          wait "underline" timeout=2s
+  22  28:3    colours          linger 700ms
+  23  29:1    colours          span-end #3
+  24  31:1    tour             span-begin #4 scene "tour"
+  25  33:3    tour             type "sh contrib/examples/colors.sh" typing=30ms jitter=30%
+  26  33:3    tour             press enter after-gap typing=30ms jitter=30%
+  27  33:3    tour             settle quiet=200ms timeout=15s (fails at timeout)
+  28  33:3    tour             linger 700ms
+  29  34:3    tour             wait "truecolour" timeout=20s
+  30  34:3    tour             linger 700ms
+  31  35:3    tour             press ctrl+l typing=30ms jitter=30%
+  32  35:3    tour             linger 700ms
+  33  36:3    tour             type "sh contrib/examples/unicode.sh" typing=30ms jitter=30%
+  34  36:3    tour             press enter after-gap typing=30ms jitter=30%
+  35  36:3    tour             settle quiet=200ms timeout=15s (fails at timeout)
+  36  36:3    tour             linger 700ms
+  37  37:3    tour             wait idle quiet=1s timeout=15s
+  38  37:3    tour             linger 700ms
+  39  38:1    tour             span-end #4
+  40  40:1    -                mark "end"
+  41  -       hidden           span-begin #5 hidden
+  42  -       hidden           drain quiet=200ms timeout=2s (never fails)
+  43  -       hidden           exit grace=2s
+  44  -       hidden           span-end #5

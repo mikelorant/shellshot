@@ -6,13 +6,13 @@ process
   output  git-demo.shot
   seed    1
 estimate
-  total   17.24s to 2m14.64s, 1 wait, 2 scenes
+  total   16.16s to 2m13.56s, 1 wait, 2 scenes
   scene   #2 init: 2.96s to 32.56s
   scene   #3 commit: 12.8s to 1m22s
 ops
    1  8:1     hidden           span-begin #1 hidden
-   2  9:3     hidden           type "rm -rf .git README.md\nclear" typing=40ms
-   3  9:3     hidden           press enter after-gap typing=40ms
+   2  9:3     hidden           type "rm -rf .git README.md\nclear" typing=0s
+   3  9:3     hidden           press enter after-gap typing=0s
    4  9:3     hidden           settle quiet=200ms timeout=15s (fails at timeout)
    5  13:1    hidden           span-end #1
    6  15:1    init             span-begin #2 scene "init"

@@ -191,6 +191,7 @@ A block contains at least one step. A `hidden` block may sit inside a `scene`; n
 allowed. A hidden name follows the rules of a scene name (written bare), and scenes and hidden
 blocks share one namespace: a name is used by at most one block in the script. `info` lists named
 hidden spans. The implicit hidden block at the end has no name. Scenes and hidden blocks are recorded as `SPAN` events (see [format.md](format.md#spans)).
+Inside a hidden block `typing` and `linger` default to 0, since nobody sees it; a `typing` or `linger` written inside the block still applies from its line to the closing brace. `settle` and `timeout` are unchanged.
 After the last step the runner always exits the shell inside an implicit hidden block, so a script
 cannot leave a live shell running.
 

@@ -4,18 +4,18 @@ process
   output  (default)
   seed    1
 estimate
-  total   3.15s to 1m6.15s, 0 waits, 1 scene
-  scene   #2 demo: 1.35s to 30.95s
+  total   1.5s to 1m4.5s, 0 waits, 1 scene
+  scene   #2 demo: 900ms to 30.5s
 ops
    1  2:1     hidden           span-begin #1 hidden "setup"
-   2  3:3     hidden           type "echo prepare" typing=50ms
-   3  3:3     hidden           press enter after-gap typing=50ms
+   2  3:3     hidden           type "echo prepare" typing=0s
+   3  3:3     hidden           press enter after-gap typing=0s
    4  3:3     hidden           settle quiet=200ms timeout=15s (fails at timeout)
    5  4:1     hidden           span-end #1
    6  6:1     demo             span-begin #2 scene "demo"
    7  7:3     demo/hidden      span-begin #3 hidden "warm-up" parent=#2
-   8  8:5     demo/hidden      type "echo warm" typing=50ms
-   9  8:5     demo/hidden      press enter after-gap typing=50ms
+   8  8:5     demo/hidden      type "echo warm" typing=0s
+   9  8:5     demo/hidden      press enter after-gap typing=0s
   10  8:5     demo/hidden      settle quiet=200ms timeout=15s (fails at timeout)
   11  9:3     demo/hidden      span-end #3
   12  10:3    demo             type "echo shown" typing=50ms
@@ -23,8 +23,8 @@ ops
   14  10:3    demo             settle quiet=200ms timeout=15s (fails at timeout)
   15  11:1    demo             span-end #2
   16  13:1    hidden           span-begin #4 hidden
-  17  14:3    hidden           type "echo cleanup" typing=50ms
-  18  14:3    hidden           press enter after-gap typing=50ms
+  17  14:3    hidden           type "echo cleanup" typing=0s
+  18  14:3    hidden           press enter after-gap typing=0s
   19  14:3    hidden           settle quiet=200ms timeout=15s (fails at timeout)
   20  15:1    hidden           span-end #4
   21  -       hidden           span-begin #5 hidden
