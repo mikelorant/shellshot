@@ -360,7 +360,7 @@ hold: it pauses on the last screen of a scene for the scene's hold hint, if any.
 Cutting a hidden span removes its time, not its effects: the screen after the span is the next
 frame, and `replay` draws it like any other change, with no extra frame. `replay`'s summary
 counts the time it removed as saved and adds a `hidden` line (`3 spans cut, 12.4s`) when it cut
-any.
+any. `replay` does not merge short frames, so it shows as many frames as `export --min-delay 0`.
 
 A scene or hidden span that was never closed (the recorder was killed) ends at the last event. A
 malformed span event ends the span list, and export warns on stderr.
