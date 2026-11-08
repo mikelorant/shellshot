@@ -23,12 +23,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # Each job tests the portable libghostty build that release.yml ships for its platform (same
+      # zig target, same cache key as the libs job there), not a native-CPU build.
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        include:
+          - { os: macos-latest, target: aarch64-macos, goos: darwin, goarch: arm64 }
+          - { os: ubuntu-latest, target: x86_64-linux-gnu.2.28, goos: linux, goarch: amd64 }
     # The Makefile exports these for make targets. The go commands below run directly, so they need them too.
     env:
       CGO_ENABLED: '1'
-      PKG_CONFIG_PATH: ${{ github.workspace }}/build/libghostty/lib/pkgconfig
+      PKG_CONFIG_PATH: ${{ github.workspace }}/build/libghostty-${{ matrix.goos }}-${{ matrix.goarch }}/lib/pkgconfig
     steps:
       # Submodules are fetched below, and only ghostty: apple-emoji-ttf is not needed to build.
       - uses: actions/checkout@v7
@@ -52,23 +56,32 @@ jobs:
         id: pin
         run: echo "commit=$(git rev-parse HEAD:third_party/ghostty)" >> "$GITHUB_OUTPUT"
 
-      - name: Cache libghostty
+      # Same key as the libs job in release.yml: one cache entry serves both workflows.
+      - name: Restore the libghostty cache
         id: libghostty
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
-          path: build/libghostty
-          key: libghostty-${{ runner.os }}-${{ runner.arch }}-zig${{ env.ZIG_VERSION }}-${{ steps.pin.outputs.commit }}
+          path: build/libghostty-${{ matrix.goos }}-${{ matrix.goarch }}
+          key: libghostty-${{ matrix.goos }}-${{ matrix.goarch }}-zig${{ env.ZIG_VERSION }}-${{ steps.pin.outputs.commit }}
 
       - name: Build libghostty
         if: steps.libghostty.outputs.cache-hit != 'true'
-        run: make deps
+        run: ./scripts/build-libghostty.sh ${{ matrix.target }}
+
+      - name: Save the libghostty cache
+        if: steps.libghostty.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: build/libghostty-${{ matrix.goos }}-${{ matrix.goarch }}
+          key: ${{ steps.libghostty.outputs.cache-primary-key }}
 
       # The .pc files hold the absolute prefix of the build, so point them at this workspace
       # (a cache restored under another path would otherwise leave them pointing nowhere).
       - name: Check the libghostty pkg-config files
         run: |
-          sed -i.bak "s|^prefix=.*|prefix=$GITHUB_WORKSPACE/build/libghostty|" build/libghostty/lib/pkgconfig/*.pc
-          rm -f build/libghostty/lib/pkgconfig/*.bak
+          dir="build/libghostty-${{ matrix.goos }}-${{ matrix.goarch }}"
+          sed -i.bak "s|^prefix=.*|prefix=$GITHUB_WORKSPACE/$dir|" "$dir"/lib/pkgconfig/*.pc
+          rm -f "$dir"/lib/pkgconfig/*.bak
           pkg-config --exists libghostty-vt-static || { echo "::error::libghostty-vt-static not found in $PKG_CONFIG_PATH: the libghostty cache is stale, delete it and rerun"; exit 1; }
           pkg-config --cflags --libs --static libghostty-vt-static
 
