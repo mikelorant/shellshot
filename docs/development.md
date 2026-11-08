@@ -169,8 +169,9 @@ Prerequisites: `goreleaser` (`brew install goreleaser`), zig 0.17.x, `git` with 
 Run `make release-libs` once (and again after bumping the libghostty pin), then `make snapshot`.
 `dist/` holds:
 
-- `shellshot_<version>_<os>_<arch>.tar.gz` for `darwin_amd64`, `darwin_arm64`, `linux_amd64` and
-  `linux_arm64`. Each contains `shellshot`, `README.md`, `LICENSE` and `NOTICE`;
+- `shellshot_<os>_<arch>.tar.gz` for `darwin_amd64`, `darwin_arm64`, `linux_amd64` and `linux_arm64`.
+  The name has no version, so `releases/latest/download/<name>` never changes. Each contains
+  `shellshot`, `README.md`, `LICENSE` and `NOTICE`;
 - `checksum.txt` (sha256 of the four archives);
 - one directory per target with the bare binary (`dist/shellshot_linux_arm64_v8.0/shellshot`), plus
   goreleaser's `config.yaml`, `artifacts.json` and `metadata.json`.

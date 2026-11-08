@@ -14,10 +14,8 @@ Construction: a scallop seashell (the "shell") carries a `>_` prompt (the termin
 It sits on a hinged, striped clapper stick, so the shell "claps" the shot.
 The wordmark is JetBrains Mono Bold outlined to paths (no font needed) with a block cursor after it.
 
-README top (put the tagline right below):
+README top (the logo is the page title, centred, and the `id` is the target of the back-to-top links):
 
 ```html
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="shellshot" src="docs/assets/logo.svg" width="360"></picture></p>
+<h1 id="shellshot" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="Shellshot" src="docs/assets/logo.svg" width="360"></picture></h1>
 ```
-
-Tagline: *Record terminal sessions. Replay them. Export them as animated PNGs.*

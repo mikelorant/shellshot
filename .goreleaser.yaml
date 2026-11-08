@@ -34,7 +34,7 @@ builds:
 archives:
   - id: shellshot
     formats: [tar.gz]
-    name_template: "shellshot_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "shellshot_{{ .Os }}_{{ .Arch }}"
     files:
       - README.md
       - LICENSE
