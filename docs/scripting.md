@@ -24,7 +24,9 @@ shellshot record --script FILE --list
   `file:line:col: message` lines on stderr if the script is invalid, else 0. Waits count as "up to
   `timeout`", so the range is a minimum and a maximum.
 - `--watch` shows the terminal output on stdout while the script runs. Off by default: a scripted run
-  forwards no stdin and, apart from the progress line below, prints only a summary line.
+  forwards no stdin and, apart from the progress line below, prints only a summary line. If your terminal
+  is a different size from the script's, the live display can look wrong (the recording is not
+  affected), and shellshot says so on stderr.
 - While a script runs on a terminal, one progress line is redrawn on stderr, for example
   `[=====>              ]   7/23  create  12s`: a bar, the steps completed of the total, the scene (or
   `hidden`, or `scene/hidden`) the current step is in, and the time since the run started. A step is one
