@@ -25,6 +25,14 @@ shellshot record --script FILE --list
   `timeout`", so the range is a minimum and a maximum.
 - `--watch` shows the terminal output on stdout while the script runs. Off by default: a scripted run
   forwards no stdin and prints only a summary line.
+- While a script runs on a terminal, one progress line is redrawn on stderr, for example
+  `[=====>              ]   7/23  create  12s`: a bar, the steps completed of the total, the scene (or
+  `hidden`, or `scene/hidden`) the current step is in, and the time since the run started. A step is one
+  line or block of the script (`run`, `type`, `press`, `wait`, `sleep`, `mark`; a text block is one step);
+  scene and `hidden` blocks and the exit at the end are not counted, so the bar starts at `0/N` and shows
+  `N/N` once the last step has finished. The line fits the terminal width and is erased before the
+  summary or any error. It is not drawn when stderr is not a terminal, and not with `--watch`, whose
+  terminal output would be torn up by a redrawn line. It is never written to the recording.
 - Explicit flags beat the script, which beats the defaults. `-o` beats `output`; `--cols` and `--rows`
   beat `size`, each on its own. `--record-input`, `--codec`, `--coalesce` and `--ignore-exit-status`
   work as in an interactive `record`; input is not recorded unless `--record-input` is set.
