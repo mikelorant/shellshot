@@ -37,6 +37,10 @@ type recordOptions struct {
 	// stderrTerminal tells whether stderr is a terminal and how wide it is
 	// (see stderrTerminal). Tests set it; the command leaves it nil.
 	stderrTerminal func(io.Writer) (width func() int, ok bool)
+	// stdoutSize returns the size of the terminal behind a writer, or 0, 0
+	// when it is not one (see terminalSize). Tests set it; the command leaves
+	// it nil.
+	stdoutSize func(io.Writer) (cols, rows int)
 }
 
 // createRecording creates the recording file and returns it with its path.
@@ -99,6 +103,9 @@ func newRecordCmdWith(ro recordOptions) *cobra.Command {
 			}
 			opts.Command = command
 			opts.Cols, opts.Rows = resolveSize(opts.Cols, opts.Rows, cmd.OutOrStdout())
+			if f := cmd.Flags(); f.Changed("cols") || f.Changed("rows") {
+				ro.warnSizeMismatch(cmd, opts.Cols, opts.Rows)
+			}
 			return runRecord(cmd, opts, ro)
 		},
 	}

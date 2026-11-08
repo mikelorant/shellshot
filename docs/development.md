@@ -334,3 +334,7 @@ print `1.0.0-dev+0fa3d57`. That is expected for this tag.
   `NO_COLOR` is set. Pass `--color always`.
 - `replay` flickers or scrolls: the recording is probably larger than the terminal. `replay` crops
   to the terminal size; enlarge the terminal or record with `--cols` and `--rows` that fit it.
+- The live display of `record` looks wrong (wrapped, scrolled or cleared lines) and shellshot printed
+  `your terminal is ... but the recording is ...`: `--cols`/`--rows` (or the script's `size`) differ from
+  your terminal's size, and the live display is the recorded output drawn as it is. The recording is
+  not affected. Use a terminal of the recorded size, or record at the terminal's size.
