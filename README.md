@@ -3,7 +3,7 @@
 [![Release][release-badge]][release]
 [![GoReleaser][goreleaser-badge]][goreleaser]
 [![Licence][license-badge]][license]
-[![AI Coded: Claude Sonnet 5.5][ai-badge]][ai]
+[![ai coded: Claude Sonnet 5.5][ai-badge]][ai]
 
 [release]: https://github.com/mikelorant/shellshot/releases
 [release-badge]: https://img.shields.io/github/v/release/mikelorant/shellshot
@@ -12,7 +12,7 @@
 [license]: LICENSE
 [license-badge]: https://img.shields.io/github/license/mikelorant/shellshot
 [ai]: https://www.anthropic.com/claude
-[ai-badge]: https://img.shields.io/badge/AI_Coded-Claude_Sonnet_5.5-D97757?logo=anthropic&logoColor=white
+[ai-badge]: https://img.shields.io/badge/ai_coded-Claude_Sonnet_5.5-D97757?logo=anthropic&logoColor=white
 
 Shellshot records a terminal session, your shell or one command, into a small `.shot` log. Replay it
 in your terminal, or export it as an animated PNG, GIF, WebP or SVG. A script can drive the session.
