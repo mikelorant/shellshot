@@ -201,6 +201,30 @@ func (p *Process) Resize(cols, rows int) error {
 	return nil
 }
 
+// ShellInForeground reports whether the program started by Start is the
+// foreground process group of the terminal, which for a shell means it is
+// waiting at its prompt: a command the shell runs gets a process group of its
+// own and takes over the foreground until it ends. The child is a session
+// leader, so its process group id is its pid. A shell without job control
+// never hands the foreground over, so this stays true.
+func (p *Process) ShellInForeground() (bool, error) {
+	rc, err := p.ptmx.SyscallConn()
+	if err != nil {
+		return false, fmt.Errorf("pty: foreground: %w", err)
+	}
+	var pgrp int
+	var ioctlErr error
+	if err := rc.Control(func(fd uintptr) {
+		pgrp, ioctlErr = unix.IoctlGetInt(int(fd), unix.TIOCGPGRP)
+	}); err != nil {
+		return false, fmt.Errorf("pty: foreground: %w", err)
+	}
+	if ioctlErr != nil {
+		return false, fmt.Errorf("pty: foreground: %w", ioctlErr)
+	}
+	return pgrp == p.cmd.Process.Pid, nil
+}
+
 // DisableEOTEcho stops the terminal from echoing a Ctrl-D (EOT) byte written
 // afterwards, so it does not appear in the output as "^D". On macOS this
 // switches off all echo; on Linux only the ^X notation for control

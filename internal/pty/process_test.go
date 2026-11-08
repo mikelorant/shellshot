@@ -307,3 +307,61 @@ func TestCloseWithUnreadOutputReturns(t *testing.T) {
 		t.Fatal("Close did not return with unread output")
 	}
 }
+
+// eventually polls cond until it holds or ten seconds have passed.
+func eventually(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestShellInForegroundFollowsTheRunningCommand(t *testing.T) {
+	p := start(t, context.Background(), Config{
+		Command: "/bin/sh", Args: []string{"-i"}, Env: append(os.Environ(), "PS1=READY> "),
+	})
+	var seen strings.Builder
+	buf := make([]byte, 4096)
+	for !strings.Contains(seen.String(), "READY> ") {
+		n, err := p.Read(buf)
+		if err != nil {
+			t.Fatalf("reading until the prompt: %v (output %q)", err, seen.String())
+		}
+		seen.Write(buf[:n])
+	}
+	inForeground := func() bool {
+		ok, err := p.ShellInForeground()
+		if err != nil {
+			t.Fatalf("ShellInForeground: %v", err)
+		}
+		return ok
+	}
+	if !inForeground() {
+		t.Fatal("at the prompt: the shell is not in the foreground")
+	}
+	if _, err := p.Write([]byte("sleep 30\n")); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "sleep to take the foreground", func() bool { return !inForeground() })
+	if _, err := p.Write([]byte{0x03}); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the shell to come back to the foreground", inForeground)
+}
+
+func TestShellInForegroundAfterCloseFails(t *testing.T) {
+	p, err := Start(context.Background(), Config{Command: "sleep", Args: []string{"30"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := p.ShellInForeground(); err == nil {
+		t.Errorf("ShellInForeground after Close = (%v, nil), want an error", ok)
+	}
+}
