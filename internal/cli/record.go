@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -33,6 +34,9 @@ type recordOptions struct {
 	// created. Tests set them; the command uses time.Now and ".".
 	now    func() time.Time
 	outDir string
+	// stderrTerminal tells whether stderr is a terminal and how wide it is
+	// (see stderrTerminal). Tests set it; the command leaves it nil.
+	stderrTerminal func(io.Writer) (width func() int, ok bool)
 }
 
 // createRecording creates the recording file and returns it with its path.
