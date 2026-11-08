@@ -21,6 +21,12 @@ import (
 // scripts below do not depend on the user's shell or its startup files.
 const scriptPrelude = "shell /bin/sh\nenv PS1=\"$ \"\nsize 60x8\ntyping 5ms\n"
 
+// scriptPreludeFor is scriptPrelude with another shell, given as the argv of
+// the "shell" setting.
+func scriptPreludeFor(shell string) string {
+	return "shell " + shell + "\nenv PS1=\"$ \"\nsize 60x8\ntyping 5ms\n"
+}
+
 // scriptRun is the result of runScriptCLI.
 type scriptRun struct {
 	code           int
@@ -39,9 +45,15 @@ func runScriptCLI(t *testing.T, src string, args ...string) scriptRun {
 
 func runScriptCLIContext(t *testing.T, parent context.Context, src string, args ...string) scriptRun {
 	t.Helper()
+	return runScriptCLIWith(t, parent, scriptPrelude+src, args...)
+}
+
+// runScriptCLIWith is runScriptCLIContext for a complete script text.
+func runScriptCLIWith(t *testing.T, parent context.Context, text string, args ...string) scriptRun {
+	t.Helper()
 	dir := t.TempDir()
 	file := filepath.Join(dir, "demo.script")
-	if err := os.WriteFile(file, []byte(scriptPrelude+src), 0o644); err != nil {
+	if err := os.WriteFile(file, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	r := scriptRun{shot: filepath.Join(dir, "demo.shot")}
