@@ -12,3 +12,6 @@ recordings/
 /*.webp
 /*.svg
 /*.apng
+
+# zig package cache created by setup-zig in CI; goreleaser requires a clean tree
+/.zig-cache/
