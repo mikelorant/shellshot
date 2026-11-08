@@ -115,7 +115,8 @@ no script), looping like the other formats (`--loops`). Give `--frame` to write 
 
 `--frame` is an error for the raster formats and `--svg-text` is an error for any format but
 `svg`.
-`--fallback-font` and `--system-fonts` change SVG output only with `--svg-text paths`.
+`--fallback-font` and `--system-fonts` change SVG output with `--svg-text paths`. In the default
+`text` mode they also apply to private-use icon characters that one of the fonts covers.
 
 Each glyph in `text` mode carries its own x position, so text stays on the terminal grid even
 when the viewer's monospace font has a different width. The look of the glyphs still depends on

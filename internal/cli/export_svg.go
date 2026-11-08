@@ -61,7 +61,7 @@ func svgWriteFunc(cmd *cobra.Command, of format.Format, settings format.Settings
 	return func(w *os.File) error {
 		o := settings.SVG
 		if o.Text == svg.TextText && (len(flags.fallbackFonts) > 0 || flags.systemFonts) {
-			fmt.Fprintln(cmd.ErrOrStderr(), "note: --fallback-font and --system-fonts only change svg output with --svg-text paths; text mode leaves glyphs to the viewer's fonts")
+			fmt.Fprintln(cmd.ErrOrStderr(), "note: --fallback-font and --system-fonts change svg output with --svg-text paths; in text mode they only apply to private-use icon characters that one of the fonts covers, and other glyphs are left to the viewer's fonts")
 		}
 		ts, err := pipeline.ReadSteps(cmd.Context(), src, tl)
 		if err != nil {
