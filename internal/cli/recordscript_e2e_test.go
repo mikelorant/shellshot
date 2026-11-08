@@ -249,6 +249,7 @@ func TestRecordScriptWatch(t *testing.T) {
 func TestRecordScriptFailedWaitKeepsRecording(t *testing.T) {
 	t.Parallel()
 	r := runScriptCLI(t, `
+wait "$" 20s
 scene probe {
   run echo hi
   wait "never-on-screen" 1s
@@ -257,7 +258,7 @@ scene probe {
 	if r.code != 3 {
 		t.Fatalf("exit code = %d, want 3\nstderr: %s", r.code, r.stderr)
 	}
-	if r.took > 5*time.Second {
+	if r.took > 10*time.Second {
 		t.Errorf("took %v, want about 2 s", r.took)
 	}
 	for _, want := range []string{
@@ -292,10 +293,19 @@ scene probe {
 	}
 }
 
+// The first wait holds the script until the shell has drawn its prompt. The
+// start hold of the script gives up after one second, and a shell that is
+// slower than that (a cold /bin/sh on a loaded macOS runner) would still be
+// starting when the command is typed. Its echo then stops, the screen looks
+// quiet, and the settle passes before the loop prints anything. The quiet
+// time is long against any gap between the Enter and the first tick, which
+// the 50 ms ticks never leave.
 func TestRecordScriptSettleTimeoutFails(t *testing.T) {
 	t.Parallel()
 	r := runScriptCLI(t, `
-timeout 1s
+timeout 3s
+settle 1s
+wait "$" 20s
 scene busy {
   run i=0; while :; do i=$((i+1)); echo tick$i; sleep 0.05; done
 }
@@ -355,7 +365,7 @@ func TestRecordScriptCannotStartProgram(t *testing.T) {
 func TestRecordScriptCancelClosesSpans(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(1500*time.Millisecond, cancel)
+	time.AfterFunc(4*time.Second, cancel) // long after the shell has started and echoed
 	r := runScriptCLIContext(t, ctx, `
 scene waiting {
   run echo started
@@ -365,8 +375,8 @@ scene waiting {
 	if r.code != 130 {
 		t.Fatalf("exit code = %d, want 130\nstderr: %s", r.code, r.stderr)
 	}
-	if r.took > 8*time.Second {
-		t.Errorf("took %v after cancel, want a prompt exit", r.took)
+	if r.took > 12*time.Second {
+		t.Errorf("took %v with a cancel at 4 s, want a prompt exit", r.took)
 	}
 	if !strings.Contains(r.stderr, "cancelled; partial recording kept at "+r.shot) {
 		t.Errorf("stderr = %s", r.stderr)
