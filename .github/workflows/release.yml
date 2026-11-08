@@ -191,7 +191,7 @@ jobs:
           (cd dist && sha256sum -c checksum.txt)
           for arch in amd64 arm64; do
             mkdir -p "dist/context/linux/$arch"
-            tar -xzf dist/shellshot_*_linux_"$arch".tar.gz -C "dist/context/linux/$arch" shellshot
+            tar -xzf "dist/shellshot_linux_$arch.tar.gz" -C "dist/context/linux/$arch" shellshot
           done
           cp LICENSE NOTICE dist/context/
           ls -l dist/context/linux/*/shellshot
