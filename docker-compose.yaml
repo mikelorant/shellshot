@@ -1,7 +1,5 @@
-# shellshot in a container. Build the image first:
-#
-#   git submodule update --init --depth 1 third_party/ghostty
-#   docker compose build
+# shellshot in a container. The only requirement is Docker: the first command pulls the published
+# image ghcr.io/mikelorant/shellshot:latest (multi-arch) and needs no source checkout or build.
 #
 # shellshot allocates its own PTY, so `record -c` needs no `-t`. Files land in ./recordings.
 #
@@ -13,9 +11,20 @@
 #
 #   docker compose run --rm -it shellshot record -o session.shot
 #
-# The example demos, recorded and exported in one go (profile `demo`, writes showcase.png):
+# The example demos, recorded and exported in one go (profile `demo`, writes showcase.png).
+# The demo mounts ./contrib/examples, so it needs the repository checkout:
 #
 #   docker compose run --rm demo
+#
+# The image is pulled once and then reused. To update to the newest image:
+#
+#   docker compose pull
+#
+# To pin a version instead of `latest`:
+#
+#   SHELLSHOT_IMAGE=ghcr.io/mikelorant/shellshot:0.1.0 docker compose run --rm shellshot --version
+#
+# To build the image from source instead, see docker-compose.build.yaml.
 #
 # File ownership: the image runs as uid 1000. Docker Desktop and OrbStack map bind-mount owners
 # to your user, so nothing more is needed on macOS. On Linux, files created in ./recordings are
@@ -25,11 +34,7 @@
 
 services:
   shellshot:
-    image: shellshot:dev
-    build:
-      context: .
-      args:
-        VERSION: ${VERSION:-dev}
+    image: ${SHELLSHOT_IMAGE:-ghcr.io/mikelorant/shellshot:latest}
     user: "${SHELLSHOT_UID:-1000}:${SHELLSHOT_GID:-1000}"
     working_dir: /work
     volumes:
