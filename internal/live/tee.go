@@ -56,20 +56,44 @@ func Tee(p Process, out io.Writer) Process {
 	return &teeProcess{Process: p, out: out}
 }
 
+// TeeHidingQueries is Tee, except that the copy written to out has the
+// terminal queries removed (see QueryFilter). The bytes Read returns are
+// unchanged. Use it when out is a real terminal that must not answer on top
+// of a terminal that already does.
+func TeeHidingQueries(p Process, out io.Writer) Process {
+	return &teeProcess{Process: p, out: out, filter: &QueryFilter{}}
+}
+
 type teeProcess struct {
 	Process
 	out       io.Writer
 	outFailed bool
+	filter    *QueryFilter // nil: copy everything
 }
 
 func (t *teeProcess) Read(b []byte) (int, error) {
 	n, err := t.Process.Read(b)
-	if n > 0 && !t.outFailed {
-		if _, werr := t.out.Write(b[:n]); werr != nil {
-			t.outFailed = true
+	if n > 0 {
+		shown := b[:n]
+		if t.filter != nil {
+			shown = t.filter.Filter(shown)
 		}
+		t.write(shown)
+	}
+	if err != nil && t.filter != nil {
+		t.write(t.filter.Flush())
 	}
 	return n, err
+}
+
+// write copies p to out until a write fails.
+func (t *teeProcess) write(p []byte) {
+	if len(p) == 0 || t.outFailed {
+		return
+	}
+	if _, err := t.out.Write(p); err != nil {
+		t.outFailed = true
+	}
 }
 
 // ShellInForeground implements ForegroundReporter by asking the wrapped

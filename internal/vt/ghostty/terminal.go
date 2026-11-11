@@ -42,21 +42,37 @@ type terminal struct {
 // New creates a headless terminal of the given size in cells. It is a
 // vt.Factory.
 func New(cols, rows int) (vt.Terminal, error) {
+	return newTerminal(cols, rows, nil)
+}
+
+// newTerminal is New with an optional reply sink; see NewAnswering.
+func newTerminal(cols, rows int, reply func([]byte)) (vt.Terminal, error) {
 	if err := checkSize(cols, rows); err != nil {
 		return nil, err
 	}
 
 	t := &terminal{cols: cols, height: rows}
 
-	var err error
-	t.term, err = libghostty.NewTerminal(
+	opts := []libghostty.TerminalOption{
 		libghostty.WithSize(uint16(cols), uint16(rows)),
 		// Grapheme clustering (mode 2027) is on by default in modern terminals;
 		// as the reset default it also survives RIS.
 		libghostty.WithModeDefault(libghostty.ModeGraphemeCluster, true),
-	)
+	}
+	if reply != nil {
+		opts = append(opts, t.replyOptions(reply)...)
+	}
+
+	var err error
+	t.term, err = libghostty.NewTerminal(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("ghostty: create terminal: %w", err)
+	}
+	if reply != nil {
+		if err := t.setReplyColors(); err != nil {
+			t.Close()
+			return nil, err
+		}
 	}
 	if t.state, err = libghostty.NewRenderState(); err != nil {
 		t.Close()

@@ -124,6 +124,12 @@ The format is in [format.md](format.md). The wiring:
 - The executor needs the key encoder, which needs the terminal, which `session.Run` creates. A wrapper
   around `vt.Factory` keeps the terminal, and the encoder is made on first use. Both live on the session
   goroutine, the one that polls the driver.
+- A scripted run has no terminal to answer the program's queries, so it builds the terminal with
+  `ghostty.NewAnswering` (libghostty's write-pty, size and colour-scheme effects, with the default theme's
+  colours). The replies are produced inside `Write`, on the session goroutine, and go to `live.Replies`:
+  a bounded queue that a goroutine of its own writes to the PTY, so a child that asks and never reads
+  cannot stall the loop that reads its output. Interactive `record` and `export` use `ghostty.New` and
+  answer nothing. With `--watch`, `live.TeeHidingQueries` removes the queries from the display copy.
 - A failure ends the run through `session`: open spans are ended, the child is killed and `EXIT` is logged,
   so the partial recording is complete. A cancelled run ends its spans but writes no `EXIT`.
 
