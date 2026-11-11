@@ -11,7 +11,5 @@ ops
    2  8:1     -                press enter after-gap typing=50ms
    3  8:1     -                settle quiet=200ms timeout=15s (fails at timeout)
    4  8:1     -                linger 1s
-   5  -       hidden           span-begin #1 hidden
-   6  -       hidden           drain quiet=200ms timeout=2s (never fails)
-   7  -       hidden           exit grace=2s
-   8  -       hidden           span-end #1
+   5  -       -                drain quiet=200ms timeout=2s (never fails)
+   6  -       -                exit grace=2s

@@ -33,7 +33,5 @@ ops
   20  27:3    save             press enter typing=50ms
   21  28:3    save             wait /^\$$/ timeout=10s
   22  29:1    save             span-end #3
-  23  -       hidden           span-begin #4 hidden
-  24  -       hidden           drain quiet=200ms timeout=2s (never fails)
-  25  -       hidden           exit grace=2s
-  26  -       hidden           span-end #4
+  23  -       -                drain quiet=200ms timeout=2s (never fails)
+  24  -       -                exit grace=2s

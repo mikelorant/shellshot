@@ -9,8 +9,7 @@ t=+202.863239ms write "\x1b[B"
 t=+1.202863239s write "a"
 t=+1.22515865s write "\r"
 t=+1.256762875s write "b"
-t=+1.256762875s span-begin hidden id=1 parent=0
+t=+1.456762875s quiet
 t=+1.456762875s shutdown
 t=+1.466762875s child-exit 0
-t=+1.466762875s span-end id=1
 t=+1.466762875s done

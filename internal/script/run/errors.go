@@ -70,7 +70,7 @@ type ScriptError struct {
 	Kind ErrorKind
 	File string
 	// Pos is the source position of the failing step (the opener of a text
-	// block); zero for the implicit exit span.
+	// block); zero for the exit sequence.
 	Pos script.Pos
 	// Scene is the enclosing scene, or "".
 	Scene string

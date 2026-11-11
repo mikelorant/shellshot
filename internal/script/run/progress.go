@@ -8,7 +8,7 @@ type Progress struct {
 	Total int
 	// Scope names where the current op sits: "NAME" for a scene, "hidden"
 	// for a hidden block, "NAME/hidden" for a hidden block in a scene, and
-	// "" outside any block and in the implicit exit sequence.
+	// "" outside any block and in the exit sequence.
 	Scope string
 }
 
@@ -16,7 +16,7 @@ type Progress struct {
 // Progress. A step is one step line or block of the script: a run, type,
 // press, wait, sleep or mark, whatever number of ops it was lowered to (a
 // run is a type, a press, a settle and maybe a linger). Scene and hidden
-// blocks are not steps, but the steps inside them are. The implicit exit
+// blocks are not steps, but the steps inside them are. The exit
 // sequence at the end of every plan is not counted, so a plan whose script is
 // empty has no steps.
 func (p *Plan) Steps() int {

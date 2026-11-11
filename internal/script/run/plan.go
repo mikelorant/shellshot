@@ -31,8 +31,8 @@ const (
 // same AST are reflect.DeepEqual.
 type Plan struct {
 	Process Process
-	// Ops are the steps in execution order. They always end with the
-	// implicit hidden span of the exit sequence.
+	// Ops are the steps in execution order. They always end with the exit
+	// sequence: a final drain and the exit, outside any span.
 	Ops []Op
 }
 
@@ -61,10 +61,10 @@ type Settings struct {
 
 // Meta is what every op knows about where it came from.
 type Meta struct {
-	Pos script.Pos // the source position of the step (or block); zero for the implicit exit span
+	Pos script.Pos // the source position of the step (or block); zero for the exit sequence
 	// Scene is the name of the enclosing scene, or "".
 	Scene string
-	// Hidden is true inside a hidden span, including the implicit exit span.
+	// Hidden is true inside a hidden span.
 	Hidden bool
 	// Eff holds the settings in effect at this op.
 	Eff Settings
@@ -188,10 +188,12 @@ func (o OpSpanEnd) Event() event.Span {
 	return event.Span{Op: event.SpanEnd, ID: o.ID}
 }
 
-// OpExit shuts the child down (docs/research/script-format.md §7.4). If the
-// child still runs, a shell gets EOF (Ctrl-D) and any other program gets its
-// PTY closed; after Grace the child is killed. A child that had to be closed
-// is noted, not a failure.
+// OpExit ends the recording of the terminal and shuts the child down
+// (docs/research/script-format.md §7.4). If the child still runs, a shell gets
+// EOF (Ctrl-D) and any other program gets its PTY closed; after Grace the
+// child is killed. A child that had to be closed is noted, not a failure.
+// Nothing the child prints from the start of the op on is recorded, except
+// its exit status.
 type OpExit struct {
 	Meta
 	Grace time.Duration

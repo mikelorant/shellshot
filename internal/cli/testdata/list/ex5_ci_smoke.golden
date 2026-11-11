@@ -38,7 +38,5 @@ ops
   22  33:3    interrupt        press up after-gap typing=35ms jitter=25%
   23  33:3    interrupt        press enter after-gap typing=35ms jitter=25%
   24  34:1    interrupt        span-end #3
-  25  -       hidden           span-begin #4 hidden
-  26  -       hidden           drain quiet=300ms timeout=2s (never fails)
-  27  -       hidden           exit grace=2s
-  28  -       hidden           span-end #4
+  25  -       -                drain quiet=300ms timeout=2s (never fails)
+  26  -       -                exit grace=2s

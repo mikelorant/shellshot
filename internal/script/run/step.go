@@ -54,7 +54,7 @@ type SpanOp struct {
 }
 
 // Step is what the host must do after one Poll. At most one of Write, Mark,
-// Span and Shutdown is set per Step.
+// Span, Quiet and Shutdown is set per Step.
 type Step struct {
 	// Write is bytes to send to the child now.
 	Write []byte
@@ -62,6 +62,10 @@ type Step struct {
 	Mark string
 	// Span is a SPAN event to record now.
 	Span *SpanOp
+	// Quiet asks the host to stop recording the terminal: from now on only
+	// the exit status is recorded. The Executor hands it out once, before
+	// Shutdown, so that nothing the child prints while it exits is recorded.
+	Quiet bool
 	// Shutdown asks the host to end the child: send EOF (Ctrl-D) to a shell,
 	// close the PTY master for any other program. The Executor then waits for
 	// ChildExited until the grace time is over and carries on. When Done is

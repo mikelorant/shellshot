@@ -14,7 +14,5 @@ ops
    6  6:1     -                type "echo after" typing=50ms
    7  6:1     -                press enter after-gap typing=50ms
    8  6:1     -                settle off
-   9  -       hidden           span-begin #1 hidden
-  10  -       hidden           drain quiet=200ms timeout=2s (never fails)
-  11  -       hidden           exit grace=2s
-  12  -       hidden           span-end #1
+   9  -       -                drain quiet=200ms timeout=2s (never fails)
+  10  -       -                exit grace=2s

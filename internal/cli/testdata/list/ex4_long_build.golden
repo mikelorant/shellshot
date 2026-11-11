@@ -30,7 +30,5 @@ ops
   18  29:3    check            wait /v[0-9]+\.[0-9]+/ timeout=2m0s
   19  29:3    check            linger 2s
   20  30:1    check            span-end #3
-  21  -       hidden           span-begin #4 hidden
-  22  -       hidden           drain quiet=200ms timeout=2s (never fails)
-  23  -       hidden           exit grace=2s
-  24  -       hidden           span-end #4
+  21  -       -                drain quiet=200ms timeout=2s (never fails)
+  22  -       -                exit grace=2s

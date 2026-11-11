@@ -155,8 +155,8 @@ hidden {
 	if s.err != nil && s.err.Error() != "EOF" {
 		t.Errorf("recording ended with %v", s.err)
 	}
-	if want := []string{"scene:hello", "hidden", "hidden"}; !reflect.DeepEqual(spanNames(s.spans), want) {
-		t.Errorf("spans = %v, want %v (the last is the implicit one)", spanNames(s.spans), want)
+	if want := []string{"scene:hello", "hidden"}; !reflect.DeepEqual(spanNames(s.spans), want) {
+		t.Errorf("spans = %v, want %v (the exit is not a span)", spanNames(s.spans), want)
 	}
 	for _, sp := range s.spans {
 		if sp.Open {
@@ -212,13 +212,13 @@ scene hello {
 		}
 	}
 	if want := []string{"setup"}; !reflect.DeepEqual(named, want) {
-		t.Errorf("named hidden spans = %v, want %v (the implicit exit span has no name)", named, want)
+		t.Errorf("named hidden spans = %v, want %v (the exit is not a span)", named, want)
 	}
 	code, stdout, stderr := runCLI(t, "info", r.shot)
 	if code != 0 || stderr != "" {
 		t.Fatalf("info exit code = %d, stderr %q", code, stderr)
 	}
-	if !strings.Contains(stdout, "hidden        2 spans, ") || !strings.Contains(stdout, "\n  1 setup  0:") {
+	if !strings.Contains(stdout, "hidden        1 span, ") || !strings.Contains(stdout, "\n  1 setup  0:") {
 		t.Errorf("info lacks the hidden span named setup:\n%s", stdout)
 	}
 }
@@ -546,7 +546,10 @@ func TestRecordScriptClosesChildThatIgnoresEOF(t *testing.T) {
 		t.Errorf("took %v, want about the 2 s grace time", took)
 	}
 	s := readShot(t, out)
-	if want := []string{"hidden"}; !reflect.DeepEqual(spanNames(s.spans), want) || s.spans[0].Open {
-		t.Errorf("spans = %v, want one closed hidden span", spanNames(s.spans))
+	if len(s.spans) != 0 {
+		t.Errorf("spans = %v, want none (the exit is not a span)", spanNames(s.spans))
+	}
+	if got := s.exitStatus(t); got == 0 {
+		t.Errorf("EXIT status = 0, want the status of the closed child")
 	}
 }

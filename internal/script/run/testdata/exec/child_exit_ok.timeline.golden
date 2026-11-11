@@ -7,6 +7,4 @@ t=+200ms write "\r"
 t=+220ms child-exit 0
 t=+1.4s mark after-exit
 t=+1.4s span-end id=1
-t=+1.4s span-begin hidden id=2 parent=0
-t=+1.6s span-end id=2
 t=+1.6s done

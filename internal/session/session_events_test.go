@@ -78,6 +78,12 @@ func (e *fakeEvents) Span(at time.Duration, op SpanOp) error {
 	return nil
 }
 
+func (e *fakeEvents) Quiet() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.seq = append(e.seq, "quiet")
+}
+
 func (e *fakeEvents) Exit(at time.Duration, status int) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()

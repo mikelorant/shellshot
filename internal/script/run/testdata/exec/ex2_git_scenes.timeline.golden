@@ -137,8 +137,7 @@ t=+13.81s write "e"
 t=+13.88s write "\r"
 t=+16.1s span-end id=3
 t=+16.1s mark done
-t=+16.1s span-begin hidden id=4 parent=0
+t=+16.3s quiet
 t=+16.3s shutdown
 t=+16.31s child-exit 0
-t=+16.31s span-end id=4
 t=+16.31s done

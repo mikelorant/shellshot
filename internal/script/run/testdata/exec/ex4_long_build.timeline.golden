@@ -60,8 +60,7 @@ t=+1m36.69s write "o"
 t=+1m36.72s write "n"
 t=+1m36.75s write "\r"
 t=+1m40.97s span-end id=3
-t=+1m40.97s span-begin hidden id=4 parent=0
+t=+1m41.17s quiet
 t=+1m41.17s shutdown
 t=+1m41.18s child-exit 0
-t=+1m41.18s span-end id=4
 t=+1m41.18s done

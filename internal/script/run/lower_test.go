@@ -59,17 +59,17 @@ func kinds(ops []Op) string {
 	return strings.Join(names, " ")
 }
 
-const exitKinds = "begin settle exit end"
+const exitKinds = "settle exit"
 
-// body returns the ops before the implicit exit span, and fails if the plan
-// does not end with it.
+// body returns the ops before the exit sequence, and fails if the plan does
+// not end with it.
 func body(t *testing.T, p *Plan) []Op {
 	t.Helper()
 	n := len(p.Ops)
-	if n < 4 || kinds(p.Ops[n-4:]) != exitKinds {
-		t.Fatalf("plan does not end with the exit span: %s", kinds(p.Ops))
+	if n < 2 || kinds(p.Ops[n-2:]) != exitKinds {
+		t.Fatalf("plan does not end with the exit sequence: %s", kinds(p.Ops))
 	}
-	return p.Ops[:n-4]
+	return p.Ops[:n-2]
 }
 
 func TestRunIsTypeEnterSettle(t *testing.T) {
@@ -394,12 +394,11 @@ hidden {
 		{3, 2, event.SpanHidden, "warm-up"},
 		{4, 0, event.SpanScene, "two"},
 		{5, 0, event.SpanHidden, ""},
-		{6, 0, event.SpanHidden, ""}, // the implicit exit span
 	}
 	if !reflect.DeepEqual(begins, want) {
 		t.Errorf("begins\n got %+v\nwant %+v", begins, want)
 	}
-	if want := []uint64{1, 3, 2, 4, 5, 6}; !reflect.DeepEqual(ends, want) {
+	if want := []uint64{1, 3, 2, 4, 5}; !reflect.DeepEqual(ends, want) {
 		t.Errorf("ends = %v, want %v", ends, want)
 	}
 	if depth != 0 || maxDepth != 2 {
@@ -442,8 +441,8 @@ func TestSceneNameOnOps(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	n := len(p.Ops)
-	for _, op := range p.Ops[n-4:] {
-		if m := op.OpMeta(); m.Scene != "" || !m.Hidden {
+	for _, op := range p.Ops[n-2:] {
+		if m := op.OpMeta(); m.Scene != "" || m.Hidden {
 			t.Errorf("exit op meta = %+v", m)
 		}
 	}
@@ -479,7 +478,6 @@ hidden {
 		{Speed: 8000, Idle: 2 * time.Second, Hold: time.Second}, // own: scene overrides, inherits hold
 		{}, // hidden in scene: none
 		{}, // top-level hidden: none
-		{}, // implicit exit span: none
 	}
 	if len(begins) != len(want) {
 		t.Fatalf("got %d spans", len(begins))
@@ -501,7 +499,7 @@ func TestHintAfterStepsInSceneStillApplies(t *testing.T) {
 	}
 }
 
-func TestImplicitExitSpanExactlyOnce(t *testing.T) {
+func TestExitSequenceExactlyOnceAndInNoSpan(t *testing.T) {
 	for _, src := range []string{
 		"",
 		"# only a comment\n",
@@ -513,25 +511,32 @@ func TestImplicitExitSpanExactlyOnce(t *testing.T) {
 	} {
 		p := lowerSrc(t, src)
 		n := len(p.Ops)
-		if n < 4 || kinds(p.Ops[n-4:]) != exitKinds {
+		if n < 2 || kinds(p.Ops[n-2:]) != exitKinds {
 			t.Errorf("%q: ops = %s", src, kinds(p.Ops))
 			continue
 		}
 		if c := strings.Count(kinds(p.Ops), "exit"); c != 1 {
 			t.Errorf("%q: %d exit ops", src, c)
 		}
-		begin, end := p.Ops[n-4].(OpSpanBegin), p.Ops[n-1].(OpSpanEnd)
-		if begin.Type != event.SpanHidden || begin.Name != "" || begin.Parent != 0 || begin.Hints != (event.SpanHints{}) || end.ID != begin.ID {
-			t.Errorf("%q: exit span %+v / %+v", src, begin, end)
+		var hidden int
+		for _, op := range p.Ops {
+			if b, ok := op.(OpSpanBegin); ok && b.Type == event.SpanHidden {
+				hidden++
+			}
 		}
-		if drain := p.Ops[n-3].(OpSettle); !drain.Drain || drain.Timeout != 2*time.Second || drain.Off {
+		if want := strings.Count(src, "hidden {"); hidden != want {
+			t.Errorf("%q: %d hidden spans, want %d (the written ones only)", src, hidden, want)
+		}
+		if drain := p.Ops[n-2].(OpSettle); !drain.Drain || drain.Timeout != 2*time.Second || drain.Off {
 			t.Errorf("%q: drain = %+v", src, drain)
 		}
-		if exit := p.Ops[n-2].(OpExit); exit.Grace != 2*time.Second {
+		if exit := p.Ops[n-1].(OpExit); exit.Grace != 2*time.Second {
 			t.Errorf("%q: exit = %+v", src, exit)
 		}
-		if begin.Pos != (script.Pos{}) {
-			t.Errorf("%q: implicit span has a source position %v", src, begin.Pos)
+		for _, op := range p.Ops[n-2:] {
+			if m := op.OpMeta(); m.Hidden || m.Scene != "" || m.Pos != (script.Pos{}) {
+				t.Errorf("%q: %T meta = %+v, want a plain op without a source position", src, op, m)
+			}
 		}
 	}
 }
@@ -539,12 +544,12 @@ func TestImplicitExitSpanExactlyOnce(t *testing.T) {
 func TestExitDrainUsesSettleAtEndOfScript(t *testing.T) {
 	p := lowerSrc(t, "settle 500ms\nscene a {\n  settle 1s\n  type x\n}\n")
 	n := len(p.Ops)
-	if got := p.Ops[n-3].(OpSettle).Quiet; got != 500*time.Millisecond {
+	if got := p.Ops[n-2].(OpSettle).Quiet; got != 500*time.Millisecond {
 		t.Errorf("drain quiet = %v, want 500ms", got)
 	}
 	p = lowerSrc(t, "settle off\ntype x\n")
 	n = len(p.Ops)
-	if d := p.Ops[n-3].(OpSettle); d.Quiet != 200*time.Millisecond || d.Off {
+	if d := p.Ops[n-2].(OpSettle); d.Quiet != 200*time.Millisecond || d.Off {
 		t.Errorf("drain with settle off = %+v", d)
 	}
 }

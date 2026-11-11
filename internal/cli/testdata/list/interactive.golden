@@ -51,7 +51,5 @@ ops
   38  37:3    tour             linger 700ms
   39  38:1    tour             span-end #4
   40  40:1    -                mark "end"
-  41  -       hidden           span-begin #5 hidden
-  42  -       hidden           drain quiet=200ms timeout=2s (never fails)
-  43  -       hidden           exit grace=2s
-  44  -       hidden           span-end #5
+  41  -       -                drain quiet=200ms timeout=2s (never fails)
+  42  -       -                exit grace=2s

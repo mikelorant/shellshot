@@ -73,12 +73,19 @@ func TestFormatShowsScenesAndDurations(t *testing.T) {
 		"total   2.2s to 6s, 0 waits, 1 scene",
 		"span-begin #1 scene \"intro\"",
 		"intro",
-		"span-begin #2 hidden",
+		"drain quiet=200ms timeout=2s (never fails)",
 		"exit grace=2s",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("listing lacks %q:\n%s", want, got)
 		}
+	}
+}
+
+func TestFormatHasNoSpanForTheExit(t *testing.T) {
+	got := lowerSrc(t, "run x\n").Format()
+	if strings.Contains(got, "span-") || strings.Contains(got, "hidden") {
+		t.Errorf("listing has a span or a hidden scope:\n%s", got)
 	}
 }
 

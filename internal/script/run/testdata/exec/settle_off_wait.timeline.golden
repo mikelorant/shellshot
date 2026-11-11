@@ -31,8 +31,7 @@ t=+1.45s write "="
 t=+1.5s write "$"
 t=+1.55s write "?"
 t=+1.6s write "\r"
-t=+1m36.6s span-begin hidden id=1 parent=0
+t=+1m36.8s quiet
 t=+1m36.8s shutdown
 t=+1m36.81s child-exit 0
-t=+1m36.81s span-end id=1
 t=+1m36.81s done

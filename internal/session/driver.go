@@ -64,7 +64,7 @@ var ErrNoForeground = live.ErrNoForeground
 type SpanOp interface{}
 
 // Step is what the session must do after one Poll, in this order: Write, Mark,
-// Span, Shutdown.
+// Span, Quiet, Shutdown.
 type Step struct {
 	// Write is sent to the process now. A write error aborts the run.
 	Write []byte
@@ -72,6 +72,9 @@ type Step struct {
 	Mark string
 	// Span, if not nil, is logged with Events.Span now.
 	Span SpanOp
+	// Quiet, if set, is logged with Events.Quiet now: the events that follow
+	// are not recorded, except Exit.
+	Quiet bool
 	// Shutdown asks the session to end the child: it sends EOF (Ctrl-D, 0x04)
 	// and, if the child is still running after Config.ShutdownGrace, closes
 	// the process.
@@ -210,7 +213,7 @@ func (s *session) driverPoll() error {
 			}
 			return nil
 		}
-		acts := len(step.Write) > 0 || step.Mark != "" || step.Span != nil || step.Shutdown
+		acts := len(step.Write) > 0 || step.Mark != "" || step.Span != nil || step.Quiet || step.Shutdown
 		if step.Deadline > now {
 			if d.deadline.armed() == nil || d.armedFor != step.Deadline {
 				s.armTimer(&d.deadline, step.Deadline-now)
@@ -247,6 +250,9 @@ func (s *session) act(step Step) error {
 		if err := s.cfg.Events.Span(s.elapsed(), step.Span); err != nil {
 			return fmt.Errorf("session: events: %w", err)
 		}
+	}
+	if step.Quiet && s.cfg.Events != nil {
+		s.cfg.Events.Quiet()
 	}
 	if step.Shutdown && !d.exited {
 		// Best effort: a child that is gone, or a pty that refuses, is dealt

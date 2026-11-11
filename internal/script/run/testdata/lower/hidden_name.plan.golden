@@ -27,7 +27,5 @@ ops
   18  14:3    hidden           press enter after-gap typing=0s
   19  14:3    hidden           settle quiet=200ms timeout=15s (fails at timeout)
   20  15:1    hidden           span-end #4
-  21  -       hidden           span-begin #5 hidden
-  22  -       hidden           drain quiet=200ms timeout=2s (never fails)
-  23  -       hidden           exit grace=2s
-  24  -       hidden           span-end #5
+  21  -       -                drain quiet=200ms timeout=2s (never fails)
+  22  -       -                exit grace=2s
