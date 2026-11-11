@@ -35,6 +35,11 @@ func (f SinkFunc) Frame(frame snapshot.Frame) error { return f(frame) }
 // value the driver put in Step.Span (see SpanOp), so the sink must know its
 // dynamic type and return an error for any other.
 //
+// Quiet is called only when Config.Driver asks for it, on the same goroutine.
+// From then on the sink records nothing but Exit: no more output, input or
+// resizes, however they reach it. The driver asks for it before it ends the
+// child, so that what the child prints while it exits is not recorded.
+//
 // Resize is part of the interface for event writers (such as the binary
 // recording writer's adapter) but is not called by session today.
 type EventSink interface {
@@ -42,5 +47,6 @@ type EventSink interface {
 	Resize(at time.Duration, cols, rows int) error
 	Mark(at time.Duration, label string) error
 	Span(at time.Duration, op SpanOp) error
+	Quiet()
 	Exit(at time.Duration, status int) error
 }

@@ -478,6 +478,28 @@ func TestDriverShutdownSendsEOFThenClosesAfterGrace(t *testing.T) {
 	h.assertClean()
 }
 
+func TestDriverQuietIsLoggedBeforeTheShutdownIsSent(t *testing.T) {
+	d := &fakeDriver{fn: func(n int, now time.Duration, _ Screen) (Step, error) {
+		switch n {
+		case 0:
+			return Step{Quiet: true, Deadline: now}, nil
+		case 1: // the Step above asked for another poll at once
+			return Step{Shutdown: true, Deadline: 5 * time.Second}, nil
+		case 2: // after ChildExited
+			return Step{Done: true, Deadline: now}, nil
+		}
+		return Step{Done: true}, nil
+	}}
+	h, ev := startDriverRun(t, d, func(h *harness) { h.proc.exit = 0 })
+	h.polled(d, 2)
+	h.exitChild(0)
+	if r := h.wait(); r.err != nil || r.code != 0 {
+		t.Fatalf("Run = (%d, %v), want (0, nil)", r.code, r.err)
+	}
+	wantSeq(t, ev, "quiet", `send:"\x04"`, "exit")
+	h.assertClean()
+}
+
 func TestDriverShutdownChildExitsWithinGrace(t *testing.T) {
 	d := &fakeDriver{fn: func(n int, now time.Duration, _ Screen) (Step, error) {
 		switch n {

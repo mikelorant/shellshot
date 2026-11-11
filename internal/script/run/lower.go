@@ -12,8 +12,8 @@ import (
 
 // Lower converts a validated script into a Plan. It resolves every scope: each
 // op carries the settings in effect at its position, SPAN begin and end are
-// explicit ops, and the implicit hidden span of the end-of-script exit
-// sequence is always appended. Lower does not read the environment, so equal
+// explicit ops, and the end-of-script exit sequence (a final drain, then the
+// exit, outside any span) is always appended. Lower does not read the environment, so equal
 // scripts give equal plans.
 //
 // The script must have passed the validator. Lower still returns an error,
@@ -41,7 +41,7 @@ func Lower(s *script.Script) (*Plan, error) {
 	if err := l.items(s.Settings, s.Items, &sc, span{}); err != nil {
 		return nil, err
 	}
-	l.exitSpan(sc)
+	l.exitSequence(sc)
 	return l.plan, nil
 }
 
@@ -244,16 +244,13 @@ func (l *lowerer) linger(m Meta) {
 	}
 }
 
-// exitSpan appends the implicit hidden span of the exit sequence
-// (docs/research/script-format.md §7.4): a final drain that never fails, the
-// shutdown with its grace time, and the span end. sc is the setting state at
-// the end of the script.
-func (l *lowerer) exitSpan(sc Settings) {
-	l.lastID++
-	id := l.lastID
-	m := Meta{Hidden: true, Eff: sc}
-	l.emit(OpSpanBegin{Meta: m, ID: id, Type: event.SpanHidden})
+// exitSequence appends the end of the script (docs/research/script-format.md
+// §7.4): a final drain that never fails, then the exit, which stops the
+// recording of the terminal before it shuts the shell down. The sequence is in
+// no span: what the shell prints while it exits is not recorded. sc is the
+// setting state at the end of the script.
+func (l *lowerer) exitSequence(sc Settings) {
+	m := Meta{Eff: sc}
 	l.emit(OpSettle{Meta: m, Quiet: sc.quiet(), Timeout: DrainTimeout, Drain: true})
 	l.emit(OpExit{Meta: m, Grace: ExitGrace})
-	l.emit(OpSpanEnd{Meta: m, ID: id})
 }

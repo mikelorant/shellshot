@@ -190,6 +190,10 @@ func (d *driver) apply(s Step) bool {
 		}
 		did = true
 	}
+	if s.Quiet {
+		d.record("quiet", "")
+		did = true
+	}
 	if s.Shutdown {
 		d.record("shutdown", "")
 		d.w.Shutdown(d.now)

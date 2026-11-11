@@ -16,8 +16,7 @@ t=+700ms write "r"
 t=+750ms write "l"
 t=+800ms write "d"
 t=+850ms write "\r"
-t=+2.07s span-begin hidden id=1 parent=0
+t=+2.27s quiet
 t=+2.27s shutdown
 t=+2.28s child-exit 0
-t=+2.28s span-end id=1
 t=+2.28s done

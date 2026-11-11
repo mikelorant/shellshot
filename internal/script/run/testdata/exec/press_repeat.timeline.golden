@@ -4,8 +4,7 @@ t=+60ms write "\x1b[B"
 t=+60ms write "\x03"
 t=+60ms write "\x1b[D\x1b[D\x1b[D"
 t=+60ms write "xyz"
-t=+60ms span-begin hidden id=1 parent=0
+t=+260ms quiet
 t=+260ms shutdown
 t=+270ms child-exit 0
-t=+270ms span-end id=1
 t=+270ms done

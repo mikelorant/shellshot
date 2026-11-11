@@ -67,8 +67,7 @@ t=+3.31500025s write "\x1b[A"
 t=+3.344215781s write "\x1b[A"
 t=+3.374125257s write "\r"
 t=+3.374125257s span-end id=3
-t=+3.374125257s span-begin hidden id=4 parent=0
+t=+3.694125257s quiet
 t=+3.694125257s shutdown
 t=+3.704125257s child-exit 0
-t=+3.704125257s span-end id=4
 t=+3.704125257s done

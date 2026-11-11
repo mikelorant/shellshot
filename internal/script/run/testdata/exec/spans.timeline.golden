@@ -18,8 +18,7 @@ t=+720ms write "\r"
 t=+940ms span-end id=1
 t=+940ms span-begin hidden id=3 parent=0
 t=+1.94s span-end id=3
-t=+1.94s span-begin hidden id=4 parent=0
+t=+2.14s quiet
 t=+2.14s shutdown
 t=+2.15s child-exit 0
-t=+2.15s span-end id=4
 t=+2.15s done

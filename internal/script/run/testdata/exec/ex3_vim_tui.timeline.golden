@@ -104,8 +104,7 @@ t=+10.92s write "q"
 t=+10.92s mark saving
 t=+10.92s write "\r"
 t=+10.94s span-end id=3
-t=+10.94s span-begin hidden id=4 parent=0
+t=+11.14s quiet
 t=+11.14s shutdown
 t=+11.15s child-exit 0
-t=+11.15s span-end id=4
 t=+11.15s done

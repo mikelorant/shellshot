@@ -151,7 +151,7 @@ func (e *Executor) Poll(now time.Duration, scr Screen) (Step, error) {
 			st.Deadline = now
 			st.Done = e.pc >= len(e.ops)
 		}
-		if !finished || st.Write != nil || st.Mark != "" || st.Span != nil || st.Shutdown || st.Done {
+		if !finished || st.Write != nil || st.Mark != "" || st.Span != nil || st.Quiet || st.Shutdown || st.Done {
 			if st.Done {
 				e.done = true
 			}
@@ -205,14 +205,19 @@ func (e *Executor) pause(d, now time.Duration) (Step, bool, *ScriptError) {
 	return Step{}, true, nil
 }
 
-// advanceExit shuts the child down unless it is gone, then waits for its exit
-// for the grace time. The op uses cur.flag for "Shutdown was handed out".
+// advanceExit stops the recording and shuts the child down unless it is gone,
+// then waits for its exit for the grace time. The op uses cur.n for the Steps
+// handed out: Quiet, then Shutdown.
 func (e *Executor) advanceExit(op OpExit, now time.Duration) (Step, bool, *ScriptError) {
 	if e.exited {
 		return Step{}, true, nil
 	}
-	if !e.cur.flag {
-		e.cur.flag = true
+	switch e.cur.n {
+	case 0:
+		e.cur.n++
+		return Step{Quiet: true, Deadline: now}, false, nil
+	case 1:
+		e.cur.n++
 		return Step{Shutdown: true, Deadline: e.cur.start + op.Grace}, false, nil
 	}
 	if until := e.cur.start + op.Grace; now < until {

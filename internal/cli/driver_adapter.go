@@ -65,6 +65,7 @@ func (d *scriptDriver) Poll(now time.Duration, scr session.Screen) (session.Step
 	out := session.Step{
 		Write:    st.Write,
 		Mark:     st.Mark,
+		Quiet:    st.Quiet,
 		Shutdown: st.Shutdown,
 		Deadline: st.Deadline,
 		Done:     st.Done,

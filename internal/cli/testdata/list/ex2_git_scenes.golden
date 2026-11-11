@@ -46,7 +46,5 @@ ops
   34  32:3    commit           linger 1s
   35  33:1    commit           span-end #3
   36  35:1    -                mark "done"
-  37  -       hidden           span-begin #4 hidden
-  38  -       hidden           drain quiet=200ms timeout=2s (never fails)
-  39  -       hidden           exit grace=2s
-  40  -       hidden           span-end #4
+  37  -       -                drain quiet=200ms timeout=2s (never fails)
+  38  -       -                exit grace=2s

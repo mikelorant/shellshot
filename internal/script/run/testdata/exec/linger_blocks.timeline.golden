@@ -15,8 +15,7 @@ t=+3.6s write "b"
 t=+3.61s write "y"
 t=+3.62s write "e"
 t=+3.63s write "\r"
-t=+4.85s span-begin hidden id=1 parent=0
+t=+5.05s quiet
 t=+5.05s shutdown
 t=+5.06s child-exit 0
-t=+5.06s span-end id=1
 t=+5.06s done

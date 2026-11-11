@@ -68,6 +68,50 @@ func TestBinSinkWritesEvents(t *testing.T) {
 	}
 }
 
+func TestBinSinkQuietDropsEverythingButExit(t *testing.T) {
+	t.Parallel()
+	clk := &testClock{t: time.Unix(1000, 0)}
+	s, buf := newTestSink(t, head.FlagInputRecorded, bin.WriterOptions{Uncompressed: true}, clk)
+	s.start(clk.t)
+
+	steps := []error{
+		s.Output(10*time.Millisecond, []byte("before")),
+		s.input([]byte("typed")),
+	}
+	s.Quiet()
+	steps = append(steps,
+		s.Output(20*time.Millisecond, []byte("after")),
+		s.Resize(20*time.Millisecond, 30, 4),
+		s.input([]byte("\x04")),
+		s.Exit(30*time.Millisecond, 7),
+		s.close(),
+	)
+	for i, err := range steps {
+		if err != nil {
+			t.Fatalf("step %d: %v", i, err)
+		}
+	}
+
+	rec := readRecording(t, buf.Bytes())
+	if !errors.Is(rec.err, io.EOF) {
+		t.Fatalf("read error = %v", rec.err)
+	}
+	if got := rec.out(); got != "before" {
+		t.Errorf("OUT = %q, want only what came before Quiet", got)
+	}
+	if got := rec.in(); got != "typed" {
+		t.Errorf("IN = %q, want only what came before Quiet", got)
+	}
+	if n := len(rec.events); n != 3 {
+		t.Errorf("%d events, want OUT, IN and EXIT", n)
+	}
+	if last := rec.events[len(rec.events)-1]; last.Kind != event.KindExit {
+		t.Errorf("last event = %+v, want EXIT", last)
+	} else if st, err := event.ParseExit(last.Data); err != nil || st != 7 {
+		t.Errorf("EXIT = %d, %v, want status 7", st, err)
+	}
+}
+
 func TestBinSinkInputIsStampedFromSessionOrigin(t *testing.T) {
 	t.Parallel()
 	clk := &testClock{t: time.Unix(1000, 0)}

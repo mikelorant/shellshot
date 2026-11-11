@@ -23,8 +23,7 @@ t=+1.16s span-begin hidden id=4 parent=0
 t=+1.16s write "echo cleanup"
 t=+1.16s write "\r"
 t=+1.38s span-end id=4
-t=+1.38s span-begin hidden id=5 parent=0
+t=+1.58s quiet
 t=+1.58s shutdown
 t=+1.59s child-exit 0
-t=+1.59s span-end id=5
 t=+1.59s done

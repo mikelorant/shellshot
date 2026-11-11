@@ -215,22 +215,22 @@ func TestLingerOncePerTextBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 5 units (a CR b CR c) at 50ms, then one linger of 1s before the exit span.
+	// 5 units (a CR b CR c) at 50ms, then one linger of 1s, then the 200ms final drain, before the exit.
 	var last, begin time.Duration
 	for _, e := range ev {
 		if e.Kind == "write" {
 			last = e.At
 		}
-		if e.Kind == "span-begin" {
+		if e.Kind == "quiet" {
 			begin = e.At
 		}
 	}
-	if last != 200*time.Millisecond || begin != last+time.Second {
-		t.Errorf("last write %v, exit span at %v; want one 1s linger after the block", last, begin)
+	if last != 200*time.Millisecond || begin != last+time.Second+DefaultSettle {
+		t.Errorf("last write %v, quiet at %v; want one 1s linger and the drain after the block", last, begin)
 	}
 }
 
-func TestSpansInOrderWithImplicitEndSpanLast(t *testing.T) {
+func TestSpansInOrderAndQuietThenShutdownLast(t *testing.T) {
 	plan := lowerSrc(t, "scene s {\n  hidden {\n    mark a\n  }\n  mark b\n}\n")
 	ev, err := runWorld(t, plan, newFakeShell(), Deps{})
 	if err != nil {
@@ -242,7 +242,7 @@ func TestSpansInOrderWithImplicitEndSpanLast(t *testing.T) {
 	}
 	want := []string{
 		"span-begin scene:s id=1 parent=0", "span-begin hidden id=2 parent=1", "mark a", "span-end id=2",
-		"mark b", "span-end id=1", "span-begin hidden id=3 parent=0", "shutdown ", "child-exit 0", "span-end id=3", "done ",
+		"mark b", "span-end id=1", "quiet ", "shutdown ", "child-exit 0", "done ",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("events\n%q\nwant\n%q", got, want)
@@ -369,8 +369,8 @@ func TestHiddenRunConsumesNoTypingOrLingerTime(t *testing.T) {
 			case "write":
 				writes++
 				at = e.At
-			case "span-begin":
-				exitBegin = e.At // the last begin is the exit span
+			case "quiet":
+				exitBegin = e.At
 			}
 		}
 		return writes, at, exitBegin
@@ -380,12 +380,13 @@ func TestHiddenRunConsumesNoTypingOrLingerTime(t *testing.T) {
 	if writes != 2 || at != 0 {
 		t.Errorf("hidden: %d writes, last at %v; want the text and Enter, both at 0", writes, at)
 	}
-	// The fake shell takes 20ms to run the command and the settle quiet time
-	// is 200ms, so the exit span starts there with no linger added.
+	// The fake shell takes 20ms to run the command; the settle and then the
+	// final drain each wait 200ms of quiet, so the exit starts there with no
+	// linger added.
 	_, _, hiddenExit := last("hidden")
 	_, _, visibleExit := last("scene s")
-	if want := 20*time.Millisecond + DefaultSettle; hiddenExit != want {
-		t.Errorf("hidden: exit span begins at %v, want %v", hiddenExit, want)
+	if want := 20*time.Millisecond + 2*DefaultSettle; hiddenExit != want {
+		t.Errorf("hidden: exit begins at %v, want %v", hiddenExit, want)
 	}
 	if visibleWrites, visibleAt, _ := last("scene s"); visibleWrites <= 2 || visibleAt == 0 || visibleExit <= hiddenExit {
 		t.Errorf("visible control: %d writes, last at %v, exit at %v; want typing delays and a linger", visibleWrites, visibleAt, visibleExit)

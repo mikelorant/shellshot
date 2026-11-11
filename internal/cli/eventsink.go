@@ -21,6 +21,10 @@ import (
 //
 // Event times are offsets from one origin, the start of the session, which
 // Start receives from session.Config.OnStart.
+//
+// After Quiet the sink drops output, resize and input events, but still writes
+// the exit event, so a recording can end with what the child printed while it
+// was being shut down left out.
 type binSink struct {
 	w   *bin.Writer
 	now func() time.Time // the session clock
@@ -28,6 +32,7 @@ type binSink struct {
 	mu      sync.Mutex
 	origin  time.Time
 	started bool
+	quiet   bool // Quiet was called: only Exit (and close) still write
 }
 
 // newBinSink returns a sink that writes to w. now is the clock the session
@@ -64,6 +69,9 @@ func (s *binSink) tick(now time.Time) error {
 func (s *binSink) Output(at time.Duration, p []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.quiet {
+		return nil
+	}
 	return s.w.Output(at, p)
 }
 
@@ -71,6 +79,9 @@ func (s *binSink) Output(at time.Duration, p []byte) error {
 func (s *binSink) Resize(at time.Duration, cols, rows int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.quiet {
+		return nil
+	}
 	return s.w.Resize(at, cols, rows, 0, 0)
 }
 
@@ -93,6 +104,13 @@ func (s *binSink) Span(at time.Duration, op session.SpanOp) error {
 	return s.w.Span(at, sp)
 }
 
+// Quiet implements session.EventSink.
+func (s *binSink) Quiet() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.quiet = true
+}
+
 // Exit implements session.EventSink.
 func (s *binSink) Exit(at time.Duration, status int) error {
 	s.mu.Lock()
@@ -108,6 +126,9 @@ func (s *binSink) Exit(at time.Duration, status int) error {
 func (s *binSink) input(p []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.quiet {
+		return nil
+	}
 	var at time.Duration
 	if s.started {
 		at = s.now().Sub(s.origin)
