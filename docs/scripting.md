@@ -43,6 +43,12 @@ shellshot record --script FILE --list
 - At the end of the script the shell is always exited (Ctrl-D, then closed after 2 s). A program that
   ignores Ctrl-D is closed and `shellshot: child did not exit; closed by shellshot` is printed; that is
   not a failure. Leave the prompt empty at the end: text typed and not submitted stops Ctrl-D working.
+- The exit is not recorded. Once the last step has finished and the screen has gone quiet, shellshot
+  stops recording the terminal and only then exits the shell, so what the shell prints while it leaves
+  (`exit`, `^D`) is not in the recording and the last frame is the last screen of the script. The
+  recording still ends with an `EXIT` event holding the shell's exit status. With `--watch` the
+  terminal shows the shell's output as it is, including that text. Recordings made by earlier versions
+  have the exit in a hidden block at the end; they play and export as they always did.
 - The scripted terminal answers the questions a program asks its terminal, so programs that wait for
   the answer (many TUIs ask for the background colour at start) do not hang. It answers cursor position
   and status reports (`CSI 6 n`, `CSI 5 n`), device attributes (DA1, DA2, DA3), XTVERSION, mode reports
@@ -199,10 +205,10 @@ hidden [NAME] {   # runs and is recorded; export and replay drop it; the name is
 A block contains at least one step. A `hidden` block may sit inside a `scene`; no other nesting is
 allowed. A hidden name follows the rules of a scene name (written bare), and scenes and hidden
 blocks share one namespace: a name is used by at most one block in the script. `info` lists named
-hidden spans. The implicit hidden block at the end has no name. Scenes and hidden blocks are recorded as `SPAN` events (see [format.md](format.md#spans)).
+hidden spans. Scenes and hidden blocks are recorded as `SPAN` events (see [format.md](format.md#spans)).
 Inside a hidden block `typing` and `linger` default to 0, since nobody sees it; a `typing` or `linger` written inside the block still applies from its line to the closing brace. `settle` and `timeout` are unchanged.
-After the last step the runner always exits the shell inside an implicit hidden block, so a script
-cannot leave a live shell running.
+After the last step the runner always exits the shell (see [Running a script](#running-a-script)), so a script
+cannot leave a live shell running. That exit is not a block and is not recorded.
 
 These words are reserved and give a "reserved for future use" error: `if else elif for while repeat
 loop break let var const set fn func def define call return include import source require use copy

@@ -438,7 +438,7 @@ type paragraphs {
 }
 ```
 
-At the end of every script, shellshot exits the shell for you, inside an implicit hidden block.
+At the end of every script, shellshot exits the shell for you, without recording the exit.
 
 ## 📚 Documentation [⭡](#shellshot)
 
