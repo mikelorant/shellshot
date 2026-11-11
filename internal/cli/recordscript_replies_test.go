@@ -59,7 +59,13 @@ func TestRecordScriptAnswersTerminalQueries(t *testing.T) {
 // line of output after each, and never reads its input. The replies fill the
 // pty input queue, so a terminal that wrote them in the loop that reads the
 // program's output would stop reading while the program waits to write.
-const floodHelper = `i=0
+//
+// It turns echo off first: with echo on, the line discipline of the pty (on
+// Linux) writes every unread reply back into the output as text such as
+// "^[[8;1R", without a newline, so the final line can be "^[[8;1RFLOOD-DONE"
+// and never match the wait.
+const floodHelper = `stty -echo
+i=0
 while [ $i -lt 3000 ]; do
   printf '\033[6n%0100d\n' 0
   i=$((i+1))
