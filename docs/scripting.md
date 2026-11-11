@@ -43,6 +43,15 @@ shellshot record --script FILE --list
 - At the end of the script the shell is always exited (Ctrl-D, then closed after 2 s). A program that
   ignores Ctrl-D is closed and `shellshot: child did not exit; closed by shellshot` is printed; that is
   not a failure. Leave the prompt empty at the end: text typed and not submitted stops Ctrl-D working.
+- The scripted terminal answers the questions a program asks its terminal, so programs that wait for
+  the answer (many TUIs ask for the background colour at start) do not hang. It answers cursor position
+  and status reports (`CSI 6 n`, `CSI 5 n`), device attributes (DA1, DA2, DA3), XTVERSION, mode reports
+  (DECRQM), the kitty keyboard flags, size reports (`CSI 14 t`, `16 t`, `18 t`), the colour scheme
+  (`CSI ? 996 n`, always dark) and the colour queries OSC 4, 10, 11 and 12. Colours are those of the
+  default (dark) theme, whatever theme you export with: a recording has no theme. ENQ is not answered.
+  The replies are written to the program's input like typed keys, but are not recorded as input.
+  An interactive `record` answers nothing: your own terminal does. With `--watch` the queries are
+  removed from the copy shown on your terminal, so it does not answer a second time.
 - The recording header holds the shell argv, and the script's file name (not its content) as meta `script`.
 - On a script failure the recording is kept at its path, scenes are closed and `EXIT` is written, so
   `info`, `replay` and `export` work on it. A cancelled run (Ctrl-C) keeps the file, closes the scenes
