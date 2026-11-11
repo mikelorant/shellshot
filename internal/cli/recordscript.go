@@ -294,7 +294,9 @@ func runScript(cmd *cobra.Command, so scriptOptions, ro recordOptions, wopts bin
 
 	var p live.Process = tracked
 	if so.Watch {
-		p = live.Tee(p, cmd.OutOrStdout())
+		// The headless terminal answers the program's queries; the real
+		// terminal showing the run must not answer them a second time.
+		p = live.TeeHidingQueries(p, cmd.OutOrStdout())
 	}
 	if ro.RecordInput {
 		p = inputRecorder{Process: p, sink: sink}
