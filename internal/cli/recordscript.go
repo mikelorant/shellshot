@@ -308,7 +308,14 @@ func runScript(cmd *cobra.Command, so scriptOptions, ro recordOptions, wopts bin
 	}
 	sink.configure(&cfg)
 
-	status, runErr := session.Run(ctx, p, holder.factory(ghostty.New), cfg, session.SinkFunc(discardFrame))
+	// A scripted run has no user at a terminal to answer the program's
+	// queries (colours, cursor position, ...), so the headless terminal does.
+	// The replies go straight to the child's input, not through the input
+	// recorder: they are not typed input. Run closes the process before it
+	// returns, which lets replies.Close finish.
+	replies := live.NewReplies(tracked)
+	status, runErr := session.Run(ctx, p, holder.factory(ghostty.NewAnswering(replies.Send)), cfg, session.SinkFunc(discardFrame))
+	replies.Close()
 	stopProgress()
 	closedByUs := tracked.killed.Load()
 	closeErr := sink.close()
