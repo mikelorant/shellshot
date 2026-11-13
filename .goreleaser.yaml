@@ -76,3 +76,20 @@ release:
     ## shellshot {{ .Tag }}
   footer: |
     Verify the archives against `checksum.txt` (sha256). Container image: `ghcr.io/mikelorant/shellshot:{{ .Version }}`.
+
+# Publishes a Homebrew cask to mikelorant/homebrew-shellshot on each tagged release. The default
+# GITHUB_TOKEN cannot push to another repository, so the job needs HOMEBREW_TAP_TOKEN.
+# The release is a draft, so `brew install` works only once it is published.
+homebrew_casks:
+  - name: shellshot
+    ids: [shellshot]
+    repository:
+      owner: mikelorant
+      name: homebrew-shellshot
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/mikelorant/shellshot
+    description: Record terminal sessions and export them as animated images
+    license: MIT
+    commit_msg_template: "chore: update {{ .ProjectName }} to {{ .Tag }}"
+    skip_upload: auto
