@@ -211,7 +211,7 @@ run):
 - `libs` is a four-way matrix that builds libghostty for one target each, in parallel, on
   `ubuntu-latest`, and saves each result as its own cache entry (see "The libghostty caches").
 - `archives` (macOS runner, `contents: write`, needs `libs`) restores the four libraries from the
-  caches and runs GoReleaser. On a tag it creates a **draft** GitHub Release
+  caches and runs GoReleaser. On a tag it publishes a GitHub Release
   with the four archives, `checksum.txt` and a changelog of the `feat` and `fix` commits. In a dry run
   it runs `release --snapshot`, which publishes nothing. Both modes upload the archives and
   `checksum.txt` as the `archives` workflow artifact (kept 14 days).
@@ -255,9 +255,9 @@ workflow; to rebuild all of them, bump `ZIG_VERSION` (in both workflows and the 
 ghostty pin (the key contains both). Entries unused for 7 days are evicted by GitHub; the `archives`
 job then fails with a cache-miss message naming the key: rerun the workflow and `libs` rebuilds it.
 
-To cut a release: make sure `main` is green, then `git tag vX.Y.Z && git push origin vX.Y.Z`. When the
-workflow finishes, review the draft under the repository's Releases page, edit the notes, and publish
-it by hand; releases are never published automatically. To rehearse, run the `release` workflow from
+To cut a release: make sure `main` is green, then `git tag vX.Y.Z && git push origin vX.Y.Z`. The
+release is public when the workflow finishes; edit the notes on the repository's Releases page if
+needed. To rehearse, run the `release` workflow from
 the Actions tab (Run workflow) and download the `archives` artifact.
 
 Repository settings: nothing beyond the defaults, because the jobs ask for their own permissions
