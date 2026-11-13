@@ -92,6 +92,14 @@ parts to install or break.
 
 ## 💾 Installation [⭡](#shellshot)
 
+With Homebrew:
+
+```sh
+brew install mikelorant/shellshot/shellshot
+```
+
+Or download an archive.
+
 Go to the [latest release](https://github.com/mikelorant/shellshot/releases/latest) and download
 the archive for your platform: macOS (Apple silicon or Intel) or Linux (amd64 or arm64). Extract it
 in the folder you are working in, so that `./shellshot` is there. Opening the archive in a file
