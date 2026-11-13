@@ -92,3 +92,11 @@ homebrew_casks:
     description: Record terminal sessions and export them as animated images
     commit_msg_template: "chore: update {{ .ProjectName }} to {{ .Tag }}"
     skip_upload: auto
+    # The binary is not signed or notarised, and Homebrew quarantines cask downloads, so
+    # Gatekeeper would refuse it. Remove the quarantine flag after install (macOS only).
+    hooks:
+      pre:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/shellshot"]
+          end
