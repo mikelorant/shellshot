@@ -90,6 +90,5 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/mikelorant/shellshot
     description: Record terminal sessions and export them as animated images
-    license: MIT
     commit_msg_template: "chore: update {{ .ProjectName }} to {{ .Tag }}"
     skip_upload: auto
