@@ -1,6 +1,6 @@
 name: release
 
-# A v* tag builds the archives, drafts a GitHub Release and pushes the container image.
+# A v* tag builds the archives, publishes a GitHub Release and pushes the container image.
 # A manual run is a dry run: the same builds, the archives kept as a workflow artifact, nothing published.
 on:
   push:
@@ -76,7 +76,7 @@ jobs:
     # The darwin targets need the macOS SDK, so the whole release is built on a Mac.
     runs-on: macos-latest
     permissions:
-      contents: write # creates the draft release and uploads the archives
+      contents: write # creates the release and uploads the archives
     steps:
       - uses: actions/checkout@v7
         with:
