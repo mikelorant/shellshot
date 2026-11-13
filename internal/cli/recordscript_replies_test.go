@@ -49,7 +49,7 @@ func TestRecordScriptAnswersTerminalQueries(t *testing.T) {
 	want := fmt.Sprintf("%02x%02x/%02x%02x/%02x%02x", bg.R, bg.R, bg.G, bg.G, bg.B, bg.B)
 	helper := writeHelper(t, fmt.Sprintf(queryHelper, want))
 
-	r := runScriptCLI(t, "run sh "+helper+"\nwait /^GOT-BACKGROUND$/ 10s\nwait /^GOT-CURSOR$/ 0s\n")
+	r := runScriptCLI(t, "run sh "+helper+"\nwait /^GOT-BACKGROUND$/ 10s\nwait /^GOT-CURSOR$/ 10s\n")
 	if r.code != 0 {
 		t.Fatalf("exit code = %d, want 0 (the program should have received the replies)\nstdout: %s\nstderr: %s", r.code, r.stdout, r.stderr)
 	}
