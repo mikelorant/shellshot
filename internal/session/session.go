@@ -140,17 +140,23 @@ func (s *session) run(ctx context.Context) (int, error) {
 		s.cfg.OnStart(s.start)
 	}
 	chunks := make(chan chunk, chunkQueueLen)
-	s.in = chunks
 	stop := make(chan struct{})
-	go func() {
-		defer close(chunks)
-		s.readErr = pump(s.proc, chunks, stop, s.elapsed)
-	}()
+	readerStarted := false
+	startReader := func() {
+		readerStarted = true
+		s.in = chunks
+		go func() {
+			defer close(chunks)
+			s.readErr = pump(s.proc, chunks, stop, s.elapsed)
+		}()
+	}
 
 	defer func() {
 		close(stop)
 		_ = s.proc.Close() // unblocks a pending Read and Wait
-		for range chunks { // returns once the reader has exited
+		if readerStarted {
+			for range chunks { // returns once the reader has exited
+			}
 		}
 		if s.waited != nil {
 			<-s.waited
@@ -172,7 +178,10 @@ func (s *session) run(ctx context.Context) (int, error) {
 		return 0, err
 	}
 
-	// These stay nil (never ready) without a driver.
+	// These stay nil (never ready) without a driver. The driver's first poll
+	// comes before the reader starts, so that what it logs at the start (a
+	// span that must open before the child's first output) precedes every
+	// output event.
 	var again <-chan struct{}
 	if s.drv != nil {
 		again = s.drv.again
@@ -180,6 +189,7 @@ func (s *session) run(ctx context.Context) (int, error) {
 			return 0, err
 		}
 	}
+	startReader()
 
 loop:
 	for {

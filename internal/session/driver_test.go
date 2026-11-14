@@ -763,3 +763,27 @@ func TestDriverScreenWithoutForegroundReporterFails(t *testing.T) {
 		t.Errorf("ShellForeground = (%v, %v), want (false, ErrNoForeground)", fg, err)
 	}
 }
+
+// The first poll comes before the process is read, so what the driver logs at
+// the start (a span that hides the child's first output) precedes every
+// output event.
+func TestDriverFirstPollComesBeforeTheProcessIsRead(t *testing.T) {
+	var proc *fakeProc
+	var readersAtFirstPoll int32 = -1
+	d := &fakeDriver{fn: func(n int, now time.Duration, _ Screen) (Step, error) {
+		if n == 0 {
+			time.Sleep(20 * time.Millisecond) // a reader that had started would be in Read by now
+			readersAtFirstPoll = proc.readers.Load()
+			return Step{Span: "begin1", Deadline: now}, nil
+		}
+		return Step{Deadline: time.Hour}, nil
+	}}
+	h, ev := startDriverRun(t, d, func(h *harness) { proc = h.proc })
+	h.polled(d, 2)
+	h.output("boot")
+	h.settle()
+	if readersAtFirstPoll != 0 {
+		t.Errorf("the process was being read during the first poll (readers = %d)", readersAtFirstPoll)
+	}
+	wantSeq(t, ev, "span:begin1", "event:boot", "write:boot")
+}

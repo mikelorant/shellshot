@@ -20,6 +20,8 @@ type fakeExecutor struct {
 	screens []string
 	exited  []int
 	open    []run.SpanOp
+
+	startsHidden bool
 }
 
 func (f *fakeExecutor) Poll(now time.Duration, scr run.Screen) (run.Step, error) {
@@ -35,6 +37,7 @@ func (f *fakeExecutor) Poll(now time.Duration, scr run.Screen) (run.Step, error)
 
 func (f *fakeExecutor) ChildExited(_ time.Duration, status int) { f.exited = append(f.exited, status) }
 func (f *fakeExecutor) OpenSpans() []run.SpanOp                 { return f.open }
+func (f *fakeExecutor) StartsHidden() bool                      { return f.startsHidden }
 
 type fakeScreen string
 
@@ -286,5 +289,38 @@ func TestScriptDriverKeepsScreenWhileHeld(t *testing.T) {
 	}
 	if d.lastScreen() != "$ " {
 		t.Errorf("lastScreen = %q, want the screen seen while held", d.lastScreen())
+	}
+}
+
+// A script that opens with a hidden block gets its first poll at once, so the
+// span begins before the child's first output; the rest waits as usual.
+func TestScriptDriverLetsALeadingHiddenSpanThrough(t *testing.T) {
+	t.Parallel()
+	begin := event.Span{Op: event.SpanBegin, ID: 1, Type: event.SpanHidden}
+	fake := &fakeExecutor{startsHidden: true, steps: []run.Step{
+		{Span: &run.SpanOp{Event: begin}},
+		{Write: []byte("x"), Deadline: time.Hour},
+	}}
+	d := newScriptDriver(fake)
+	st, err := d.Poll(0, fakeScreen(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Span != begin || !reflect.DeepEqual(fake.polls, []time.Duration{0}) {
+		t.Errorf("first poll: step %+v, executor polls %v; want the span begin from one poll at 0", st, fake.polls)
+	}
+	st, err = d.Poll(0, fakeScreen(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Deadline != time.Second || len(fake.polls) != 1 {
+		t.Errorf("second poll: step %+v, executor polls %v; want it held until %v", st, fake.polls, time.Second)
+	}
+	if _, err = d.Poll(300*time.Millisecond, fakeScreen("$")); err != nil {
+		t.Fatal(err)
+	}
+	st, err = d.Poll(450*time.Millisecond, fakeScreen("$"))
+	if err != nil || string(st.Write) != "x" || !reflect.DeepEqual(fake.polls, []time.Duration{0, 450 * time.Millisecond}) {
+		t.Errorf("after the start: step %+v, err %v, executor polls %v; want the write at 450ms", st, err, fake.polls)
 	}
 }
