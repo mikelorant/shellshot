@@ -315,6 +315,7 @@ func TestDriverSameDeadlineKeepsItsTimer(t *testing.T) {
 	h, _ := startDriverRun(t, d, nil)
 	h.output("a")
 	h.output("b")
+	eventually(t, "a poll for the start and each chunk", func() bool { return len(d.polls()) >= 3 })
 	h.settle()
 	if n := len(d.polls()); n != 3 {
 		t.Errorf("polls = %d, want 3 (start and each chunk)", n)
