@@ -14,8 +14,8 @@ The Go binary links libghostty-vt through cgo. libghostty is built from the pinn
 | `make examples` | Records and exports every `contrib/examples/*.sh` into `build/examples/` (fast speed, 80x24) |
 | `make test-scripts` | Runs every `contrib/examples/scripts/*.script` with `--list` and for real (about a minute); not part of `make test` |
 | `make noto-asset`, `make emoji-asset` | Rebuild the embedded colour emoji fonts; see `scripts/README.md`. Needs network, and `uv` for the Apple one |
-| `make showcase` | Records the agent demo and exports the README image `docs/assets/showcase.png` (on demand; see below) |
-| `make check-showcase` | Fails if `docs/assets/showcase.png` is stale (see "Regenerating the README image") |
+| `make showcase` | Records the agent demo and exports the README image `docs/assets/showcase.svg` (on demand; see below) |
+| `make check-showcase` | Fails if `docs/assets/showcase.svg` is stale (see "Regenerating the README image") |
 | `make test-examples` | Runs every `contrib/examples/*.sh` under dash, bash, sh and zsh (takes a few minutes); it checks exit status, terminal restore and Ctrl-C handling |
 | `make check-examples` | Records every `contrib/examples/*.sh` at 80x24 with the real binary, follows the cursor through the raw output to find lines that auto-wrap, and lists every non-ASCII character the demos print, flagging those no embedded font has (they render blank). Takes about a minute; needs `bin/shellshot` (it builds it), libghostty and `uv`. Not part of `make test` |
 | `make docker-build` | Builds the container image `shellshot:dev` (see "Container image") |
@@ -77,21 +77,20 @@ go test ./internal/recording/...
 ## Regenerating the README image
 
 `make showcase` builds the binary, records `contrib/examples/agent.sh` at 80x24 and speed
-`normal` into `build/showcase.shot`, and exports it to `docs/assets/showcase.png` with every
-look and timing flag pinned (`scripts/build-showcase.sh` has the list): `--scale 2 --emoji-set noto`
-(licence-clean artwork), 60 fps, normal speed, pauses capped at 1 s, 2 s final hold. That gives about
-57 s and 6.9 MB. `--poster 46s` pins the frame that viewers without animation support show to a frame of the
-dashboard (the demo ends on a bare shell prompt); pick another time with `shellshot export --poster Ns`
-if the demo's timing changes. The README shows it at half its pixel width (736 of 1472), so retina screens get
-sharp text. If you change `--scale` or `--font-size`, update the `width` in `README.md`.
+`normal` into `build/showcase.shot`, and exports it to `docs/assets/showcase.svg` with every
+look and timing flag pinned (`scripts/build-showcase.sh` has the list): the dark theme, normal
+speed, pauses capped at 1 s and a 2 s final hold. That gives about 57 s and 1.6 MB. The SVG draws
+text and emoji as text, which is the smallest output, so the look of the glyphs and emoji depends
+on the reader's fonts. It is 736 pixels wide, the same as the `width` in `README.md`; if you change
+`--font-size`, update that `width`.
 
 It runs only on demand, never as part of `make build`, because the image is committed and a new
-6.9 MB binary on every build would bloat the history. Regenerate it when the demo or the export
+1.6 MB file on every build would bloat the history. Regenerate it when the demo or the export
 flags change, and commit it deliberately. The demo runs in real time, so two runs can differ byte for byte
 (frame boundaries move by a few milliseconds) while looking the same.
 
-`docs/assets/showcase.png.src` holds a sha256 of `agent.sh`, `lib.sh` and the record and export
-settings. `make check-showcase` recomputes it and fails with `showcase.png is stale: run make showcase`
+`docs/assets/showcase.svg.src` holds a sha256 of `agent.sh`, `lib.sh` and the record and export
+settings. `make check-showcase` recomputes it and fails with `showcase.svg is stale: run make showcase`
 when they differ; `make test` runs it too. It is a hash comparison, so it is fast and needs no libghostty.
 
 ## Container image

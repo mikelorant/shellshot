@@ -30,12 +30,12 @@ examples: build
 	done; \
 	ls -l build/examples | awk 'NR > 1 { printf "%10d  %s\n", $$5, $$9 }'
 
-# Records contrib/examples/agent.sh and exports the README image docs/assets/showcase.png.
+# Records contrib/examples/agent.sh and exports the README image docs/assets/showcase.svg.
 # On demand only: the result is committed deliberately (see docs/development.md).
 showcase: build
 	./scripts/build-showcase.sh
 
-# Fails when docs/assets/showcase.png no longer matches the demo and export flags it was made from
+# Fails when docs/assets/showcase.svg no longer matches the demo and export flags it was made from
 # (a sha256 comparison, instant).
 check-showcase:
 	./scripts/build-showcase.sh --check
