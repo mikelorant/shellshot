@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mikelorant/shellshot/internal/recording/bin"
 	"github.com/mikelorant/shellshot/internal/recording/bin/event"
@@ -166,6 +167,10 @@ func firstIndex(events []bin.Event, kind event.Kind) int {
 	return -1
 }
 
+// startSlack is how long after the recording clock starts the first poll may
+// open a leading span. The first output of a shell takes much longer.
+const startSlack = 50 * time.Millisecond
+
 // A script that opens with a hidden block hides the shell's startup too: the
 // span begins at time 0, before the first output, so the first prompt is
 // inside it.
@@ -179,8 +184,11 @@ func TestRecordScriptLeadingHiddenBlockBeginsBeforeTheStartupOutput(t *testing.T
 	if len(s.spans) != 1 || s.spans[0].Type != event.SpanHidden || s.spans[0].Open {
 		t.Fatalf("spans = %v, want one closed hidden span", spanNames(s.spans))
 	}
-	if s.spans[0].Start != 0 {
-		t.Errorf("hidden span starts at %v, want 0", s.spans[0].Start)
+	// The span opens at the driver's first poll, a moment after the clock
+	// starts, so its start is near 0, not exactly 0. What matters is that it
+	// comes before the first output (below).
+	if s.spans[0].Start > startSlack {
+		t.Errorf("hidden span starts at %v, want within %v of the start", s.spans[0].Start, startSlack)
 	}
 	span, out := firstIndex(s.events, event.KindSpan), firstIndex(s.events, event.KindOut)
 	if span < 0 || out < 0 || span > out {
@@ -199,8 +207,8 @@ func TestRecordScriptLeadingHiddenBlockAfterSettings(t *testing.T) {
 		t.Fatalf("exit code = %d, want 0\nstderr: %s", r.code, r.stderr)
 	}
 	s := readShot(t, r.shot)
-	if len(s.spans) != 1 || s.spans[0].Start != 0 {
-		t.Errorf("spans = %+v, want one starting at 0", s.spans)
+	if len(s.spans) != 1 || s.spans[0].Start > startSlack {
+		t.Errorf("spans = %+v, want one starting within %v of the start", s.spans, startSlack)
 	}
 }
 
