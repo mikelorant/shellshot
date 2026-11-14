@@ -22,7 +22,7 @@ type rowVariants struct {
 }
 
 func (w *Writer) writeAnimated(out *bytes.Buffer, cols, rows int, steps []timeline.Step) error {
-	b := NewBuilder(w.o.Geometry, w.o.Text)
+	b := NewBuilder(w.o.Geometry, w.o.Text, w.o.Emoji)
 	lay := b.lay
 
 	// Find the variants of every row.

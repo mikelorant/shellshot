@@ -17,6 +17,7 @@ import (
 // svgFlags holds the values of the flags that only SVG output uses.
 type svgFlags struct {
 	text  string
+	emoji string
 	frame string
 }
 
@@ -24,16 +25,17 @@ type svgFlags struct {
 func addSVGFlags(cmd *cobra.Command, f *svgFlags) {
 	fl := cmd.Flags()
 	fl.StringVar(&f.text, "svg-text", "text", "how svg draws text: text (small, selectable, drawn in the viewer's monospace font) or paths (glyph outlines of the built-in fonts, exact but larger)")
+	fl.StringVar(&f.emoji, "svg-emoji", "text", "how svg draws emoji: text (small, drawn by the viewer's emoji font, so the artwork varies; --emoji-set and --emoji-font are ignored) or image (embedded PNG images from the --emoji-set and --emoji-font fonts, the same everywhere but larger)")
 	fl.StringVar(&f.frame, "frame", "", "write one frame as a still instead of the animation (svg only): first, last, or a time on the output clock such as 1.5s")
 }
 
 // options validates the SVG flags for output format of, returning the SVG
-// options they set. --svg-text and --frame belong to SVG: given with another
-// format they are errors, not silently ignored.
+// options they set. --svg-text, --svg-emoji and --frame belong to SVG: given
+// with another format they are errors, not silently ignored.
 func (f svgFlags) options(cmd *cobra.Command, of format.Format) (svg.Options, error) {
 	fl := cmd.Flags()
 	if of.Name != "svg" {
-		for _, name := range []string{"svg-text", "frame"} {
+		for _, name := range []string{"svg-text", "svg-emoji", "frame"} {
 			if fl.Changed(name) {
 				return svg.Options{}, fmt.Errorf("export: --%s only applies to svg output, not %s", name, of.Name)
 			}
@@ -44,6 +46,9 @@ func (f svgFlags) options(cmd *cobra.Command, of format.Format) (svg.Options, er
 	var err error
 	if o.Text, err = svg.ParseTextMode(f.text); err != nil {
 		return svg.Options{}, fmt.Errorf("export: --svg-text: %w", err)
+	}
+	if o.Emoji, err = svg.ParseEmojiMode(f.emoji); err != nil {
+		return svg.Options{}, fmt.Errorf("export: --svg-emoji: %w", err)
 	}
 	if f.frame != "" {
 		if o.Frame, err = svg.ParseFrame(f.frame); err != nil {
@@ -62,6 +67,9 @@ func svgWriteFunc(cmd *cobra.Command, of format.Format, settings format.Settings
 		o := settings.SVG
 		if o.Text == svg.TextText && (len(flags.fallbackFonts) > 0 || flags.systemFonts) {
 			fmt.Fprintln(cmd.ErrOrStderr(), "note: --fallback-font and --system-fonts change svg output with --svg-text paths; in text mode they only apply to private-use icon characters that one of the fonts covers, and other glyphs are left to the viewer's fonts")
+		}
+		if o.Emoji == svg.EmojiText && (cmd.Flags().Changed("emoji-set") || cmd.Flags().Changed("emoji-font")) {
+			fmt.Fprintln(cmd.ErrOrStderr(), "note: --emoji-set and --emoji-font have no effect on svg output with --svg-emoji text; use --svg-emoji image to embed emoji from those fonts")
 		}
 		ts, err := pipeline.ReadSteps(cmd.Context(), src, tl)
 		if err != nil {

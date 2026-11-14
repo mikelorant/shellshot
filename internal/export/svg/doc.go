@@ -1,7 +1,7 @@
 // Package svg writes terminal sessions as SVG: a static image of one screen,
 // or an animation of the whole session. It works from snapshots, not from
 // rendered frames, so the output is vector content (text or glyph outlines,
-// rectangles, embedded colour emoji) and not a picture of pixels. It is pure
+// rectangles, and colour emoji as text or embedded images) and not a picture of pixels. It is pure
 // Go (no cgo, no cobra).
 //
 // Every cell is placed where the raster renderer places it: the cell grid,
@@ -57,6 +57,42 @@ func ParseTextMode(s string) (TextMode, error) {
 func (m TextMode) String() string {
 	if m == TextPaths {
 		return "paths"
+	}
+	return "text"
+}
+
+// EmojiMode says how emoji are written.
+type EmojiMode uint8
+
+const (
+	// EmojiText writes an emoji grapheme cluster as <text>, centred on its
+	// cells like any other wide character, so the viewer's emoji font draws
+	// it. It is small, but the artwork depends on the viewer. The emoji fonts
+	// are not read. A cluster is an emoji by the same test as EmojiImage; in
+	// TextPaths mode it is still <text>, because the outline fonts have no
+	// colour glyphs.
+	EmojiText EmojiMode = iota
+	// EmojiImage embeds each distinct emoji as a PNG <image> rendered from
+	// the emoji fonts of the Geometry, so the artwork is the same in every
+	// viewer. A cluster no emoji font has falls back to the text mode's
+	// treatment of the cell.
+	EmojiImage
+)
+
+// ParseEmojiMode parses the --svg-emoji values "text" and "image".
+func ParseEmojiMode(s string) (EmojiMode, error) {
+	switch s {
+	case "text":
+		return EmojiText, nil
+	case "image":
+		return EmojiImage, nil
+	}
+	return 0, fmt.Errorf("invalid emoji mode %q (want text or image)", s)
+}
+
+func (m EmojiMode) String() string {
+	if m == EmojiImage {
+		return "image"
 	}
 	return "text"
 }
@@ -127,6 +163,8 @@ type Options struct {
 	Geometry Geometry
 	// Text selects text or outlines for glyphs.
 	Text TextMode
+	// Emoji selects <text> or embedded images for emoji.
+	Emoji EmojiMode
 	// Frame selects the step of a static SVG; FrameNone writes the animation.
 	Frame Frame
 	// Loops is the number of times the animation plays; 0 means forever.

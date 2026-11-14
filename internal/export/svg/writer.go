@@ -90,7 +90,7 @@ func open(sb *strings.Builder, lay raster.Layout, cols, rows int, style, defs st
 }
 
 func (w *Writer) writeStatic(out *bytes.Buffer, cols, rows int, s snapshot.Snapshot) error {
-	b := NewBuilder(w.o.Geometry, w.o.Text)
+	b := NewBuilder(w.o.Geometry, w.o.Text, w.o.Emoji)
 	lay := b.lay
 	var body strings.Builder
 	for row := 0; row < rows; row++ {
