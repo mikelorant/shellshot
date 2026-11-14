@@ -264,24 +264,22 @@ func TestBlockCursorRedrawsTheGlyphInTheBackgroundColour(t *testing.T) {
 	}
 }
 
-func TestSpritesAreSharedShapes(t *testing.T) {
+func TestSimpleSpritesAreDrawnInline(t *testing.T) {
 	t.Parallel()
 	r, g := newRenderer(t, raster.Options{})
 	lay := r.Layout()
 	s := screen(t, 20, "██ ▄ ░")
 	doc := write(t, Options{Geometry: g, Frame: Frame{Kind: FrameLast}}, 20, 1, step(s, time.Second))
-	if n := strings.Count(doc, "<path id="); n != 3 {
-		t.Errorf("%d sprite definitions, want 3 (█, ▄, ░)\n%s", n, doc)
+	if strings.Contains(doc, "<defs>") || strings.Contains(doc, "<use ") {
+		t.Errorf("block sprites are shared shapes:\n%s", doc)
 	}
-	full := `<path id="s0" d="M0 0h` + itoaT(lay.CellWidth) + `v` + itoaT(lay.CellHeight) + `h-` + itoaT(lay.CellWidth) + `z"/>`
+	w, h := itoaT(2*lay.CellWidth), itoaT(lay.CellHeight)
+	full := `M` + itoaT(lay.Pad) + ` ` + itoaT(lay.Pad) + `h` + w + `v` + h + `h-` + w + `z`
 	if !strings.Contains(doc, full) {
-		t.Errorf("full block is not one rectangle: want %s in\n%s", full, doc)
+		t.Errorf("two full blocks are not one rectangle: want %s in\n%s", full, doc)
 	}
 	if !strings.Contains(doc, `fill-opacity="0.251"`) {
 		t.Errorf("light shade is not 25%% coverage:\n%s", doc)
-	}
-	if n := strings.Count(doc, `<use href="#s0"`); n != 2 {
-		t.Errorf("█ used %d times, want 2", n)
 	}
 }
 

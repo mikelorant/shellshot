@@ -21,17 +21,25 @@ import (
 // (g0, ...) and colour emoji images (e0, ...). Ids follow first use, so the
 // output depends only on the order the builder is driven in.
 type defs struct {
-	items   []string // <defs> children in definition order
-	sprites map[spriteKey]string
-	glyphs  map[glyphKey]glyphDef
-	emoji   map[emojiKey]string // "" for a cluster without an image
-	nGlyphs int                 // glyph ids handed out
-	nEmoji  int                 // emoji ids handed out
+	items    []string // <defs> children in definition order
+	sprites  map[spriteKey]spriteDef
+	glyphs   map[glyphKey]glyphDef
+	emoji    map[emojiKey]string // "" for a cluster without an image
+	nSprites int                 // sprite ids handed out
+	nGlyphs  int                 // glyph ids handed out
+	nEmoji   int                 // emoji ids handed out
 }
 
 type spriteKey struct {
 	r    rune
 	w, h int
+}
+
+// spriteDef is a sprite's rectangles and, when it has too many to draw inline,
+// the id of its shared <path>.
+type spriteDef struct {
+	rects []sprite.Rect
+	id    string
 }
 
 type glyphKey struct {
@@ -54,7 +62,7 @@ type emojiKey struct {
 
 func newDefs() defs {
 	return defs{
-		sprites: make(map[spriteKey]string),
+		sprites: make(map[spriteKey]spriteDef),
 		glyphs:  make(map[glyphKey]glyphDef),
 		emoji:   make(map[emojiKey]string),
 	}
@@ -68,25 +76,29 @@ func (d *defs) markup() string {
 	return "<defs>\n" + strings.Join(d.items, "\n") + "\n</defs>\n"
 }
 
-// sprite defines the glyph for r in a w x h cell and returns its id. ok is
-// false for a rune sprite does not draw.
-func (d *defs) sprite(r rune, w, h int) (id string, ok bool) {
+// sprite returns the glyph for r in a w x h cell. A glyph of few rectangles
+// is drawn inline, so id is empty and rects holds them; a more complex one is
+// defined once and id names it. ok is false for a rune sprite does not draw.
+func (d *defs) sprite(r rune, w, h int) (id string, rects []sprite.Rect, ok bool) {
 	k := spriteKey{r, w, h}
-	if id, ok := d.sprites[k]; ok {
-		return id, true
+	if s, ok := d.sprites[k]; ok {
+		return s.id, s.rects, true
 	}
-	rects, ok := sprite.Rects(r, w, h)
+	rects, ok = sprite.Rects(r, w, h)
 	if !ok {
-		return "", false
+		return "", nil, false
 	}
-	id = "s" + strconv.Itoa(len(d.sprites))
-	d.sprites[k] = id
-	d.items = append(d.items, spriteMarkup(id, rects))
-	return id, true
+	if len(rects) > maxInlineRects {
+		id = "s" + strconv.Itoa(d.nSprites)
+		d.nSprites++
+		d.items = append(d.items, spriteMarkup(id, rects))
+	}
+	d.sprites[k] = spriteDef{rects, id}
+	return id, rects, true
 }
 
-// spriteMarkup writes rects as one <path> per coverage level, in a <g> when
-// there is more than one.
+// spriteMarkup writes rects, which are not empty, as one <path> per coverage
+// level, in a <g> when there is more than one.
 func spriteMarkup(id string, rects []sprite.Rect) string {
 	var levels []uint8
 	paths := map[uint8]*strings.Builder{}
@@ -101,15 +113,9 @@ func spriteMarkup(id string, rects []sprite.Rect) string {
 		fmt.Fprintf(p, "M%d %dh%sv%sh-%sz", r.X0, r.Y0, w, h, w)
 	}
 	path := func(a uint8, attr string) string {
-		s := fmt.Sprintf(`<path%s d="%s"`, attr, paths[a].String())
-		if a != 255 {
-			s += fmt.Sprintf(` fill-opacity="%s"`, strconv.FormatFloat(float64(a)/255, 'f', 3, 64))
-		}
-		return s + "/>"
+		return fmt.Sprintf(`<path%s d="%s"%s/>`, attr, paths[a].String(), fillOpacity(a))
 	}
 	switch len(levels) {
-	case 0:
-		return fmt.Sprintf(`<path id="%s" d=""/>`, id)
 	case 1:
 		return path(levels[0], ` id="`+id+`"`)
 	}

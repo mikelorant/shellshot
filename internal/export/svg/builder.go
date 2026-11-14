@@ -36,12 +36,17 @@ func NewBuilder(g Geometry, mode TextMode) *Builder {
 // reference, or "" if there are none.
 func (b *Builder) Defs() string { return b.defs.markup() }
 
-// use is a reference to a shared shape at a position.
+// use is a shape drawn at a position: a reference to a shared shape, or when
+// id is empty a sprite drawn inline from its rectangles.
 type use struct {
-	id   string
-	x, y float64
-	fg   color.RGBA
+	id    string
+	x, y  float64
+	fg    color.RGBA
+	rects []sprite.Rect // inline sprite only, relative to the cell
 }
+
+// inline reports whether u is a sprite drawn inline rather than by reference.
+func (u use) inline() bool { return u.id == "" }
 
 // Row returns the elements that draw row of s with the top-left corner of its
 // first cell at (x0, y0): background rectangles, glyphs, then underlines and
@@ -148,14 +153,14 @@ func (b *Builder) glyphs(sb *strings.Builder, cells []raster.RowCell, x0, y0 int
 			text.blank(x + l.GlyphOffsetX)
 			continue
 		}
-		if id, ok := b.sprite(c); ok {
-			uses = append(uses, use{id, x, y, c.Fg})
+		if id, rects, ok := b.sprite(c); ok {
+			uses = append(uses, use{id: id, x: x, y: y, fg: c.Fg, rects: rects})
 			text.close()
 			continue
 		}
 		if id, side := b.emoji(c); id != "" {
 			w := c.Width * l.CellWidth
-			uses = append(uses, use{id, x + float64((w-side)/2), y + float64((l.CellHeight-side)/2), c.Fg})
+			uses = append(uses, use{id: id, x: x + float64((w-side)/2), y: y + float64((l.CellHeight-side)/2), fg: c.Fg})
 			text.close()
 			continue
 		}
@@ -191,10 +196,11 @@ func isPrivateUse(r rune) bool {
 	return r >= 0xE000 && r <= 0xF8FF || r >= 0xF0000 && r <= 0xFFFFD || r >= 0x100000 && r <= 0x10FFFD
 }
 
-// sprite returns the id of the procedural glyph that draws c, if it has one.
-func (b *Builder) sprite(c raster.RowCell) (string, bool) {
+// sprite returns the procedural glyph that draws c, if it has one: the id of
+// a shared shape, or when id is empty the rectangles to draw inline.
+func (b *Builder) sprite(c raster.RowCell) (id string, rects []sprite.Rect, ok bool) {
 	if len(c.Marks) != 0 || !raster.HasInk(c.Base) || !sprite.Handles(c.Base) {
-		return "", false
+		return "", nil, false
 	}
 	return b.defs.sprite(c.Base, c.Width*b.lay.CellWidth, b.lay.CellHeight)
 }
@@ -221,7 +227,7 @@ func (b *Builder) outlines(c raster.RowCell, x, y float64) ([]use, error) {
 		return nil, err
 	}
 	if raster.HasInk(c.Base) && base.ok {
-		out = append(out, use{base.id, x, y, c.Fg})
+		out = append(out, use{id: base.id, x: x, y: y, fg: c.Fg})
 	}
 	advance := float64(b.lay.CellWidth)
 	if base.ok && base.primary {
@@ -239,35 +245,48 @@ func (b *Builder) outlines(c raster.RowCell, x, y float64) ([]use, error) {
 		if g.primary {
 			mx += advance
 		}
-		out = append(out, use{g.id, mx, y, c.Fg})
+		out = append(out, use{id: g.id, x: mx, y: y, fg: c.Fg})
 	}
 	return out, nil
 }
 
-// writeUses writes the references, grouping neighbours of one colour under a
-// <g> with that fill. The theme foreground is the document's default fill.
+// writeUses writes the shapes in order. A run of inline sprites becomes
+// merged paths; a run of references of one colour is grouped under a <g> with
+// that fill. The theme foreground is the document's default fill.
 func writeUses(sb *strings.Builder, uses []use, def color.RGBA) {
 	for i := 0; i < len(uses); {
 		j := i + 1
-		for j < len(uses) && uses[j].fg == uses[i].fg {
-			j++
-		}
-		group := uses[i:j]
-		grouped := j-i > 1 && group[0].fg != def
-		if grouped {
-			sb.WriteString(`<g fill="` + hex(group[0].fg) + `">`)
-		}
-		for _, u := range group {
-			sb.WriteString(`<use href="#` + u.id + `" x="` + num(u.x) + `" y="` + num(u.y) + `"`)
-			if !grouped && u.fg != def {
-				sb.WriteString(` fill="` + hex(u.fg) + `"`)
+		if uses[i].inline() {
+			for j < len(uses) && uses[j].inline() {
+				j++
 			}
-			sb.WriteString("/>")
-		}
-		if grouped {
-			sb.WriteString("</g>")
+			writeInlineSprites(sb, uses[i:j], def)
+		} else {
+			for j < len(uses) && !uses[j].inline() && uses[j].fg == uses[i].fg {
+				j++
+			}
+			writeReferences(sb, uses[i:j], def)
 		}
 		i = j
+	}
+}
+
+// writeReferences writes the references of group, all of one colour, under a
+// <g> with that fill when there are several.
+func writeReferences(sb *strings.Builder, group []use, def color.RGBA) {
+	grouped := len(group) > 1 && group[0].fg != def
+	if grouped {
+		sb.WriteString(`<g fill="` + hex(group[0].fg) + `">`)
+	}
+	for _, u := range group {
+		sb.WriteString(`<use href="#` + u.id + `" x="` + num(u.x) + `" y="` + num(u.y) + `"`)
+		if !grouped && u.fg != def {
+			sb.WriteString(` fill="` + hex(u.fg) + `"`)
+		}
+		sb.WriteString("/>")
+	}
+	if grouped {
+		sb.WriteString("</g>")
 	}
 }
 
