@@ -104,17 +104,18 @@ the PNG's.
 ## SVG
 
 `--format svg` (or a `.svg` output name) writes the recording as vector graphics instead of
-pixels: the text of the screen is drawn as text, cell backgrounds as rectangles, emoji as small
-embedded PNG images. By default the SVG is **animated** with CSS (`@keyframes` with `steps()`;
-no script), looping like the other formats (`--loops`). Give `--frame` to write one still instead.
+pixels: the text of the screen is drawn as text, cell backgrounds as rectangles, emoji as text
+too (or as small embedded PNG images with `--svg-emoji image`). By default the SVG is **animated**
+with CSS (`@keyframes` with `steps()`; no script), looping like the other formats (`--loops`). Give
+`--frame` to write one still instead.
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--frame first\|last\|TIME` | off (animate) | Write one frame as a static SVG. `TIME` is a time on the output clock, such as `1.5s` |
 | `--svg-text text\|paths` | `text` | `text`: `<text>` drawn in the viewer's monospace font (small, selectable, every glyph placed at its grid column). `paths`: glyph outlines of the built-in fonts, exact and independent of the viewer's fonts, but larger |
+| `--svg-emoji text\|image` | `text` | `text`: emoji are `<text>`, drawn by the viewer's emoji font (much smaller; the artwork depends on the viewer). `image`: each distinct emoji is an embedded PNG from the `--emoji-set` and `--emoji-font` fonts, the same artwork everywhere |
 
-`--frame` is an error for the raster formats and `--svg-text` is an error for any format but
-`svg`.
+`--frame`, `--svg-text` and `--svg-emoji` are errors for any format but `svg`.
 `--fallback-font` and `--system-fonts` change SVG output with `--svg-text paths`. In the default
 `text` mode they also apply to private-use icon characters that one of the fonts covers.
 
@@ -125,6 +126,18 @@ the font the viewer picks (JetBrains Mono, then `ui-monospace`, Menlo, `monospac
 The exception is Nerd Font icons: in `text` mode they are drawn as outlines, so they show even
 where no Nerd Font is installed; everything else stays text.
 
+Emoji in `--svg-emoji text` mode are `<text>` too: the whole grapheme cluster (skin tone, ZWJ
+sequence, flag, keycap) is centred on its cells, so the viewer's emoji font draws it. The file has no
+images and shellshot does not read its emoji fonts. The artwork is whatever the viewer's emoji font
+has, and a viewer without one shows boxes or blanks. `--svg-emoji image` embeds each distinct emoji as a PNG, so every viewer shows the same artwork, at
+the cost of size. `--svg-text paths` does not change this: the outline fonts have no colour glyphs,
+so with `--svg-emoji text` emoji stay `<text>` among the outlines (and so does any other
+character that no built-in font covers); with `--svg-emoji image` they are images.
+
+`--emoji-set` and `--emoji-font` only choose the artwork of the raster formats and of
+`--svg-emoji image`. With `--svg-emoji text` they are accepted and checked (a bad `--emoji-font`
+file still fails) but unused, and shellshot says so on stderr when you pass either one.
+
 Measured sizes on this implementation (80x24 unless noted; the 60x12 scrolling recording is 41
 frames; sizes include everything in the file):
 
@@ -132,10 +145,12 @@ frames; sizes include everything in the file):
 |---|---|---|---|---|
 | scrolling lines, 60x12 | 49,351 B | 1,446 B | 7,747 B | 260,389 B |
 | colors.sh | 55,805 B | 54,410 B | 79,910 B | 30,167 B |
-| emoji.sh | 126,734 B | 124,344 B | 144,163 B | 87,188 B |
+| emoji.sh, `--svg-emoji image` | 126,734 B | 124,344 B | 144,163 B | 87,188 B |
 
 An SVG wins on text and loses on dense colour: colors.sh is thousands of one-cell rectangles,
-and emoji are embedded as PNG images (about 1 KB each, once per distinct emoji).
+and embedded emoji images cost about 1 KB each, once per distinct emoji. Text emoji cost a few
+bytes each: a 31-row, 303-frame demo recording with 64 emoji (28 distinct) is 229 KB raw, 36.7 KB
+gzip and 29.5 KB brotli with `--svg-emoji image`, and 198 KB, 14.0 KB and 8.2 KB by default.
 
 Where the result plays (from `docs/research/svg-export.md`; only the first rows are well
 supported):

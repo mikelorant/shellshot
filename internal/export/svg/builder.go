@@ -21,15 +21,17 @@ const maxInnerSpaces = 3
 // taking Defs. A Builder is not safe for concurrent use; its output depends
 // only on the order of its calls.
 type Builder struct {
-	g    Geometry
-	lay  raster.Layout
-	mode TextMode
-	defs defs
+	g         Geometry
+	lay       raster.Layout
+	mode      TextMode
+	emojiMode EmojiMode
+	defs      defs
 }
 
-// NewBuilder returns a Builder drawing with the geometry g.
-func NewBuilder(g Geometry, mode TextMode) *Builder {
-	return &Builder{g: g, lay: g.Layout(), mode: mode, defs: newDefs()}
+// NewBuilder returns a Builder drawing with the geometry g, writing glyphs as
+// mode says and emoji as emojiMode says.
+func NewBuilder(g Geometry, mode TextMode, emojiMode EmojiMode) *Builder {
+	return &Builder{g: g, lay: g.Layout(), mode: mode, emojiMode: emojiMode, defs: newDefs()}
 }
 
 // Defs returns the <defs> element with every shape the rows built so far
@@ -153,6 +155,10 @@ func (b *Builder) glyphs(sb *strings.Builder, cells []raster.RowCell, x0, y0 int
 			text.close()
 			continue
 		}
+		if b.emojiMode == EmojiText && b.isEmoji(c) && !b.hasIcon(c) {
+			text.add(c, x, l)
+			continue
+		}
 		if id, side := b.emoji(c); id != "" {
 			w := c.Width * l.CellWidth
 			uses = append(uses, use{id, x + float64((w-side)/2), y + float64((l.CellHeight-side)/2), c.Fg})
@@ -182,7 +188,14 @@ func (b *Builder) glyphs(sb *strings.Builder, cells []raster.RowCell, x0, y0 int
 // carries the icon. A private use rune no font has stays text, as does all
 // other text, which the viewer can select and search.
 func (b *Builder) iconOutline(c raster.RowCell) bool {
-	return b.mode == TextText && isPrivateUse(c.Base) && b.g.Covers(c.Base, c.Bold, c.Italic)
+	return b.mode == TextText && b.hasIcon(c)
+}
+
+// hasIcon reports whether the base rune of c is a private use rune that a font
+// of the set has a glyph for. Such a cell is an icon even if a variation
+// selector follows, so text emoji mode leaves it to the outlines.
+func (b *Builder) hasIcon(c raster.RowCell) bool {
+	return isPrivateUse(c.Base) && b.g.Covers(c.Base, c.Bold, c.Italic)
 }
 
 // isPrivateUse reports whether r is in the Basic Multilingual Plane private
@@ -199,12 +212,19 @@ func (b *Builder) sprite(c raster.RowCell) (string, bool) {
 	return b.defs.sprite(c.Base, c.Width*b.lay.CellWidth, b.lay.CellHeight)
 }
 
+// isEmoji reports whether c may be an emoji. As in the raster renderer, a
+// cluster that asks for emoji presentation or whose base rune no text font has
+// is drawn as an emoji when an emoji font has it. In text emoji mode that
+// cannot be asked of the emoji fonts, so the cluster is text.
+func (b *Builder) isEmoji(c raster.RowCell) bool {
+	return raster.HasInk(c.Base) && (c.EmojiSequence || !b.g.Covers(c.Base, c.Bold, c.Italic))
+}
+
 // emoji returns the id of the colour emoji image that draws c and its side in
-// pixels, or "" if c is drawn as text. As in the raster renderer, a cluster
-// that asks for emoji presentation or whose base rune no text font has is
-// drawn as an emoji when an emoji font has it.
+// pixels, or "" if c is drawn as text or outlines (it is not an emoji, no
+// emoji font has it, or emoji are text).
 func (b *Builder) emoji(c raster.RowCell) (id string, side int) {
-	if !raster.HasInk(c.Base) || !c.EmojiSequence && b.g.Covers(c.Base, c.Bold, c.Italic) {
+	if b.emojiMode != EmojiImage || !b.isEmoji(c) {
 		return "", 0
 	}
 	side = min(c.Width*b.lay.CellWidth, b.lay.CellHeight)

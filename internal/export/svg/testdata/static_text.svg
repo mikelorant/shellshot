@@ -8,8 +8,6 @@
 <path id="s5" d="M0 0h9v20h-9z" fill-opacity="0.251"/>
 <path id="s6" d="M1 1h2v1h-2zM6 1h2v1h-2zM1 2h3v1h-3zM5 2h3v1h-3zM1 3h2v1h-2zM6 3h2v1h-2zM1 6h2v1h-2zM6 6h2v1h-2zM1 7h3v1h-3zM5 7h3v1h-3zM1 8h2v1h-2zM6 8h2v1h-2zM1 11h2v1h-2zM6 11h2v1h-2zM1 12h3v1h-3zM5 12h3v1h-3zM1 13h2v1h-2zM6 13h2v1h-2zM1 16h2v1h-2zM6 16h2v1h-2zM1 17h3v1h-3zM5 17h3v1h-3zM1 18h2v1h-2zM6 18h2v1h-2z"/>
 <path id="s7" d="M0 0h9v10h-9z"/>
-<image id="e0" width="18" height="18" href="data:image/png;base64,..."/>
-<image id="e1" width="9" height="9" href="data:image/png;base64,..."/>
 </defs>
 <rect width="232" height="156" fill="#1e1e1e"/>
 <rect x="35" y="8" width="9" height="20" fill="#aeafad"/>
@@ -50,11 +48,11 @@
 <use href="#s5" x="62" y="88"/>
 <use href="#s6" x="80" y="88"/>
 <use href="#s7" x="98" y="88" fill="#e5e510"/>
-<use href="#e0" x="62" y="109"/>
-<use href="#e0" x="80" y="109"/>
-<use href="#e1" x="107" y="113"/>
 <text y="124" xml:space="preserve">
 <tspan x="8 17 26 35 44">emoji</tspan>
+<tspan x="71" text-anchor="middle">😀</tspan>
+<tspan x="89" text-anchor="middle">😀</tspan>
+<tspan x="107">❤️</tspan>
 </text>
 <text y="144" xml:space="preserve">
 <tspan x="8 17 26 35 44 53 62 71 80" fill="#cd3131">under red</tspan>

@@ -108,7 +108,7 @@ func FuzzWriter(f *testing.F) {
 		_, g := newRenderer(t, raster.Options{Cursor: cursors[len(data)%len(cursors)]})
 		steps := []timeline.Step{step(a, 100*time.Millisecond), step(b, 300*time.Millisecond), step(a, time.Second)}
 		for _, o := range []Options{
-			{Text: TextText}, {Text: TextPaths}, {Frame: Frame{Kind: FrameAt, At: 200 * time.Millisecond}}, {Loops: 2},
+			{Text: TextText}, {Text: TextPaths}, {Emoji: EmojiImage}, {Text: TextPaths, Emoji: EmojiImage}, {Frame: Frame{Kind: FrameAt, At: 200 * time.Millisecond}}, {Loops: 2},
 		} {
 			o.Geometry = g
 			var buf bytes.Buffer

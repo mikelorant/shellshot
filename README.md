@@ -246,8 +246,8 @@ Flags:
       --adjust-cell-height string   change the cell height after --scale, in pixels or percent; text stays vertically centred, like Ghostty's adjust-cell-height; the result must be 1 px to 10x the font cell (default "0")
       --adjust-cell-width string    change the cell width after --scale, in pixels (-1, 2) or percent (-7%), like Ghostty's adjust-cell-width; the result must be 1 px to 10x the font cell (default "0")
       --cursor string               cursor shape: block, bar, underline or none (default "block")
-      --emoji-font file             COLR v0 or CBDT/CBLC colour emoji font file, tried before the --emoji-set fonts for every emoji
-      --emoji-set string            colour emoji artwork: apple or noto. apple draws Apple Color Emoji, whose artwork belongs to Apple Inc. and is not open source, and takes the few emoji it lacks from Noto. noto draws Noto Color Emoji only (SIL OFL 1.1): the licence-clean choice for exports you share (default "apple")
+      --emoji-font file             COLR v0 or CBDT/CBLC colour emoji font file, tried before the --emoji-set fonts for every emoji (png, gif, webp, and svg with --svg-emoji image)
+      --emoji-set string            colour emoji artwork (png, gif, webp, and svg with --svg-emoji image): apple or noto. apple draws Apple Color Emoji, whose artwork belongs to Apple Inc. and is not open source, and takes the few emoji it lacks from Noto. noto draws Noto Color Emoji only (SIL OFL 1.1): the licence-clean choice for exports you share (default "apple")
       --fallback-font file          TTF/OTF/TTC file for glyphs the built-in fonts lack (repeatable; tried in order, after the built-in fonts)
       --font-size float             font size in pixels, before --scale (12 matches Ghostty font-size = 12 on a 2x display with --scale 2) (default 15)
       --format string               output format: png, gif, svg, webp (default: from the extension of -o, else png)
@@ -268,6 +268,7 @@ Flags:
       --scale int                   integer scale factor for font size and padding (default 1)
       --show-hidden                 render hidden spans like the rest of the recording instead of cutting them
       --speed float                 playback speed multiplier (2 plays twice as fast); when given, replaces the speed of every scene (default 1)
+      --svg-emoji string            how svg draws emoji: text (small, drawn by the viewer's emoji font, so the artwork varies; --emoji-set and --emoji-font are ignored) or image (embedded PNG images from the --emoji-set and --emoji-font fonts, the same everywhere but larger) (default "text")
       --svg-text string             how svg draws text: text (small, selectable, drawn in the viewer's monospace font) or paths (glyph outlines of the built-in fonts, exact but larger) (default "text")
       --system-fonts                also use installed CJK and symbol fonts (macOS and Linux font folders); the output then depends on this machine's fonts
       --theme string                built-in theme name (dark, light) or a theme JSON file (default: dark)
