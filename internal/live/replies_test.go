@@ -18,12 +18,19 @@ type chanWriter struct {
 	buf     bytes.Buffer
 	written chan struct{} // receives a value after each Write
 	gate    chan struct{} // if non-nil, Write waits for it to be closed
+	entered chan struct{} // if non-nil, receives a value as a Write begins
 	err     error
 }
 
 func newChanWriter() *chanWriter { return &chanWriter{written: make(chan struct{}, 1024)} }
 
 func (w *chanWriter) Write(p []byte) (int, error) {
+	if w.entered != nil {
+		select {
+		case w.entered <- struct{}{}:
+		default:
+		}
+	}
 	if w.gate != nil {
 		<-w.gate
 	}
@@ -94,8 +101,14 @@ func TestRepliesSendDoesNotBlockOnAStuckWriter(t *testing.T) {
 func TestRepliesDropsBeyondTheCap(t *testing.T) {
 	w := newChanWriter()
 	w.gate = make(chan struct{})
+	w.entered = make(chan struct{}, 1)
 	r := live.NewReplies(w)
 	r.Send([]byte("a")) // taken by the goroutine, which then blocks in Write
+	select {
+	case <-w.entered: // the goroutine holds "a" alone; what follows is only queued
+	case <-time.After(30 * time.Second):
+		t.Fatal("the writer never started its first Write")
+	}
 	for range live.MaxPendingReplies + 100 {
 		r.Send([]byte("x"))
 	}
