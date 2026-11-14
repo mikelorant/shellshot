@@ -72,8 +72,8 @@ coloured one-pixel strokes of terminal text.
   about 0.3 MB to the binary and is slower and uses more memory than the PNG encoder: the
   whole file is held in memory until the export ends.
 
-Measured on the 60x12 line-counting recording and the 80x30 emoji recording
-(`contrib/examples/emoji.sh`), same machine, same flags:
+Measured on a 60x12 line-counting recording and an 80x30 emoji recording, same machine, same
+flags:
 
 | Recording | `--scale` | PNG | WebP |
 |---|---|---|---|
@@ -145,12 +145,12 @@ frames; sizes include everything in the file):
 |---|---|---|---|---|
 | scrolling lines, 60x12 | 49,351 B | 1,446 B | 7,747 B | 260,389 B |
 | colors.sh | 55,805 B | 54,410 B | 79,910 B | 30,167 B |
-| emoji.sh, `--svg-emoji image` | 126,734 B | 124,344 B | 144,163 B | 87,188 B |
+| emoji recording, `--svg-emoji image` | 126,734 B | 124,344 B | 144,163 B | 87,188 B |
 
 An SVG wins on text and loses on dense colour: colors.sh is thousands of one-cell rectangles,
 and embedded emoji images cost about 1 KB each, once per distinct emoji. Text emoji cost a few
-bytes each: a 31-row, 303-frame demo recording with 64 emoji (28 distinct) is 229 KB raw, 36.7 KB
-gzip and 29.5 KB brotli with `--svg-emoji image`, and 198 KB, 14.0 KB and 8.2 KB by default.
+bytes each: a 303-frame recording with 64 emoji (28 distinct) is 193 KB raw, 34.4 KB gzip and
+29.2 KB brotli with `--svg-emoji image`, and 161 KB, 11.7 KB and 7.9 KB by default.
 
 Where the result plays (from `docs/research/svg-export.md`; only the first rows are well
 supported):
@@ -257,7 +257,7 @@ To match a Ghostty terminal configured with `font-size = 12` and `adjust-cell-wi
 2x display, use:
 
 ```sh
-shellshot export demo.shot --font-size 12 --scale 2 --adjust-cell-width -7%
+shellshot export recording.shot --font-size 12 --scale 2 --adjust-cell-width -7%
 ```
 
 This gives 13x32 pixel cells, the same as in Ghostty.
