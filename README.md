@@ -1,4 +1,4 @@
-<h1 id="shellshot" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="Shellshot" src="docs/assets/logo.svg" width="360"></picture></h1>
+<h1 id="shellshot" align="left"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="Shellshot" src="docs/assets/logo.svg" width="720"></picture></h1>
 
 [![Release][release-badge]][release]
 [![GoReleaser][goreleaser-badge]][goreleaser]

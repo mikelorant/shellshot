@@ -14,8 +14,8 @@ Construction: a wavy neon film strip whose centre frame is a terminal screen wit
 Two side frames run off the ends.
 The wordmark is JetBrains Mono Bold outlined to paths (no font needed), with an amber block cursor after it.
 
-README top (the logo is the page title, centred, and the `id` is the target of the back-to-top links):
+README top (the logo is the page title, left-aligned, and the `id` is the target of the back-to-top links):
 
 ```html
-<h1 id="shellshot" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="Shellshot" src="docs/assets/logo.svg" width="360"></picture></h1>
+<h1 id="shellshot" align="left"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg"><img alt="Shellshot" src="docs/assets/logo.svg" width="720"></picture></h1>
 ```
