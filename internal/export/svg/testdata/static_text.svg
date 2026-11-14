@@ -1,13 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 232 156" width="232" height="156" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="15" fill="#d4d4d4">
 <defs>
-<path id="s0" d="M4 9h5v1h-5zM4 10h1v10h-1z"/>
-<path id="s1" d="M0 9h9v1h-9z"/>
-<path id="s2" d="M0 9h5v1h-5zM4 10h1v10h-1z"/>
-<path id="s3" d="M0 0h9v20h-9z"/>
-<path id="s4" d="M0 10h9v10h-9z"/>
-<path id="s5" d="M0 0h9v20h-9z" fill-opacity="0.251"/>
-<path id="s6" d="M1 1h2v1h-2zM6 1h2v1h-2zM1 2h3v1h-3zM5 2h3v1h-3zM1 3h2v1h-2zM6 3h2v1h-2zM1 6h2v1h-2zM6 6h2v1h-2zM1 7h3v1h-3zM5 7h3v1h-3zM1 8h2v1h-2zM6 8h2v1h-2zM1 11h2v1h-2zM6 11h2v1h-2zM1 12h3v1h-3zM5 12h3v1h-3zM1 13h2v1h-2zM6 13h2v1h-2zM1 16h2v1h-2zM6 16h2v1h-2zM1 17h3v1h-3zM5 17h3v1h-3zM1 18h2v1h-2zM6 18h2v1h-2z"/>
-<path id="s7" d="M0 0h9v10h-9z"/>
+<path id="s0" d="M1 1h2v1h-2zM6 1h2v1h-2zM1 2h3v1h-3zM5 2h3v1h-3zM1 3h2v1h-2zM6 3h2v1h-2zM1 6h2v1h-2zM6 6h2v1h-2zM1 7h3v1h-3zM5 7h3v1h-3zM1 8h2v1h-2zM6 8h2v1h-2zM1 11h2v1h-2zM6 11h2v1h-2zM1 12h3v1h-3zM5 12h3v1h-3zM1 13h2v1h-2zM6 13h2v1h-2zM1 16h2v1h-2zM6 16h2v1h-2zM1 17h3v1h-3zM5 17h3v1h-3zM1 18h2v1h-2zM6 18h2v1h-2z"/>
 </defs>
 <rect width="232" height="156" fill="#1e1e1e"/>
 <rect x="35" y="8" width="9" height="20" fill="#aeafad"/>
@@ -40,14 +33,10 @@
 <tspan x="98">é</tspan>
 <tspan x="116 125 134 143 152 161 170 179 188 197">mark &lt;&amp;&gt;&#34;&#39;</tspan>
 </text>
-<use href="#s0" x="8" y="88"/>
-<use href="#s1" x="17" y="88"/>
-<use href="#s2" x="26" y="88"/>
-<use href="#s3" x="44" y="88"/>
-<use href="#s4" x="53" y="88"/>
-<use href="#s5" x="62" y="88"/>
-<use href="#s6" x="80" y="88"/>
-<use href="#s7" x="98" y="88" fill="#e5e510"/>
+<path d="M44 88h9v20h-9zM12 97h19v1h-19zM12 98h1v10h-1zM30 98h1v10h-1zM53 98h9v10h-9z"/>
+<path d="M62 88h9v20h-9z" fill-opacity="0.251"/>
+<use href="#s0" x="80" y="88"/>
+<path fill="#e5e510" d="M98 88h9v10h-9z"/>
 <text y="124" xml:space="preserve">
 <tspan x="8 17 26 35 44">emoji</tspan>
 <tspan x="71" text-anchor="middle">😀</tspan>
