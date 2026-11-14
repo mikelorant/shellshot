@@ -392,3 +392,29 @@ func TestHiddenRunConsumesNoTypingOrLingerTime(t *testing.T) {
 		t.Errorf("visible control: %d writes, last at %v, exit at %v; want typing delays and a linger", visibleWrites, visibleAt, visibleExit)
 	}
 }
+
+func TestExecutorStartsHidden(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want bool
+	}{
+		{"hidden first", "hidden {\n  run a\n}\nrun b\n", true},
+		{"settings then hidden", "size 60x8\nsettle 100ms\nhidden x {\n  run a\n}\n", true},
+		{"step first", "run a\nhidden {\n  run b\n}\n", false},
+		{"scene first", "scene s {\n  hidden {\n    run a\n  }\n}\n", false},
+		{"no blocks", "run a\n", false},
+		{"empty", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ex, err := New(lowerSrc(t, tt.src), Deps{Keys: fakeKeys{}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := ex.StartsHidden(); got != tt.want {
+				t.Errorf("StartsHidden = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

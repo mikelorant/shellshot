@@ -155,3 +155,81 @@ func TestReplayOfRecordingWithImplicitExitSpanIsUnchanged(t *testing.T) {
 		t.Errorf("--show-hidden drew %d frames, want 4", n)
 	}
 }
+
+// firstIndex returns the index of the first event of kind, or -1.
+func firstIndex(events []bin.Event, kind event.Kind) int {
+	for i, e := range events {
+		if e.Kind == kind {
+			return i
+		}
+	}
+	return -1
+}
+
+// A script that opens with a hidden block hides the shell's startup too: the
+// span begins at time 0, before the first output, so the first prompt is
+// inside it.
+func TestRecordScriptLeadingHiddenBlockBeginsBeforeTheStartupOutput(t *testing.T) {
+	t.Parallel()
+	r := runScriptCLI(t, "hidden setup {\n  run echo preparing\n}\nrun echo hello\n")
+	if r.code != 0 {
+		t.Fatalf("exit code = %d, want 0\nstderr: %s", r.code, r.stderr)
+	}
+	s := readShot(t, r.shot)
+	if len(s.spans) != 1 || s.spans[0].Type != event.SpanHidden || s.spans[0].Open {
+		t.Fatalf("spans = %v, want one closed hidden span", spanNames(s.spans))
+	}
+	if s.spans[0].Start != 0 {
+		t.Errorf("hidden span starts at %v, want 0", s.spans[0].Start)
+	}
+	span, out := firstIndex(s.events, event.KindSpan), firstIndex(s.events, event.KindOut)
+	if span < 0 || out < 0 || span > out {
+		t.Errorf("first span event at index %d, first output at %d; want the span first", span, out)
+	}
+	if s.events[out].At < s.spans[0].Start {
+		t.Errorf("first output at %v is before the span start %v", s.events[out].At, s.spans[0].Start)
+	}
+}
+
+// Settings before the leading hidden block change nothing: it still begins at 0.
+func TestRecordScriptLeadingHiddenBlockAfterSettings(t *testing.T) {
+	t.Parallel()
+	r := runScriptCLI(t, "settle 100ms\nhidden {\n  run echo preparing\n}\nrun echo hello\n")
+	if r.code != 0 {
+		t.Fatalf("exit code = %d, want 0\nstderr: %s", r.code, r.stderr)
+	}
+	s := readShot(t, r.shot)
+	if len(s.spans) != 1 || s.spans[0].Start != 0 {
+		t.Errorf("spans = %+v, want one starting at 0", s.spans)
+	}
+}
+
+// A script that starts with a step, or a scene, keeps the shell's first
+// prompt visible: the first output comes before any span.
+func TestRecordScriptVisibleStartKeepsTheStartupOutputVisible(t *testing.T) {
+	t.Parallel()
+	tests := []struct{ name, src string }{
+		{"step then hidden", "run echo hello\nhidden {\n  run echo tidy\n}\n"},
+		{"scene then hidden", "scene a {\n  run echo hello\n}\nhidden {\n  run echo tidy\n}\n"},
+		{"mark then hidden", "mark here\nhidden {\n  run echo tidy\n}\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			r := runScriptCLI(t, tt.src)
+			if r.code != 0 {
+				t.Fatalf("exit code = %d, want 0\nstderr: %s", r.code, r.stderr)
+			}
+			s := readShot(t, r.shot)
+			span, out := firstIndex(s.events, event.KindSpan), firstIndex(s.events, event.KindOut)
+			if out < 0 || span < out {
+				t.Errorf("first output at index %d, first span event at %d; want the output first", out, span)
+			}
+			for _, sp := range s.spans {
+				if sp.Start == 0 {
+					t.Errorf("span %+v starts at 0, want it after the startup output", sp)
+				}
+			}
+		})
+	}
+}

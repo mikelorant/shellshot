@@ -103,6 +103,17 @@ func (e *Executor) ChildExited(now time.Duration, status int) {
 	e.last = max(e.last, now)
 }
 
+// StartsHidden reports that the script opens with a top-level hidden block,
+// before any step. The host then polls the Executor at once, so that the span
+// opens before the child's first output and hides it (docs/format.md#spans).
+func (e *Executor) StartsHidden() bool {
+	if len(e.ops) == 0 {
+		return false
+	}
+	b, ok := e.ops[0].(OpSpanBegin)
+	return ok && b.Type == event.SpanHidden && b.Parent == 0
+}
+
 // OpenSpans returns the SPAN end events of the spans that are open, innermost
 // first. After a failure the host records them before the EXIT event.
 func (e *Executor) OpenSpans() []SpanOp {

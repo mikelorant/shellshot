@@ -16,6 +16,7 @@ type scriptExecutor interface {
 	Poll(now time.Duration, scr run.Screen) (run.Step, error)
 	ChildExited(now time.Duration, status int)
 	OpenSpans() []run.SpanOp
+	StartsHidden() bool
 }
 
 // A script starts once the child has drawn its first screen and left it
@@ -33,13 +34,16 @@ const (
 // and the binSink, which records it, expects an event.Span.
 //
 // It holds the executor back until the child has settled (see
-// scriptStartQuiet), and remembers the last screen it looked at, which is
+// scriptStartQuiet), except for the opening of a leading hidden block, which
+// it lets through at the first Poll: the span then begins before the child's
+// first output and hides it, together with the block. It remembers the last screen it looked at, which is
 // the screen of a script failure.
 type scriptDriver struct {
 	exec   scriptExecutor
 	screen string
 
 	started    bool
+	opened     bool          // the leading hidden span was let through
 	seen       bool          // a screen was looked at before the start
 	beforeText string        // the latest screen text before the start
 	changedAt  time.Duration // when beforeText last changed
@@ -53,11 +57,20 @@ func newScriptDriver(exec scriptExecutor) *scriptDriver { return &scriptDriver{e
 func (d *scriptDriver) Poll(now time.Duration, scr session.Screen) (session.Step, error) {
 	watched := watchedScreen{scr: scr, last: &d.screen}
 	if !d.started {
+		if !d.opened && d.exec.StartsHidden() {
+			d.opened = true
+			return d.poll(now, watched)
+		}
 		if wait, hold := d.holdBack(now, watched.Text()); hold {
 			return session.Step{Deadline: wait}, nil
 		}
 		d.started = true
 	}
+	return d.poll(now, watched)
+}
+
+// poll polls the executor and converts its Step.
+func (d *scriptDriver) poll(now time.Duration, watched watchedScreen) (session.Step, error) {
 	st, err := d.exec.Poll(now, watched)
 	if err != nil {
 		return session.Step{}, err

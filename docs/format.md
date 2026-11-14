@@ -87,7 +87,8 @@ are 1 speed (milli-x), 2 idle (µs), 3 hold (µs) and 4 caption (UTF-8). Decoder
 tags and bytes after the last known field. An unknown version, op or type makes the event ignorable.
 A span still open at the end of the readable events ends at the last event. `info` lists scenes and
 hidden spans (with their names, when they have one) when a recording has them, and `export` applies their hints. `record --script` writes
-them (see [scripting.md](scripting.md)); a plain `record` writes none.
+them (see [scripting.md](scripting.md)); a plain `record` writes none. A script that opens with a hidden block
+has that span begin at time 0, before the first `OUT` event.
 
 ## Compression
 
