@@ -53,7 +53,7 @@ internal/export/format      registry of output formats: name, extensions and con
 internal/export/apng        animated PNG encoder (standard library only)
 internal/export/gif         animated GIF sink: one palette for all frames, changed rectangles only (image/gif)
 internal/export/webp        animated lossless WebP sink (RIFF container; VP8L from github.com/HugoSmits86/nativewebp)
-internal/export/svg         SVG writer: text or glyph paths, CSS animation or one still frame
+internal/export/svg         SVG writer: text or glyph paths, emoji as text or images, CSS animation or one still frame
 internal/render/raster      frame -> image: cells, clusters, colours, cursor
 internal/render/font        embedded fonts and the fallback chain
 internal/render/fontchain   builds the font set for export: embedded, --fallback-font, --system-fonts

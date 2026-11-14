@@ -36,6 +36,16 @@ func TestStaticTextGolden(t *testing.T) {
 	golden(t, "static_text.svg", normalise(doc))
 }
 
+// TestStaticTextEmojiImageGolden pins the output of --svg-emoji image, which
+// is what the default drew before emoji became text.
+func TestStaticTextEmojiImageGolden(t *testing.T) {
+	t.Parallel()
+	g := testGeometry(t, raster.Options{})
+	s := withCursor(featureScreen(t), 3, 0)
+	doc := write(t, Options{Geometry: g, Emoji: EmojiImage, Frame: Frame{Kind: FrameLast}}, s.Cols, s.Rows, step(s, time.Second))
+	golden(t, "static_text_emoji_image.svg", normalise(doc))
+}
+
 func TestStaticPathsGolden(t *testing.T) {
 	t.Parallel()
 	g := testGeometry(t, raster.Options{})
@@ -288,7 +298,7 @@ func TestEmojiImagesAreDefinedOnce(t *testing.T) {
 	r, g := newRenderer(t, raster.Options{})
 	lay := r.Layout()
 	s := screen(t, 20, "😀😀 ❤\ufe0f")
-	doc := write(t, Options{Geometry: g, Frame: Frame{Kind: FrameLast}}, 20, 1, step(s, time.Second))
+	doc := write(t, Options{Geometry: g, Emoji: EmojiImage, Frame: Frame{Kind: FrameLast}}, 20, 1, step(s, time.Second))
 	if n := strings.Count(doc, "<image "); n != 2 {
 		t.Errorf("%d <image> definitions, want 2 (😀 once, ❤️ once)", n)
 	}

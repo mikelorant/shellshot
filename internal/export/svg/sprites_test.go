@@ -186,7 +186,7 @@ func firstPathData(t *testing.T, doc string) string {
 func TestInlineSpritesAreGroupedByColourAndLevel(t *testing.T) {
 	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
-	b := NewBuilder(g, TextText)
+	b := NewBuilder(g, TextText, EmojiText)
 	red, blue := esc+"31m", esc+"34m"
 	s := screen(t, 20, "██"+red+"░█░"+reset+"█"+blue+"░░░"+reset+"▓")
 	row, err := b.Row(s, 0, 0, 0)
@@ -213,7 +213,7 @@ func TestInlineSpritesAreGroupedByColourAndLevel(t *testing.T) {
 func TestInlineSpriteRunsStayInDrawOrder(t *testing.T) {
 	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
-	b := NewBuilder(g, TextPaths)
+	b := NewBuilder(g, TextPaths, EmojiText)
 	row, err := b.Row(screen(t, 10, "──a──"), 0, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -235,7 +235,7 @@ func TestInlineSpriteRunsStayInDrawOrder(t *testing.T) {
 func TestComplexSpritesStayShared(t *testing.T) {
 	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
-	b := NewBuilder(g, TextText)
+	b := NewBuilder(g, TextText, EmojiText)
 	row, err := b.Row(screen(t, 10, "\ue0b0\ue0b0─\ue0b0"), 0, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -254,7 +254,7 @@ func TestComplexSpritesStayShared(t *testing.T) {
 func TestBlankBrailleDrawsNothing(t *testing.T) {
 	t.Parallel()
 	_, g := newRenderer(t, raster.Options{})
-	b := NewBuilder(g, TextText)
+	b := NewBuilder(g, TextText, EmojiText)
 	row, err := b.Row(screen(t, 10, "\u2800\u2800"), 0, 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -318,7 +318,7 @@ func TestInlineSpritesMatchReferences(t *testing.T) {
 			}
 			s := screen(t, cols, src...)
 			w, h := cols*lay.CellWidth, len(lines)*lay.CellHeight
-			b := NewBuilder(g, TextPaths)
+			b := NewBuilder(g, TextPaths, EmojiText)
 			var merged, refs, defs strings.Builder
 			for row := range lines {
 				rowMarkup, err := b.Row(s, row, 0, row*lay.CellHeight)
