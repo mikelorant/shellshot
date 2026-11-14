@@ -384,7 +384,7 @@ func (w *signalWriter) Write(p []byte) (int, error) {
 
 func TestRecordCoalesceMergesOutputs(t *testing.T) {
 	t.Parallel()
-	script := "printf a; sleep 0.02; printf b; sleep 0.02; printf c"
+	script := "printf a; sleep 0.2; printf b; sleep 0.2; printf c"
 	plain, _ := recordToFile(t, []string{"--cols", "40", "--rows", "6", "-c", script}, "")
 	merged, _ := recordToFile(t, []string{"--cols", "40", "--rows", "6", "--coalesce", "1s", "-c", script}, "")
 
